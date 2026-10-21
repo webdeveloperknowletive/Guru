@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block title %}Guruji Profile & Ashram Details{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Guruji Profile & Storefront About Us</h1>
+    <p class="page-subtitle">Manage public biography, lineage, stats, profile photo, and control which fields are shown or hidden on the website.</p>
+  </div>
+</div>
+
+<form method="POST" action="{{ url_for('content.guruji_profile') }}" enctype="multipart/form-data" style="max-width:960px;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+  <!-- 1. Photo Section -->
+  <div class="dashboard-card" style="margin-bottom:1.5rem;">
+    <h3 style="font-size:1.05rem; font-weight:700; color:var(--saffron-600); margin-bottom:0.35rem; display:flex; align-items:center; gap:0.5rem;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+      Guruji's Profile Photo (About Us Page)
+    </h3>
+    <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1.25rem;">
+      This portrait is showcased in the sacred About Us section on the main storefront.
+    </p>
+
+    <div style="display:flex; flex-wrap:wrap; gap:1.75rem; align-items:flex-start;">
+      <!-- Photo Preview Frame -->
+      <div style="flex-shrink:0; text-align:center;">
+        <div style="width:150px; height:180px; border-radius:14px; overflow:hidden; border:2px solid var(--gold-400); box-shadow: 0 8px 20px rgba(0,0,0,0.08); background: #1a1512; position:relative;">
+          <img id="gurujiPhotoPreview" 
+               src="{{ profile.profile_image or '/static/uploads/guruji.png' }}" 
+               alt="{{ profile.full_title }}" 
+               style="width:100%; height:100%; object-fit:cover; object-position:center top; display:block;"
+               onerror="this.onerror=null; this.src='/static/uploads/guruji.png';">
+        </div>
+        <span style="display:inline-block; margin-top:0.5rem; font-size:0.75rem; color:var(--text-muted);">Current Photo Preview</span>
+      </div>
+
+      <!-- Photo Upload & URL Inputs -->
+      <div style="flex:1; min-width:280px; display:flex; flex-direction:column; gap:1rem;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label" style="font-weight:600;">Upload New Portrait Photo</label>
+          <input type="file" name="profile_photo" id="profile_photo" class="form-control" accept="image/png, image/jpeg, image/jpg, image/webp" onchange="previewGurujiImage(this)">
+          <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.35rem;">Supported formats: PNG, JPG, WebP. Recommended: High-resolution vertical portrait.</div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label" style="font-weight:600;">Or Enter Image Path / URL</label>
+          <input type="text" name="profile_image" id="profile_image" class="form-control" value="{{ profile.profile_image or '/guruji.png' }}" placeholder="/guruji.png or https://...">
+          <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.35rem;">Used if no file is uploaded. Default is <code>/guruji.png</code>.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Core Profile Details -->
+  <div class="dashboard-card" style="margin-bottom:1.5rem;">
+    <h3 style="font-size:1.05rem; font-weight:700; color:var(--saffron-600); margin-bottom:0.35rem; display:flex; align-items:center; gap:0.5rem;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Identity & Spiritual Biography
+    </h3>
+    <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1.25rem;">
+      Primary titles, lineage, and Marathi narrative displayed alongside the photo.
+    </p>
+
+    <div class="form-group">
+      <label class="form-label">Full Spiritual Title / Name *</label>
+      <input type="text" name="full_title" class="form-control" value="{{ profile.full_title }}" required placeholder="e.g. Nagesh Guruji">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Spiritual Lineage / Sampradaya / Motto</label>
+      <input type="text" name="spiritual_lineage" class="form-control" value="{{ profile.spiritual_lineage or '' }}" placeholder="वेदशास्त्र संपन्न • २५+ वर्षांची साधना व ज्योतिष मार्गदर्शन">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Primary Biography & Spiritual Journey * (Paragraph 1)</label>
+      <textarea name="bio" class="form-control" rows="3" required placeholder="श्रद्धेतून समाधान, परंपरेतून मार्गदर्शन...">{{ profile.bio }}</textarea>
+    </div>
+
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label">Detailed Practice & Seva Information (Paragraph 2)</label>
+      <textarea name="secondary_bio" class="form-control" rows="3" placeholder="जन्मकुंडली अभ्यास, वास्तुशांती, रुद्राभिषेक, नवग्रह शांती आणि रत्न निवड...">{{ profile.secondary_bio or '' }}</textarea>
+    </div>
+  </div>
+
+  <!-- 3. Key Statistics Counters & Action Button -->
+  <div class="dashboard-card" style="margin-bottom:1.5rem;">
+    <h3 style="font-size:1.05rem; font-weight:700; color:var(--saffron-600); margin-bottom:0.35rem; display:flex; align-items:center; gap:0.5rem;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+      Key Statistics & Action Button
+    </h3>
+    <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1.25rem;">
+      The 3 milestone numbers (Years Experience, Consultations, Pujas) and the consultation call-to-action button.
+    </p>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:1rem; margin-bottom:1.25rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Years of Experience</label>
+        <input type="text" name="experience_years" class="form-control" value="{{ profile.experience_years or '25+' }}" placeholder="25+">
+        <span style="font-size:0.72rem; color:var(--text-muted);">Displays below title</span>
+      </div>
+
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Consultations Completed</label>
+        <input type="text" name="consultations_count" class="form-control" value="{{ profile.consultations_count or '10K+' }}" placeholder="10K+">
+        <span style="font-size:0.72rem; color:var(--text-muted);">E.g. 10K+ or 15000+</span>
+      </div>
+
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Pujas Performed</label>
+        <input type="text" name="pujas_count" class="form-control" value="{{ profile.pujas_count or '5000+' }}" placeholder="5000+">
+        <span style="font-size:0.72rem; color:var(--text-muted);">E.g. 5000+</span>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Consultation Button Text</label>
+        <input type="text" name="button_text" class="form-control" value="{{ profile.button_text or 'Book Consultation →' }}" placeholder="Book Consultation →">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Consultation Button Target Link</label>
+        <input type="text" name="button_url" class="form-control" value="{{ profile.button_url or '#jyotish' }}" placeholder="#jyotish or /services">
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Ashram & Public Darshan Details -->
+  <div class="dashboard-card" style="margin-bottom:1.5rem;">
+    <h3 style="font-size:1.05rem; font-weight:700; color:var(--saffron-600); margin-bottom:0.35rem; display:flex; align-items:center; gap:0.5rem;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Ashram Schedule & Direct Contacts
+    </h3>
+    <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1.25rem;">
+      Public timings, physical ashram location, and seva inquiry contact lines.
+    </p>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Public Darshan Timings</label>
+        <input type="text" name="darshan_timings" class="form-control" value="{{ profile.darshan_timings or '' }}" placeholder="सोमवार ते शनिवार: सकाळी ९ ते दुपारी १...">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Direct Contact Phone</label>
+        <input type="text" name="contact_phone" class="form-control" value="{{ profile.contact_phone or '' }}" placeholder="+91 98220 00000">
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Ashram Address</label>
+        <input type="text" name="ashram_address" class="form-control" value="{{ profile.ashram_address or '' }}" placeholder="सद्गुरू कृपा, वैदिक साधना केंद्र...">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Seva Email Address</label>
+        <input type="email" name="contact_email" class="form-control" value="{{ profile.contact_email or '' }}" placeholder="seva@nageshguruji.com">
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Field Display / Visibility Controls (Show / Hide Feature) -->
+  <div class="dashboard-card" style="margin-bottom:1.5rem; border:1px solid #fed7aa; background:linear-gradient(to bottom, #fffdfa, #ffffff);">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.75rem;">
+      <div>
+        <h3 style="font-size:1.05rem; font-weight:700; color:var(--saffron-700); margin-bottom:0.25rem; display:flex; align-items:center; gap:0.5rem;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          Storefront Display & Visibility Controls (Show / Hide Features)
+        </h3>
+        <p style="font-size:0.82rem; color:var(--text-muted);">
+          Toggle which fields and information cards appear on the storefront About Us section. Uncheck any item to immediately hide it.
+        </p>
+      </div>
+      <div style="display:flex; gap:0.5rem;">
+        <button type="button" class="btn-action-outline" style="font-size:0.75rem; padding:4px 10px;" onclick="setAllVisibility(true)">Show All</button>
+        <button type="button" class="btn-action-outline" style="font-size:0.75rem; padding:4px 10px;" onclick="setAllVisibility(false)">Hide All</button>
+      </div>
+    </div>
+
+    <!-- Toggle Groups -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:1.25rem; margin-top:1.25rem;">
+      
+      <!-- Group 1: Profile & Identity -->
+      <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:10px; padding:1rem;">
+        <h4 style="font-size:0.82rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--saffron-600); font-weight:700; margin-bottom:0.75rem; border-bottom:1px solid var(--border-color); padding-bottom:0.35rem;">
+          Profile & Biography
+        </h4>
+        <div style="display:flex; flex-direction:column; gap:0.75rem;">
+          <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer; font-size:0.85rem;">
+            <input type="checkbox" name="show_photo" value="1" class="visibility-checkbox" {{ 'checked' if profile.visibility.get('show_photo', True) }}>
+            <span><strong>Guruji Photo</strong> (Portrait Frame)</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer; font-size:0.85rem;">
+            <input type="checkbox" name="show_lineage" value="1" class="visibility-checkbox" {{ 'checked' if profile.visibility.get('show_lineage', True) }}>
+            <span><strong>Spiritual Lineage</strong> (Gold subtitle)</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer; font-size:0.85rem;">
+            <input type="checkbox" name="show_bio" value="1" class="visibility-checkbox" {{ 'checked' if profile.visibility.get('show_bio', True) }}>
+            <span><strong>Primary Bio</strong> (Paragraph 1)</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer; font-size:0.85rem;">
+            <input type="checkbox" name="show_secondary_bio" value="1" class="visibility-checkbox" {{ 'checked' if profile.visibility.get('show_secondary_bio', True) }}>
+            <span><strong>Detailed Info</strong> (Paragraph 2)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Group 2: Key Stats & Action -->
+      <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:10px; padding:1rem;">
+        <h4 style="font-size:0.82rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--saffron-600); font-weight:700; margin-bottom:0.75rem; border-bottom:1px solid var(--border-color); padding-bottom:0.35rem;">
+          Statistics & Call-to-Action
+        </h4>
+        <div style="display:flex; flex-direction:column; gap:0.75rem;">
+          <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer; font-size:0.85rem;">
+            <input type="checkbox" name="show_stats" value="1" class="visibility-checkbox" {{ 'checked' if profile.visibility.get('show_stats', True) }}>
+            <span><strong>Master Stats Bar</strong> (All 3 counters)</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer; font-size:0.85rem; padding-left:1.5rem;">
+            <input type="checkbox" name="show_experience" value="1" class="visibility-checkbox" {{ 'checked' if profile.visibility.get('show_experience', True) }}>
+            <span>Years of Experience Counter</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer; font-size:0.85rem; padding-left:1.5rem;">
+            <input type="checkbox" name="show_consultations" value="1" class="visibility-checkbox" {{ 'checked' if profile.visibility.get('show_consultations', True) }}>
+            <span>Consultations Counter</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer; font-size:0.85rem; padding-left:1.5rem;">
+            <input type="checkbox" name="show_pujas" value="1" class="visibility-checkbox" {{ 'checked' if profile.visibility.get('show_pujas', True) }}>
+            <span>Pujas Performed Counter</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer; font-size:0.85rem; border-top:1px dashed var(--border-color); padding-top:0.4rem;">
+            <input type="checkbox" name="show_cta_button" value="1" class="visibility-checkbox" {{ 'checked' if profile.visibility.get('show_cta_button', True) }}>
+            <span><strong>"Book Consultation" Button</strong></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Group 3: Ashram & Schedule -->
+      <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:10px; padding:1rem;">
+        <h4 style="font-size:0.82rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--saffron-600); font-weight:700; margin-bottom:0.75rem; border-bottom:1px solid var(--border-color); padding-bottom:0.35rem;">
+          Ashram & Darshan Info
+        </h4>
+        <div style="display:flex; flex-direction:column; gap:0.75rem;">
+          <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer; font-size:0.85rem;">
+            <input type="checkbox" name="show_darshan" value="1" class="visibility-checkbox" {{ 'checked' if profile.visibility.get('show_darshan', False) }}>
+            <span><strong>Darshan Timings</strong> (Schedules)</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer; font-size:0.85rem;">
+            <input type="checkbox" name="show_ashram" value="1" class="visibility-checkbox" {{ 'checked' if profile.visibility.get('show_ashram', False) }}>
+            <span><strong>Ashram Address</strong> (Physical Center)</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer; font-size:0.85rem;">
+            <input type="checkbox" name="show_contact" value="1" class="visibility-checkbox" {{ 'checked' if profile.visibility.get('show_contact', False) }}>
+            <span><strong>Direct Helpline & Email</strong></span>
+          </label>
+          <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.5rem; line-height:1.4;">
+            Check these options if you wish to display direct visiting and helpline details on Guruji's public profile card.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Submit Bar -->
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem 0;">
+    <button type="submit" class="btn-primary" style="padding:0.75rem 2rem; font-size:0.95rem; font-weight:600; display:inline-flex; align-items:center; gap:0.5rem;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      Save Guruji's Profile & Visibility
+    </button>
+    <a href="{{ url_for('dashboard.overview') }}" class="btn-secondary" style="text-decoration:none;">Cancel</a>
+  </div>
+</form>
+
+<script>
+function previewGurujiImage(input) {
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const preview = document.getElementById('gurujiPhotoPreview');
+      if (preview) {
+        preview.src = e.target.result;
+      }
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
+function setAllVisibility(state) {
+  const checkboxes = document.querySelectorAll('.visibility-checkbox');
+  checkboxes.forEach(cb => {
+    cb.checked = state;
+  });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Reviews Moderation{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Product Reviews Moderation</h1>
+    <p class="page-subtitle">Verify and publish genuine devotee reviews and feedback.</p>
+  </div>
+</div>
+
+<div class="dashboard-card">
+  <div class="table-responsive">
+    <table class="spiritual-table">
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th>Devotee Name</th>
+          <th>Rating</th>
+          <th>Feedback & Comment</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th>Moderation Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in reviews %}
+        <tr>
+          <td style="font-weight:600;">{{ r.product.name if r.product else 'Spiritual Item' }}</td>
+          <td>
+            <div>{{ r.customer_name }}</div>
+            {% if r.is_verified_purchase %}
+              <span style="font-size:0.68rem; color:#16a34a; font-weight:600;">✓ Verified Devotee</span>
+            {% endif %}
+          </td>
+          <td style="color:#f59e0b; font-size:1rem; white-space:nowrap;">
+            {% for _ in range(r.rating) %}★{% endfor %}
+            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">({{ r.rating }}/5)</span>
+          </td>
+          <td style="max-width:300px; line-height:1.4; color:var(--text-secondary);">
+            {{ r.comment }}
+          </td>
+          <td style="white-space:nowrap; color:var(--text-muted);">{{ format_date(r.created_at, "%b %d, %Y") }}</td>
+          <td>
+            <span class="badge badge-{{ 'delivered' if r.is_approved else 'pending' }}">
+              {{ 'Approved' if r.is_approved else 'Pending' }}
+            </span>
+          </td>
+          <td>
+            <div style="display:flex; gap:0.4rem;">
+              {% if not r.is_approved %}
+                <form action="{{ url_for('commerce.review_moderate', review_id=r.id) }}" method="POST">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="hidden" name="action" value="approve">
+                  <button type="submit" class="btn-restock" style="background-color:var(--status-green-bg); color:var(--status-green-text); border-color:#86efac;">Approve</button>
+                </form>
+              {% else %}
+                <form action="{{ url_for('commerce.review_moderate', review_id=r.id) }}" method="POST">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="hidden" name="action" value="reject">
+                  <button type="submit" class="btn-action-outline" style="color:var(--status-red-text); border-color:#fca5a5;">Revoke</button>
+                </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted);">No product reviews found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

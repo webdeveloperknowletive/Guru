@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Devotee Testimonials{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Devotee Testimonials</h1>
+    <p class="page-subtitle">Genuine experiences and blessings shared by devotees worldwide.</p>
+  </div>
+  <div class="page-header-actions">
+    <button type="button" class="btn-primary" onclick="openModal('addTestimonialModal')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+      Add Testimonial
+    </button>
+  </div>
+</div>
+
+<div class="dashboard-card">
+  <div class="table-responsive">
+    <table class="spiritual-table">
+      <thead>
+        <tr>
+          <th>Devotee Name & City</th>
+          <th>Rating</th>
+          <th>Puja / Service</th>
+          <th>Blessing & Experience</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in testimonials %}
+        <tr>
+          <td>
+            <div style="font-weight:600;">{{ t.devotee_name }}</div>
+            <div style="font-size:0.75rem; color:var(--text-muted);">{{ t.devotee_city or 'India' }}</div>
+          </td>
+          <td style="color:#f59e0b; white-space:nowrap;">
+            {% for _ in range(t.rating) %}★{% endfor %}
+          </td>
+          <td style="font-weight:600; color:var(--saffron-700);">{{ t.service_or_product or 'Vedic Puja' }}</td>
+          <td style="line-height:1.4; color:var(--text-secondary); max-width:380px;">
+            "{{ t.blessing_text }}"
+          </td>
+          <td>
+            <span class="badge badge-{{ 'delivered' if t.is_approved else 'pending' }}">
+              {{ 'Approved' if t.is_approved else 'Pending' }}
+            </span>
+          </td>
+          <td>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+              <button type="button" class="btn-action" title="Edit"
+                onclick='openEditTestimonialModal({{ t.id }}, {{ t.devotee_name|tojson }}, {{ (t.devotee_city or "")|tojson }}, {{ (t.service_or_product or "")|tojson }}, {{ t.rating }}, {{ t.blessing_text|tojson }}, {{ "true" if t.is_approved else "false" }})'>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              </button>
+              <form action="{{ url_for('content.testimonial_delete', testimonial_id=t.id) }}" method="POST" style="margin:0;" onsubmit="return confirm('Are you sure you want to delete this testimonial?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn-action delete" title="Delete">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" style="text-align:center; padding:30px; color:var(--text-muted);">No testimonials recorded.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Testimonial Modal -->
+<div class="modal-overlay" id="addTestimonialModal">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 class="modal-title">Record Devotee Blessing</h3>
+      <button type="button" class="modal-close-btn" onclick="closeModal('addTestimonialModal')">&times;</button>
+    </div>
+    <form action="{{ url_for('content.testimonial_create') }}" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Devotee Name *</label>
+            <input type="text" name="devotee_name" class="form-control" placeholder="e.g. Meera Kulkarni" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">City / State</label>
+            <input type="text" name="devotee_city" class="form-control" placeholder="Mumbai, MH">
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Puja / Product</label>
+            <input type="text" name="service_or_product" class="form-control" placeholder="Navagraha Shanti Puja">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Rating</label>
+            <select name="rating" class="form-control">
+              <option value="5">★★★★★ (5/5)</option>
+              <option value="4">★★★★☆ (4/5)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Blessing & Experience *</label>
+          <textarea name="blessing_text" class="form-control" rows="4" placeholder="Words of gratitude, spiritual feeling, or life impact..." required></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('addTestimonialModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Add Testimonial</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Testimonial Modal -->
+<div class="modal-overlay" id="editTestimonialModal">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 class="modal-title">Edit Devotee Testimonial</h3>
+      <button type="button" class="modal-close-btn" onclick="closeModal('editTestimonialModal')">&times;</button>
+    </div>
+    <form id="editTestimonialForm" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Devotee Name *</label>
+            <input type="text" name="devotee_name" id="edit_devotee_name" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">City / State</label>
+            <input type="text" name="devotee_city" id="edit_devotee_city" class="form-control">
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Puja / Product</label>
+            <input type="text" name="service_or_product" id="edit_service_or_product" class="form-control">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Rating</label>
+            <select name="rating" id="edit_rating" class="form-control">
+              <option value="5">★★★★★ (5/5)</option>
+              <option value="4">★★★★☆ (4/5)</option>
+              <option value="3">★★★☆☆ (3/5)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Blessing & Experience *</label>
+          <textarea name="blessing_text" id="edit_blessing_text" class="form-control" rows="4" required></textarea>
+        </div>
+        <div class="form-group">
+          <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+            <input type="checkbox" name="is_approved" id="edit_is_approved" value="1">
+            <span class="form-label" style="margin:0;">Approved / Display on Storefront</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('editTestimonialModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Update Testimonial</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openEditTestimonialModal(id, name, city, service, rating, text, approved) {
+  document.getElementById('editTestimonialForm').action = '/admin/content/testimonials/' + id + '/edit';
+  document.getElementById('edit_devotee_name').value = name;
+  document.getElementById('edit_devotee_city').value = city;
+  document.getElementById('edit_service_or_product').value = service;
+  document.getElementById('edit_rating').value = rating;
+  document.getElementById('edit_blessing_text').value = text;
+  document.getElementById('edit_is_approved').checked = (approved === true || approved === 'true');
+  openModal('editTestimonialModal');
+}
+</script>
+{% endblock %}

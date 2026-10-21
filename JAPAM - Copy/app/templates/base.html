@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Overview{% endblock %} - {{ app_name }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="{{ url_for('static', filename='js/admin.js') }}" defer></script>
+</head>
+<body>
+  <div class="admin-layout">
+    <!-- Mobile Backdrop -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    <!-- Sidebar Navigation -->
+    <aside class="admin-sidebar" id="adminSidebar">
+      <div class="sidebar-header">
+        <!-- Spiritual Lotus Brand Icon -->
+        <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2C8 6 6 10 6 14a6 6 0 0 0 12 0c0-4-2-8-6-12Z"/>
+          <path d="M6 14C3 13 2 10 2 8c2 0 4 2 5 4"/>
+          <path d="M18 14c3-1 4-4 4-6-2 0-4 2-5 4"/>
+          <path d="M12 22a8 8 0 0 0 8-5c-2 0-5 2-8 3-3-1-6-3-8-3a8 8 0 0 0 8 5Z"/>
+        </svg>
+        <div class="brand-info">
+          <span class="brand-title">{{ app_name }}</span>
+          <span class="brand-subtitle">{{ app_subtitle }}</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <!-- Overview -->
+        <a href="{{ url_for('dashboard.overview') }}" class="nav-link {% if active_page == 'overview' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <span>Overview</span>
+        </a>
+
+        <!-- Commerce -->
+        <div class="nav-section-title">Commerce</div>
+        <a href="{{ url_for('commerce.products_list') }}" class="nav-link {% if active_page == 'products' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+          <span>Products</span>
+        </a>
+        <a href="{{ url_for('commerce.categories_list') }}" class="nav-link {% if active_page == 'categories' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3h7v7H3z"/><path d="M14 3h7v7h-7z"/><path d="M14 14h7v7h-7z"/><path d="M3 14h7v7H3z"/></svg>
+          <span>Categories</span>
+        </a>
+        <a href="{{ url_for('commerce.inventory_list') }}" class="nav-link {% if active_page == 'inventory' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+          <span>Inventory</span>
+        </a>
+        <a href="{{ url_for('commerce.orders_list') }}" class="nav-link {% if active_page == 'orders' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+          <span>Orders</span>
+        </a>
+        <a href="{{ url_for('commerce.customers_list') }}" class="nav-link {% if active_page == 'customers' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Customers</span>
+        </a>
+        <a href="{{ url_for('commerce.reviews_list') }}" class="nav-link {% if active_page == 'reviews' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span>Reviews</span>
+        </a>
+
+        <!-- Services -->
+        <div class="nav-section-title">Services</div>
+        <a href="{{ url_for('services.puja_services_list') }}" class="nav-link {% if active_page == 'puja_services' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a5 5 0 0 0-5 5c0 2 1 3.5 2 4.5V17a3 3 0 0 0 6 0v-5.5c1-1 2-2.5 2-4.5a5 5 0 0 0-5-5Z"/></svg>
+          <span>Puja Services</span>
+        </a>
+        <a href="{{ url_for('services.puja_bookings_list') }}" class="nav-link {% if active_page == 'puja_bookings' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+          <span>Puja Bookings</span>
+        </a>
+        <a href="{{ url_for('services.consultations_list') }}" class="nav-link {% if active_page == 'consultations' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="m12 6 2 4 4 1-3 3 1 4-4-2-4 2 1-4-3-3 4-1 2-4Z"/></svg>
+          <span>Jyotish Consultations</span>
+        </a>
+        <a href="{{ url_for('services.availability_list') }}" class="nav-link {% if active_page == 'availability' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>Availability</span>
+        </a>
+
+        <!-- Content -->
+        <div class="nav-section-title">Content</div>
+        <a href="{{ url_for('content.blog_list') }}" class="nav-link {% if active_page == 'blog' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
+          <span>Blog</span>
+        </a>
+        <a href="{{ url_for('content.testimonials_list') }}" class="nav-link {% if active_page == 'testimonials' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span>Testimonials</span>
+        </a>
+        <a href="{{ url_for('content.banners_list') }}" class="nav-link {% if active_page == 'banners' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/></svg>
+          <span>Banners</span>
+        </a>
+        <a href="{{ url_for('content.welcome_popup_page') }}" class="nav-link {% if active_page == 'welcome_popup' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+          <span>Welcome Popup</span>
+        </a>
+
+        <a href="{{ url_for('content.guruji_profile') }}" class="nav-link {% if active_page == 'guruji' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+          <span>Guruji Profile</span>
+        </a>
+        <a href="{{ url_for('content.media_list') }}" class="nav-link {% if active_page == 'media' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+          <span>Media</span>
+        </a>
+
+        <!-- Operations -->
+        <div class="nav-section-title">Operations</div>
+        <a href="{{ url_for('operations.payments_list') }}" class="nav-link {% if active_page == 'payments' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+          <span>Payments</span>
+        </a>
+        <a href="{{ url_for('operations.coupons_list') }}" class="nav-link {% if active_page == 'coupons' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 14 4 9l5-5 5 5-5 5Z"/><path d="m14 9 5 5-5 5-5-5 5-5Z"/></svg>
+          <span>Coupons</span>
+        </a>
+        <a href="{{ url_for('operations.shipping_list') }}" class="nav-link {% if active_page == 'shipping' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>
+          <span>Shipping & Returns</span>
+        </a>
+        <a href="{{ url_for('operations.enquiries_list') }}" class="nav-link {% if active_page == 'enquiries' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          <span>Enquiries</span>
+        </a>
+
+        <!-- System -->
+        <div class="nav-section-title">System</div>
+        <a href="{{ url_for('system.users_list') }}" class="nav-link {% if active_page == 'users' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Admin Users & Roles</span>
+        </a>
+        <a href="{{ url_for('system.reports_page') }}" class="nav-link {% if active_page == 'reports' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+          <span>Reports</span>
+        </a>
+        <a href="{{ url_for('system.audit_logs_list') }}" class="nav-link {% if active_page == 'audit_logs' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          <span>Audit Logs</span>
+        </a>
+        <a href="{{ url_for('system.settings_page') }}" class="nav-link {% if active_page == 'settings' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Settings</span>
+        </a>
+      </nav>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="admin-main">
+      <!-- Top Navbar Header -->
+      <header class="admin-header">
+        <div class="header-left">
+          <button class="mobile-menu-toggle" id="mobileSidebarToggle" aria-label="Toggle Menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" x2="21" y1="6" y2="6"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="21" y1="18" y2="18"/></svg>
+          </button>
+          <div class="global-search-box">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/></svg>
+            <input type="text" id="globalSearchInput" class="search-input" placeholder="Search products, orders, bookings, customers..." autocomplete="off">
+            <div id="searchResultsDropdown" style="display:none; position:absolute; top:44px; left:0; right:0; background:#fff; border:1px solid #eee7de; border-radius:10px; box-shadow:0 10px 15px rgba(0,0,0,0.08); z-index:50; overflow:hidden;"></div>
+          </div>
+        </div>
+
+        <div class="header-right">
+          <!-- Notification Bell with Count 3 -->
+          <button class="notification-bell-btn" title="Pending Notifications">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+            <span class="bell-badge">3</span>
+          </button>
+
+          <!-- User Profile Menu -->
+          <div class="user-profile-menu" id="userProfileMenu">
+            {% if current_user and current_user.avatar_url %}
+              <img src="{{ current_user.avatar_url }}" alt="Admin Avatar" class="user-avatar">
+            {% else %}
+              <div class="user-avatar-placeholder">A</div>
+            {% endif %}
+            <div class="user-details">
+              <span class="user-name">{{ current_user.full_name if current_user else 'Admin' }}</span>
+              <span class="user-role-badge">{{ current_user.role.name if (current_user and current_user.role) else 'Super Admin' }}</span>
+            </div>
+
+            <!-- Profile Dropdown -->
+            <div id="userProfileDropdown" style="display:none; position:absolute; right:0; top:52px; width:180px; background:#fff; border:1px solid #eee7de; border-radius:10px; box-shadow:0 10px 15px rgba(0,0,0,0.08); z-index:50; overflow:hidden;">
+              <div style="padding:10px 14px; border-bottom:1px solid #f4eee6; font-size:0.75rem; color:#8c8277;">
+                Signed in as<br><strong style="color:#1f2937;">{{ current_user.email if current_user else 'admin@japam.in' }}</strong>
+              </div>
+              <a href="{{ url_for('system.settings_page') }}" style="display:block; padding:8px 14px; font-size:0.82rem; color:#4b5563; text-decoration:none;">Account Settings</a>
+              <a href="{{ url_for('auth.logout') }}" style="display:block; padding:8px 14px; font-size:0.82rem; color:#dc2626; text-decoration:none; border-top:1px solid #f4eee6;">Sign Out</a>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Page Content -->
+      <main class="admin-content">
+        <!-- Flash messages -->
+        <div class="flash-messages">
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, msg in messages %}
+                <div class="alert alert-{{ category }}">
+                  <span>{{ msg }}</span>
+                  <button type="button" onclick="this.parentElement.remove()" style="background:none; border:none; cursor:pointer; color:inherit; font-weight:700;">&times;</button>
+                </div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+        </div>
+
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+</body>
+</html>

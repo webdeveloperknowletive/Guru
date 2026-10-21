@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Spiritual Categories{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Product Categories</h1>
+    <p class="page-subtitle">Organize Ratna, Rudraksha, Yantra, Bracelets, Puja Samagri, and collections.</p>
+  </div>
+  <div class="page-header-actions">
+    <button type="button" class="btn-primary" onclick="openModal('addCategoryModal')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+      Add Category
+    </button>
+  </div>
+</div>
+
+<div class="dashboard-card">
+  <div class="table-responsive">
+    <table class="spiritual-table">
+      <thead>
+        <tr>
+          <th>Category Name</th>
+          <th>Slug</th>
+          <th>Description</th>
+          <th>Products Count</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cat in categories %}
+        <tr>
+          <td style="font-weight:600; display:flex; align-items:center; gap:0.5rem;">
+            <span style="color:var(--saffron-500);">✦</span>
+            {{ cat.name }}
+          </td>
+          <td style="font-family:monospace; color:var(--text-muted); font-size:0.78rem;">{{ cat.slug }}</td>
+          <td style="color:var(--text-secondary);">{{ cat.description or '-' }}</td>
+          <td>
+            <span style="font-weight:600;">{{ cat.products|length }}</span> items
+          </td>
+          <td>
+            <span class="badge badge-{{ 'delivered' if cat.is_active else 'cancelled' }}">
+              {{ 'Active' if cat.is_active else 'Inactive' }}
+            </span>
+          </td>
+          <td>
+            <div style="display:flex; gap:0.4rem; align-items:center;">
+              <button type="button" class="btn-action-outline" onclick="openEditCategoryModal({{ cat.id }}, '{{ cat.name|replace('\'', '\\\'') }}', '{{ (cat.icon or 'box')|replace('\'', '\\\'') }}', '{{ (cat.description or '')|replace('\'', '\\\'') }}', {{ 'true' if cat.is_active else 'false' }})">Edit</button>
+              <form action="{{ url_for('commerce.category_delete', category_id=cat.id) }}" method="POST" onsubmit="return confirm('Delete category {{ cat.name|replace('\'', '\\\'') }}?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn-action-outline" style="color:var(--status-red-text); border-color:#fca5a5;">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" style="text-align:center; padding:30px; color:var(--text-muted);">No categories available.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Category Modal -->
+<div class="modal-overlay" id="addCategoryModal">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 class="modal-title">Create Sacred Category</h3>
+      <button type="button" class="modal-close" onclick="closeModal('addCategoryModal')">&times;</button>
+    </div>
+    <form action="{{ url_for('commerce.category_create') }}" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Category Name *</label>
+          <input type="text" name="name" class="form-control" placeholder="e.g. Energized Yantras" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Icon (Emoji or Identifier)</label>
+          <input type="text" name="icon" class="form-control" placeholder="e.g. 🔱 or gem or sun">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea name="description" class="form-control" rows="3" placeholder="Category overview and spiritual significance..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('addCategoryModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Create Category</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Category Modal -->
+<div class="modal-overlay" id="editCategoryModal">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 class="modal-title">Edit Sacred Category</h3>
+      <button type="button" class="modal-close" onclick="closeModal('editCategoryModal')">&times;</button>
+    </div>
+    <form id="editCategoryForm" action="" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Category Name *</label>
+          <input type="text" name="name" id="editCatName" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Icon (Emoji or Identifier)</label>
+          <input type="text" name="icon" id="editCatIcon" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea name="description" id="editCatDesc" class="form-control" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+          <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+            <input type="checkbox" name="is_active" id="editCatActive" value="1">
+            <span>Category is Active</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('editCategoryModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openEditCategoryModal(id, name, icon, desc, isActive) {
+  document.getElementById('editCategoryForm').action = "/admin/commerce/categories/" + id + "/edit";
+  document.getElementById('editCatName').value = name;
+  document.getElementById('editCatIcon').value = icon;
+  document.getElementById('editCatDesc').value = desc;
+  document.getElementById('editCatActive').checked = isActive;
+  openModal('editCategoryModal');
+}
+</script>
+{% endblock %}

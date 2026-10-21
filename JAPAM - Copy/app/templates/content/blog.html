@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Spiritual Wisdom Blog{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Spiritual Wisdom & Blog</h1>
+    <p class="page-subtitle">Publish articles on Vedic scriptures, festival tithis, and spiritual practices.</p>
+  </div>
+  <div class="page-header-actions">
+    <button type="button" class="btn-primary" onclick="openModal('addPostModal')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+      Write New Article
+    </button>
+  </div>
+</div>
+
+<div class="dashboard-card">
+  <div class="table-responsive">
+    <table class="spiritual-table">
+      <thead>
+        <tr>
+          <th>Article Title</th>
+          <th>Category</th>
+          <th>Author</th>
+          <th>Published Date</th>
+          <th>Views</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for post in posts %}
+        <tr>
+          <td style="font-weight:600;">{{ post.title }}</td>
+          <td><span class="badge badge-type-puja">{{ post.category }}</span></td>
+          <td>{{ post.author_name }}</td>
+          <td style="white-space:nowrap; color:var(--text-muted);">{{ format_date(post.created_at, "%b %d, %Y") }}</td>
+          <td>{{ post.views_count }} reads</td>
+          <td>
+            <span class="badge badge-{{ 'delivered' if post.is_published else 'pending' }}">
+              {{ 'Published' if post.is_published else 'Draft' }}
+            </span>
+          </td>
+          <td>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+              <button type="button" class="btn-action" title="Edit"
+                onclick='openEditPostModal({{ post.id }}, {{ post.title|tojson }}, {{ post.category|tojson }}, {{ (post.excerpt or "")|tojson }}, {{ post.content|tojson }}, {{ "true" if post.is_published else "false" }})'>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              </button>
+              <form action="{{ url_for('content.blog_delete', post_id=post.id) }}" method="POST" style="margin:0;" onsubmit="return confirm('Are you sure you want to delete this article?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn-action delete" title="Delete">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted);">No blog articles written yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Article Modal -->
+<div class="modal-overlay" id="addPostModal">
+  <div class="modal-container" style="max-width:680px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Publish Spiritual Article</h3>
+      <button type="button" class="modal-close-btn" onclick="closeModal('addPostModal')">&times;</button>
+    </div>
+    <form action="{{ url_for('content.blog_create') }}" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Article Title *</label>
+          <input type="text" name="title" class="form-control" placeholder="e.g. Importance of Rudraksha during Shravan Maas" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select name="category" class="form-control">
+            <option value="Vedic Wisdom">Vedic Wisdom</option>
+            <option value="Rituals & Pujas">Rituals & Pujas</option>
+            <option value="Gemology & Ratna">Gemology & Ratna</option>
+            <option value="Festivals & Tithis">Festivals & Tithis</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Summary / Excerpt</label>
+          <input type="text" name="excerpt" class="form-control" placeholder="Short preview text for search engines and cards...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Full Content (Markdown or HTML) *</label>
+          <textarea name="content" class="form-control" rows="6" placeholder="Sacred texts, scriptural references, and devotee guidelines..." required></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('addPostModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Publish Article</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Article Modal -->
+<div class="modal-overlay" id="editPostModal">
+  <div class="modal-container" style="max-width:680px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Edit Spiritual Article</h3>
+      <button type="button" class="modal-close-btn" onclick="closeModal('editPostModal')">&times;</button>
+    </div>
+    <form id="editPostForm" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Article Title *</label>
+          <input type="text" name="title" id="edit_post_title" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select name="category" id="edit_post_category" class="form-control">
+            <option value="Vedic Wisdom">Vedic Wisdom</option>
+            <option value="Rituals & Pujas">Rituals & Pujas</option>
+            <option value="Gemology & Ratna">Gemology & Ratna</option>
+            <option value="Festivals & Tithis">Festivals & Tithis</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Summary / Excerpt</label>
+          <input type="text" name="excerpt" id="edit_post_excerpt" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Full Content (Markdown or HTML) *</label>
+          <textarea name="content" id="edit_post_content" class="form-control" rows="6" required></textarea>
+        </div>
+        <div class="form-group">
+          <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+            <input type="checkbox" name="is_published" id="edit_post_published" value="1">
+            <span class="form-label" style="margin:0;">Published / Visible on Storefront</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('editPostModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Update Article</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openEditPostModal(id, title, category, excerpt, content, published) {
+  document.getElementById('editPostForm').action = '/admin/content/blog/' + id + '/edit';
+  document.getElementById('edit_post_title').value = title;
+  document.getElementById('edit_post_category').value = category;
+  document.getElementById('edit_post_excerpt').value = excerpt;
+  document.getElementById('edit_post_content').value = content;
+  document.getElementById('edit_post_published').checked = (published === true || published === 'true');
+  openModal('editPostModal');
+}
+</script>
+{% endblock %}

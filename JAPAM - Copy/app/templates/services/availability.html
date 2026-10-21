@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Availability Calendar{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Availability Calendar</h1>
+    <p class="page-subtitle">Configure bookable time slots for Vedic pujas and Jyotish consultations.</p>
+  </div>
+  <div class="page-header-actions">
+    <button type="button" class="btn-primary" onclick="openModal('addSlotModal')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+      Add Time Slot
+    </button>
+  </div>
+</div>
+
+<div class="dashboard-card">
+  <div class="table-responsive">
+    <table class="spiritual-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Time Window</th>
+          <th>Service Domain</th>
+          <th>Assigned Scholar / Priest</th>
+          <th>Capacity / Booked</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in slots %}
+        <tr>
+          <td style="font-weight:600; white-space:nowrap;">{{ format_date(s.slot_date, "%A, %b %d, %Y") }}</td>
+          <td style="font-family:monospace; font-weight:600; color:var(--saffron-700);">{{ s.start_time }} - {{ s.end_time }}</td>
+          <td>
+            <span class="badge {% if s.service_type == 'puja' %}badge-type-puja{% else %}badge-type-consultation{% endif %}">
+              {{ s.service_type|upper }}
+            </span>
+          </td>
+          <td>{{ s.assigned_priest_or_astrologer or 'Open Pool' }}</td>
+          <td>
+            <span style="font-weight:700;">{{ s.booked_count }}</span> / {{ s.max_capacity }} booked
+          </td>
+          <td>
+            {% if not s.is_active %}
+              <span class="badge badge-cancelled">Blocked</span>
+            {% elif s.booked_count >= s.max_capacity %}
+              <span class="badge badge-processing">Full</span>
+            {% else %}
+              <span class="badge badge-delivered">Available</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" style="text-align:center; padding:30px; color:var(--text-muted);">No availability slots created.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Slot Modal -->
+<div class="modal-overlay" id="addSlotModal">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 class="modal-title">Create Availability Slot</h3>
+      <button type="button" class="modal-close-btn" onclick="closeModal('addSlotModal')">&times;</button>
+    </div>
+    <form action="{{ url_for('services.availability_create') }}" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Service Type</label>
+            <select name="service_type" class="form-control">
+              <option value="puja">Puja Ritual</option>
+              <option value="jyotish">Jyotish Consultation</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Date *</label>
+            <input type="date" name="slot_date" class="form-control" required>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Start Time *</label>
+            <input type="text" name="start_time" class="form-control" placeholder="10:00 AM" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">End Time *</label>
+            <input type="text" name="end_time" class="form-control" placeholder="11:30 AM" required>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Max Capacity</label>
+            <input type="number" name="max_capacity" class="form-control" value="1" min="1" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Assigned Priest / Astrologer</label>
+            <input type="text" name="assigned_priest_or_astrologer" class="form-control" placeholder="Acharya Shastri Ji">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('addSlotModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Create Slot</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

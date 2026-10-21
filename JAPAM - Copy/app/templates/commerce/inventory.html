@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Inventory & Restock{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Inventory Management</h1>
+    <p class="page-subtitle">Real-time stock tracking with concurrency locks and audit history.</p>
+  </div>
+  <div class="page-header-actions">
+    {% if low_stock_only %}
+      <a href="{{ url_for('commerce.inventory_list') }}" class="btn-secondary">Show All Products</a>
+    {% else %}
+      <a href="{{ url_for('commerce.inventory_list', low_stock='1') }}" class="btn-secondary" style="color:var(--status-red-text); border-color:#fca5a5;">
+        ⚠ Show Low Stock Only
+      </a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Products Stock Table -->
+<div class="dashboard-card" style="margin-bottom: 2rem;">
+  <div class="card-header-row">
+    <h2 class="card-title">Current Warehouse Levels</h2>
+  </div>
+
+  <div class="table-responsive">
+    <table class="spiritual-table">
+      <thead>
+        <tr>
+          <th>Product Name</th>
+          <th>SKU</th>
+          <th>Current Units</th>
+          <th>Threshold</th>
+          <th>Stock Health</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for prod in products %}
+        <tr>
+          <td>
+            <div class="product-cell">
+              <img src="{{ prod.thumbnail or '/static/img/product-default.png' }}" alt="{{ prod.name }}" class="product-thumb" onerror="this.src='/static/img/product-default.png'">
+              <span style="font-weight:600;">{{ prod.name }}</span>
+            </div>
+          </td>
+          <td style="font-family:monospace; color:var(--text-muted); font-size:0.78rem;">{{ prod.sku }}</td>
+          <td class="{% if prod.is_low_stock %}stock-alert-text{% else %}font-weight:600;{% endif %}">
+            {{ prod.stock_quantity }}
+          </td>
+          <td style="color:var(--text-muted);">{{ prod.low_stock_threshold }}</td>
+          <td>
+            {% if prod.stock_quantity == 0 %}
+              <span class="badge badge-cancelled">Out of Stock</span>
+            {% elif prod.is_low_stock %}
+              <span class="badge badge-processing">Low Stock Alert</span>
+            {% else %}
+              <span class="badge badge-delivered">Healthy</span>
+            {% endif %}
+          </td>
+          <td>
+            <button type="button" class="btn-restock" onclick="openRestockModal('{{ prod.id }}', '{{ prod.name|escape }}', '{{ prod.sku }}')">
+              Adjust Stock
+            </button>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" style="text-align:center; padding:25px; color:var(--text-muted);">No products found in inventory view.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Stock Adjustments History Audit -->
+<div class="dashboard-card">
+  <div class="card-header-row">
+    <h2 class="card-title">Recent Inventory Adjustments</h2>
+  </div>
+
+  <div class="table-responsive">
+    <table class="spiritual-table">
+      <thead>
+        <tr>
+          <th>Timestamp (IST)</th>
+          <th>Product</th>
+          <th>Change</th>
+          <th>Previous &rarr; New</th>
+          <th>Reason</th>
+          <th>Admin User</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for adj in adjustments %}
+        <tr>
+          <td style="white-space:nowrap; color:var(--text-muted);">{{ format_date(adj.created_at, "%b %d, %Y %I:%M %p") }}</td>
+          <td style="font-weight:600;">{{ adj.product.name if adj.product else '-' }}</td>
+          <td style="font-weight:700; color:{% if adj.quantity_change > 0 %}#16a34a{% else %}#dc2626{% endif %};">
+            {% if adj.quantity_change > 0 %}+{% endif %}{{ adj.quantity_change }}
+          </td>
+          <td style="color:var(--text-secondary);">
+            {{ adj.previous_stock }} &rarr; {{ adj.new_stock }}
+          </td>
+          <td>{{ adj.reason }}</td>
+          <td style="color:var(--text-muted);">{{ adj.admin_user.full_name if adj.admin_user else 'System' }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">No recorded stock adjustments yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Inventory Adjustment Modal -->
+<div class="modal-overlay" id="restockModal">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 class="modal-title">Inventory Adjustment</h3>
+      <button type="button" class="modal-close-btn" onclick="closeModal('restockModal')">&times;</button>
+    </div>
+    <form action="{{ url_for('commerce.inventory_adjust') }}" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="product_id" id="modalProductId">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Product Name</label>
+          <input type="text" id="modalProductName" class="form-control" readonly style="background-color:#faf8f4;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">SKU</label>
+          <input type="text" id="modalProductSku" class="form-control" readonly style="background-color:#faf8f4;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Adjustment Quantity (+ to add, - to reduce)</label>
+          <input type="number" name="quantity_change" class="form-control" value="20" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Reason</label>
+          <select name="reason" class="form-control">
+            <option value="Restock Batch Received">Restock Batch Received</option>
+            <option value="Physical Inventory Audit Correction">Physical Inventory Audit Correction</option>
+            <option value="Damaged or Defective Item Removed">Damaged or Defective Item Removed</option>
+            <option value="Customer Return Restock">Customer Return Restock</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Internal Notes</label>
+          <input type="text" name="notes" class="form-control" placeholder="Supplier invoice ref or audit note...">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('restockModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Apply Adjustment</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function openRestockModal(id, name, sku) {
+    document.getElementById("modalProductId").value = id;
+    document.getElementById("modalProductName").value = name;
+    document.getElementById("modalProductSku").value = sku;
+    openModal("restockModal");
+  }
+</script>
+{% endblock %}

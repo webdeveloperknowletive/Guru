@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Access Forbidden (403){% endblock %}
+
+{% block content %}
+<div class="dashboard-card" style="text-align:center; padding:3.5rem 1.5rem; max-width:600px; margin:2rem auto;">
+  <div style="font-size:3.5rem; color:var(--status-red-text); margin-bottom:1rem;">🔒</div>
+  <h1 style="font-size:1.6rem; font-weight:700; margin-bottom:0.5rem;">Access Forbidden (HTTP 403)</h1>
+  <p style="color:var(--text-secondary); line-height:1.5; margin-bottom:1.5rem;">
+    Your current administrative role does not have permission to access this module or perform this action. If you require access, please contact your Super Administrator.
+  </p>
+  <div>
+    <a href="{{ url_for('dashboard.overview') }}" class="btn-primary">Return to Dashboard</a>
+  </div>
+</div>
+{% endblock %}

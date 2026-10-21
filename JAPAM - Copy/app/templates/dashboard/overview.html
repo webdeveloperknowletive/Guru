@@ -1,0 +1,435 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Top Header Row -->
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-subtitle">Welcome back! Here's what's happening with your spiritual services and online store.</p>
+  </div>
+  <div class="page-header-actions">
+    <div class="date-range-badge" id="dateRangePicker">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+      <span>Apr 1, 2024 - Apr 30, 2024</span>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+  </div>
+</div>
+
+<!-- 4 Metric Cards -->
+<div class="metrics-grid">
+  <!-- Card 1: Orders Today -->
+  <div class="metric-card">
+    <div class="metric-icon-box icon-box-peach">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/>
+        <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>
+      </svg>
+    </div>
+    <div class="metric-body">
+      <span class="metric-label">Orders Today</span>
+      <span class="metric-value">{{ metrics.orders_today }}</span>
+      <div class="metric-trend trend-up">
+        <span>▲ +{{ metrics.orders_diff_pct }}%</span>
+        <span class="trend-subtext">vs. yesterday</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 2: Revenue -->
+  <div class="metric-card">
+    <div class="metric-icon-box icon-box-gold">
+      <span>₹</span>
+    </div>
+    <div class="metric-body">
+      <span class="metric-label">Revenue</span>
+      <span class="metric-value">{{ format_currency(metrics.revenue_today) }}</span>
+      <div class="metric-trend trend-up">
+        <span>▲ +{{ metrics.rev_diff_pct }}%</span>
+        <span class="trend-subtext">vs. yesterday</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 3: Puja Bookings -->
+  <div class="metric-card">
+    <div class="metric-icon-box icon-box-coral">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2C8 6 6 10 6 14a6 6 0 0 0 12 0c0-4-2-8-6-12Z"/>
+        <path d="M6 14C3 13 2 10 2 8c2 0 4 2 5 4"/>
+        <path d="M18 14c3-1 4-4 4-6-2 0-4 2-5 4"/>
+      </svg>
+    </div>
+    <div class="metric-body">
+      <span class="metric-label">Puja Bookings</span>
+      <span class="metric-value">{{ metrics.puja_today }}</span>
+      <div class="metric-trend trend-up">
+        <span>▲ +{{ metrics.puja_diff_pct }}%</span>
+        <span class="trend-subtext">vs. yesterday</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 4: Consultation Requests -->
+  <div class="metric-card">
+    <div class="metric-icon-box icon-box-purple">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+      </svg>
+    </div>
+    <div class="metric-body">
+      <span class="metric-label">Consultation Requests</span>
+      <span class="metric-value">{{ metrics.consult_today }}</span>
+      <div class="metric-trend trend-up">
+        <span>▲ +{{ metrics.consult_diff_pct }}%</span>
+        <span class="trend-subtext">vs. yesterday</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Charts Row -->
+<div class="charts-grid">
+  <!-- Revenue Overview Area Chart -->
+  <div class="dashboard-card">
+    <div class="card-header-row">
+      <div class="card-title-group">
+        <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+        <h2 class="card-title">Revenue Overview</h2>
+      </div>
+      <select class="card-filter-select">
+        <option>Last 30 Days</option>
+        <option>Last 7 Days</option>
+        <option>This Month</option>
+        <option>This Year</option>
+      </select>
+    </div>
+    <div class="chart-wrapper">
+      <canvas id="revenueChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Order Status Donut Chart -->
+  <div class="dashboard-card">
+    <div class="card-header-row">
+      <div class="card-title-group">
+        <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        <h2 class="card-title">Order Status</h2>
+      </div>
+      <select class="card-filter-select">
+        <option>Last 30 Days</option>
+        <option>Last 7 Days</option>
+      </select>
+    </div>
+
+    <div class="donut-chart-container">
+      <div class="donut-canvas-box">
+        <canvas id="orderStatusChart"></canvas>
+        <div class="donut-center-text">
+          <div class="donut-center-number">{{ metrics.order_status_stats.total }}</div>
+          <div class="donut-center-label">Total Orders</div>
+        </div>
+      </div>
+
+      <div class="donut-legend">
+        <div class="legend-item">
+          <div class="legend-indicator">
+            <span class="legend-dot" style="background-color: #10b981;"></span>
+            <span>Delivered</span>
+          </div>
+          <span class="legend-count">{{ metrics.order_status_stats.counts.delivered }} ({{ metrics.order_status_stats.percentages.delivered }}%)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-indicator">
+            <span class="legend-dot" style="background-color: #f59e0b;"></span>
+            <span>Processing</span>
+          </div>
+          <span class="legend-count">{{ metrics.order_status_stats.counts.processing }} ({{ metrics.order_status_stats.percentages.processing }}%)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-indicator">
+            <span class="legend-dot" style="background-color: #3b82f6;"></span>
+            <span>Shipped</span>
+          </div>
+          <span class="legend-count">{{ metrics.order_status_stats.counts.shipped }} ({{ metrics.order_status_stats.percentages.shipped }}%)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-indicator">
+            <span class="legend-dot" style="background-color: #ef4444;"></span>
+            <span>Cancelled</span>
+          </div>
+          <span class="legend-count">{{ metrics.order_status_stats.counts.cancelled }} ({{ metrics.order_status_stats.percentages.cancelled }}%)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-indicator">
+            <span class="legend-dot" style="background-color: #94a3b8;"></span>
+            <span>Pending</span>
+          </div>
+          <span class="legend-count">{{ metrics.order_status_stats.counts.pending }} ({{ metrics.order_status_stats.percentages.pending }}%)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Middle Row: Upcoming Appointments & Recent Orders -->
+<div class="widgets-grid-2col">
+  <!-- Upcoming Appointments -->
+  <div class="dashboard-card">
+    <div class="card-header-row">
+      <div class="card-title-group">
+        <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+        <h2 class="card-title">Upcoming Appointments</h2>
+      </div>
+      <a href="{{ url_for('services.puja_bookings_list') }}" class="card-action-link">View All</a>
+    </div>
+
+    <div class="table-responsive">
+      <table class="spiritual-table">
+        <thead>
+          <tr>
+            <th>Date & Time</th>
+            <th>Service</th>
+            <th>Customer</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for appt in metrics.appointments %}
+          <tr>
+            <td style="white-space: nowrap;">{{ appt.date_time }}</td>
+            <td style="font-weight: 600;">{{ appt.service }}</td>
+            <td>{{ appt.customer }}</td>
+            <td>
+              <span class="badge {% if appt.type == 'Puja' %}badge-type-puja{% else %}badge-type-consultation{% endif %}">
+                {{ appt.type }}
+              </span>
+            </td>
+            <td>
+              <span class="badge {% if appt.status == 'Confirmed' %}badge-confirmed{% else %}badge-processing{% endif %}">
+                {{ appt.status }}
+              </span>
+            </td>
+            <td>
+              <button type="button" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-weight:700;">···</button>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">No upcoming appointments found</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Recent Orders -->
+  <div class="dashboard-card">
+    <div class="card-header-row">
+      <div class="card-title-group">
+        <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+        <h2 class="card-title">Recent Orders</h2>
+      </div>
+      <a href="{{ url_for('commerce.orders_list') }}" class="card-action-link">View All</a>
+    </div>
+
+    <div class="table-responsive">
+      <table class="spiritual-table">
+        <thead>
+          <tr>
+            <th>Order #</th>
+            <th>Customer</th>
+            <th>Items</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for order in metrics.recent_orders %}
+          <tr>
+            <td>
+              <a href="{{ url_for('commerce.order_detail', order_id=order.id) }}" style="color:var(--text-primary); font-weight:600; text-decoration:none;">
+                {{ order.order_number }}
+              </a>
+            </td>
+            <td>{{ order.customer_name }}</td>
+            <td style="color:var(--text-muted);">
+              {% if order.items %}
+                {{ order.items[0].product_name }} ({{ order.items[0].quantity }})
+              {% else %}
+                Spiritual Package
+              {% endif %}
+            </td>
+            <td style="font-weight: 600;">{{ format_currency(order.total_amount) }}</td>
+            <td>
+              <span class="badge badge-{{ order.order_status }}">
+                {{ order.order_status }}
+              </span>
+            </td>
+            <td style="white-space: nowrap; color:var(--text-muted);">{{ format_date(order.placed_at, "%b %d, %Y") }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">No recent orders</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom Row: Low Stock Alert & Pending Actions -->
+<div class="widgets-grid-2col">
+  <!-- Low Stock Alert -->
+  <div class="dashboard-card">
+    <div class="card-header-row">
+      <div class="card-title-group">
+        <svg class="card-icon" style="color: #ea580c;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+        <h2 class="card-title">Low Stock Alert</h2>
+      </div>
+      <a href="{{ url_for('commerce.inventory_list', low_stock='1') }}" class="card-action-link">View All</a>
+    </div>
+
+    <div class="table-responsive">
+      <table class="spiritual-table">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>SKU</th>
+            <th>Current Stock</th>
+            <th>Threshold</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for prod in metrics.low_stock_items %}
+          <tr>
+            <td>
+              <div class="product-cell">
+                <img src="{{ prod.thumbnail or '/static/img/product-default.png' }}" alt="{{ prod.name }}" class="product-thumb" onerror="this.src='/static/img/product-default.png'">
+                <span style="font-weight: 600;">{{ prod.name }}</span>
+              </div>
+            </td>
+            <td style="color:var(--text-muted); font-size:0.78rem;">{{ prod.sku }}</td>
+            <td class="stock-alert-text">{{ prod.stock_quantity }}</td>
+            <td style="color:var(--text-muted);">{{ prod.low_stock_threshold }}</td>
+            <td>
+              <button type="button" class="btn-restock" onclick="openRestockModal('{{ prod.id }}', '{{ prod.name|escape }}', '{{ prod.sku }}')">Restock</button>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" style="text-align:center; color:var(--text-muted); padding:20px;">All spiritual inventory levels are healthy</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Pending Actions -->
+  <div class="dashboard-card">
+    <div class="card-header-row">
+      <div class="card-title-group">
+        <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+        <h2 class="card-title">Pending Actions</h2>
+      </div>
+      <a href="{{ url_for('dashboard.overview') }}" class="card-action-link">View All</a>
+    </div>
+
+    <div class="table-responsive">
+      <table class="spiritual-table">
+        <thead>
+          <tr>
+            <th>Task</th>
+            <th>Details</th>
+            <th>Count</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for action in metrics.pending_actions %}
+          <tr>
+            <td style="font-weight: 600;">{{ action.task }}</td>
+            <td style="color:var(--text-muted);">{{ action.details }}</td>
+            <td class="pending-count-badge">{{ action.count }}</td>
+            <td>
+              <a href="{{ action.url }}" class="btn-action-outline">{{ action.action_label }}</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Restock Inventory Modal -->
+<div class="modal-overlay" id="restockModal">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 class="modal-title">Restock Inventory</h3>
+      <button type="button" class="modal-close-btn" onclick="closeModal('restockModal')">&times;</button>
+    </div>
+    <form action="{{ url_for('commerce.inventory_adjust') }}" method="POST">
+      <div class="modal-body">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="product_id" id="modalProductId">
+        <div class="form-group">
+          <label class="form-label">Product Name</label>
+          <input type="text" id="modalProductName" class="form-control" readonly style="background-color:#faf8f4;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">SKU</label>
+          <input type="text" id="modalProductSku" class="form-control" readonly style="background-color:#faf8f4;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Quantity to Add</label>
+          <input type="number" name="quantity_change" class="form-control" min="1" value="25" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Adjustment Reason</label>
+          <select name="reason" class="form-control">
+            <option value="Restock Batch Received">Restock Batch Received</option>
+            <option value="Physical Inventory Audit">Physical Inventory Audit</option>
+            <option value="Supplier Return Replacement">Supplier Return Replacement</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes (Optional)</label>
+          <input type="text" name="notes" class="form-control" placeholder="PO-2024-RISHIKESH-01">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('restockModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Update Stock</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const chartLabels = {{ metrics.chart_labels | tojson }};
+    const chartValues = {{ metrics.chart_values | tojson }};
+    const statusCounts = {{ metrics.order_status_stats.counts | tojson }};
+    initDashboardCharts(chartLabels, chartValues, statusCounts);
+  });
+
+  function openRestockModal(id, name, sku) {
+    document.getElementById("modalProductId").value = id;
+    document.getElementById("modalProductName").value = name;
+    document.getElementById("modalProductSku").value = sku;
+    openModal("restockModal");
+  }
+</script>
+{% endblock %}

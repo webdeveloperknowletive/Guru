@@ -1,0 +1,395 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome Offer Popup Settings{% endblock %}
+
+{% block content %}
+<div class="page-header-row" style="margin-bottom:1.5rem;">
+  <div>
+    <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.25rem;">Content / Marketing</div>
+    <h1 class="page-title" style="display:flex; align-items:center; gap:0.6rem;">
+      <span>Welcome Offer Popup</span>
+      {% if published and published.is_enabled %}
+        <span class="badge" style="background:rgba(34,197,94,0.15); color:#16a34a; border:1px solid rgba(34,197,94,0.3); font-size:0.75rem; padding:3px 8px; border-radius:999px;">● Published & Active</span>
+      {% else %}
+        <span class="badge" style="background:rgba(239,68,68,0.15); color:#dc2626; border:1px solid rgba(239,68,68,0.3); font-size:0.75rem; padding:3px 8px; border-radius:999px;">● Disabled</span>
+      {% endif %}
+    </h1>
+    <p class="page-subtitle">Configure the two-column first-time visitor welcome offer, custom astrology banner, coupon integration, and schedule.</p>
+  </div>
+  <div class="page-header-actions" style="display:flex; align-items:center; gap:0.75rem;">
+    <!-- New Campaign Button Trigger -->
+    <form method="POST" action="{{ url_for('content.welcome_popup_save') }}" onsubmit="return confirm('Starting a new campaign will assign a new versioned campaign ID. All visitors (including those who previously dismissed or claimed the offer) will see the popup once again in their browser. Proceed?');" style="margin:0;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="form_action" value="new_campaign">
+      <button type="submit" class="btn-action-outline" style="border-color:var(--gold-400); color:var(--gold-600); display:flex; align-items:center; gap:0.4rem;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+        New Campaign
+      </button>
+    </form>
+
+    <!-- Preview Popup on Storefront (Opens in new tab bypassing visitor tracking) -->
+    <a href="http://localhost:3000/?preview_welcome=true" target="_blank" rel="noopener noreferrer" class="btn-action-outline" style="border-color:#38bdf8; color:#0284c7; display:flex; align-items:center; gap:0.4rem; text-decoration:none;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+      Preview Popup
+    </a>
+
+    <button type="button" class="btn-secondary" onclick="document.getElementById('form_action_input').value='save_draft'; document.getElementById('popupSettingsForm').submit();">
+      Save Draft
+    </button>
+    <button type="button" class="btn-primary" onclick="document.getElementById('form_action_input').value='publish'; document.getElementById('popupSettingsForm').submit();">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      Publish Changes
+    </button>
+  </div>
+</div>
+
+<form id="popupSettingsForm" method="POST" action="{{ url_for('content.welcome_popup_save') }}" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="form_action" id="form_action_input" value="publish">
+
+  <div style="display:grid; grid-template-columns: 1.15fr 0.85fr; gap:1.75rem; align-items:flex-start;">
+    
+    <!-- LEFT COLUMN: SETTINGS FORM -->
+    <div style="display:flex; flex-direction:column; gap:1.5rem;">
+      
+      <!-- 1. Campaign & Visibility -->
+      <div class="dashboard-card">
+        <h3 style="font-size:1.05rem; font-weight:700; color:var(--saffron-600); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Campaign Status & Triggering
+        </h3>
+
+        <div style="background:rgba(224,176,74,0.08); border:1px solid rgba(224,176,74,0.25); border-radius:10px; padding:14px; margin-bottom:1.25rem; font-size:0.83rem; line-height:1.5;">
+          <strong>Campaign Tracking Note:</strong>
+          First-visit detection is tracked via a versioned browser storage key based on Campaign ID (<code>{{ draft.campaign_id }}</code>). Routine text/image updates preserve dismissals. Clicking <em>New Campaign</em> creates a new campaign ID, allowing the offer to appear once again per browser. First-order discount eligibility is validated separately on the server.
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem; margin-bottom:1rem;">
+          <div>
+            <label class="form-label" style="font-weight:600;">Enable Popup</label>
+            <div style="display:flex; align-items:center; gap:0.5rem; margin-top:0.4rem;">
+              <input type="checkbox" name="is_enabled" id="is_enabled" value="1" {% if draft.is_enabled %}checked{% endif %} style="width:18px; height:18px; cursor:pointer;" onchange="updateLivePreview()">
+              <label for="is_enabled" style="font-size:0.85rem; cursor:pointer;">Active on Storefront</label>
+            </div>
+          </div>
+          <div>
+            <label class="form-label" style="font-weight:600;">Display Delay (seconds)</label>
+            <input type="number" name="delay_seconds" id="delay_seconds" class="form-control" min="1" max="60" value="{{ draft.delay_seconds or 5 }}" required oninput="updateLivePreview()">
+            <span style="font-size:0.75rem; color:var(--text-muted);">Recommended: 5 seconds</span>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
+          <div>
+            <label class="form-label" style="font-weight:600;">Schedule Start (IST)</label>
+            <input type="datetime-local" name="start_date" id="start_date" class="form-control" value="{{ start_date_str }}">
+            <span style="font-size:0.75rem; color:var(--text-muted);">Leave empty to start immediately</span>
+          </div>
+          <div>
+            <label class="form-label" style="font-weight:600;">Schedule End (IST)</label>
+            <input type="datetime-local" name="end_date" id="end_date" class="form-control" value="{{ end_date_str }}">
+            <span style="font-size:0.75rem; color:var(--text-muted);">Leave empty for indefinite run</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Astrology Banner Image -->
+      <div class="dashboard-card">
+        <h3 style="font-size:1.05rem; font-weight:700; color:var(--saffron-600); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+          Banner Image (Left Column on Desktop)
+        </h3>
+
+        <div style="display:flex; gap:1.25rem; align-items:flex-start; margin-bottom:1.25rem;">
+          <div style="width:130px; height:150px; border-radius:10px; overflow:hidden; border:2px solid var(--border-color); background:#150a10; position:relative; flex-shrink:0;">
+            <img id="imagePreviewThumb" src="{{ draft.image_url or '/hero/hero-astrology.jpg' }}" alt="Popup banner preview" style="width:100%; height:100%; object-fit:cover; object-position:{{ draft.image_position or 'center' }};" onerror="this.onerror=null; this.src='/hero/hero-astrology.jpg';">
+          </div>
+          <div style="flex:1; display:flex; flex-direction:column; gap:0.75rem;">
+            <div>
+              <label class="form-label" style="font-weight:600;">Upload New Banner Image</label>
+              <input type="file" name="banner_image" id="banner_image" class="form-control" accept="image/png, image/jpeg, image/jpg, image/webp, image/svg+xml" onchange="previewSelectedImage(this)">
+              <span style="font-size:0.75rem; color:var(--text-muted);">JPG, PNG, WebP, SVG (Max 10MB). Image stays isolated from text.</span>
+            </div>
+            <div>
+              <label class="form-label" style="font-weight:600;">Or Direct Image URL / Path</label>
+              <input type="text" name="image_url" id="image_url" class="form-control" value="{{ draft.image_url or '/hero/hero-astrology.jpg' }}" placeholder="/hero/hero-astrology.jpg" oninput="updateLivePreview()">
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
+          <div>
+            <label class="form-label" style="font-weight:600;">Image Alt Text</label>
+            <input type="text" name="image_alt" id="image_alt" class="form-control" value="{{ draft.image_alt or 'Cosmic Vedic Astrology Welcome' }}" required oninput="updateLivePreview()">
+          </div>
+          <div>
+            <label class="form-label" style="font-weight:600;">Image Position / Focal Point</label>
+            <select name="image_position" id="image_position" class="form-control" onchange="updateLivePreview()">
+              <option value="center" {% if draft.image_position == 'center' %}selected{% endif %}>Center (Balanced)</option>
+              <option value="top" {% if draft.image_position == 'top' %}selected{% endif %}>Top (Focus on Header/Deity)</option>
+              <option value="bottom" {% if draft.image_position == 'bottom' %}selected{% endif %}>Bottom</option>
+              <option value="left" {% if draft.image_position == 'left' %}selected{% endif %}>Left</option>
+              <option value="right" {% if draft.image_position == 'right' %}selected{% endif %}>Right</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Offer Content & Discount Configuration -->
+      <div class="dashboard-card">
+        <h3 style="font-size:1.05rem; font-weight:700; color:var(--saffron-600); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14 4 9l5-5 5 5-5 5Z"/><path d="m14 9 5 5-5 5-5-5 5-5Z"/></svg>
+          Offer Content & Discount Setup
+        </h3>
+
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label class="form-label" style="font-weight:600;">Heading</label>
+          <input type="text" name="heading" id="heading_input" class="form-control" value="{{ draft.heading or 'Your Cosmic Welcome' }}" required oninput="updateLivePreview()">
+        </div>
+
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label class="form-label" style="font-weight:600;">Description</label>
+          <textarea name="description" id="desc_input" class="form-control" rows="2" required oninput="updateLivePreview()">{{ draft.description or 'Enjoy a special offer on your first order.' }}</textarea>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem; margin-bottom:1rem;">
+          <div>
+            <label class="form-label" style="font-weight:600;">Offer Highlight</label>
+            <input type="text" name="offer_highlight" id="highlight_input" class="form-control" value="{{ draft.offer_highlight or '10% OFF' }}" placeholder="10% OFF" oninput="updateLivePreview()">
+            <span style="font-size:0.75rem; color:var(--text-muted);">e.g. 10% OFF or Special Blessing</span>
+          </div>
+
+          <div>
+            <label class="form-label" style="font-weight:600;">Attached Coupon</label>
+            <select name="coupon_code" id="coupon_select" class="form-control" onchange="handleCouponSelect(this)">
+              <option value="">-- No Coupon Code --</option>
+              {% for c in coupons %}
+                <option value="{{ c.code }}" 
+                        data-type="{{ c.discount_type }}" 
+                        data-val="{{ c.discount_value }}" 
+                        {% if draft.coupon_code == c.code %}selected{% endif %}>
+                  {{ c.code }} ({{ c.discount_value|int }}{% if c.discount_type == 'percentage' %}% off{% else %} ₹ off{% endif %}{% if not c.is_active %} - Inactive{% endif %})
+                </option>
+              {% endfor %}
+            </select>
+            <span style="font-size:0.75rem; color:var(--text-muted);">Synced directly with backend coupon system</span>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem; margin-bottom:1rem;">
+          <div>
+            <label class="form-label" style="font-weight:600;">Primary Button Label</label>
+            <input type="text" name="button_label" id="btn_label_input" class="form-control" value="{{ draft.button_label or 'Claim My Offer' }}" required oninput="updateLivePreview()">
+          </div>
+
+          <div>
+            <label class="form-label" style="font-weight:600;">Button Action</label>
+            <select name="button_action" id="btn_action_select" class="form-control" onchange="handleActionChange(this)">
+              <option value="claim_coupon" {% if draft.button_action == 'claim_coupon' %}selected{% endif %}>Claim Coupon (Storefront Cart)</option>
+              <option value="open_link" {% if draft.button_action == 'open_link' %}selected{% endif %}>Open Internal Page Link</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="targetUrlGroup" class="form-group" style="margin-bottom:1rem; {% if draft.button_action != 'open_link' %}display:none;{% endif %}">
+          <label class="form-label" style="font-weight:600;">Target Internal URL</label>
+          <input type="text" name="target_url" id="target_url_input" class="form-control" value="{{ draft.target_url or '' }}" placeholder="/#rudraksha or /#jyotish or /" oninput="updateLivePreview()">
+          <span style="font-size:0.75rem; color:var(--text-muted);">Visitor will navigate to this page after claiming.</span>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label" style="font-weight:600;">Terms & Conditions</label>
+          <textarea name="terms" id="terms_input" class="form-control" rows="2" oninput="updateLivePreview()">{{ draft.terms or '*Valid on eligible items on your first order. Cannot be combined with other offers. Discount verified on checkout.' }}</textarea>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN: INTERACTIVE LIVE PREVIEW -->
+    <div style="position:sticky; top:20px;">
+      <div class="dashboard-card" style="padding:1.5rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+          <h3 style="font-size:1.05rem; font-weight:700; color:var(--text-main); margin:0;">Live Preview</h3>
+          <div style="display:inline-flex; background:rgba(0,0,0,0.06); padding:3px; border-radius:8px;">
+            <button type="button" id="prevModeDesktop" class="btn-action-outline" style="padding:4px 10px; font-size:12px; background:var(--gold-400); color:#000; border:none; border-radius:6px;" onclick="setPreviewMode('desktop')">
+              🖥️ Desktop (2-Col)
+            </button>
+            <button type="button" id="prevModeMobile" class="btn-action-outline" style="padding:4px 10px; font-size:12px; background:transparent; color:var(--text-muted); border:none; border-radius:6px;" onclick="setPreviewMode('mobile')">
+              📱 Mobile (Stacked)
+            </button>
+          </div>
+        </div>
+
+        <!-- Preview Canvas Container -->
+        <div id="previewContainer" style="background:#050204; border:1px solid rgba(224,176,74,0.3); border-radius:14px; padding:18px; box-shadow:0 12px 32px rgba(0,0,0,0.5); transition:all 0.3s ease;">
+          
+          <!-- Mock Popup Dialog -->
+          <div id="mockPopup" style="background:linear-gradient(155deg, rgba(32,14,22,0.98), rgba(14,6,11,0.99)); border:1px solid #e0b04a; border-radius:14px; overflow:hidden; box-shadow:0 16px 40px rgba(0,0,0,0.8), 0 0 24px rgba(224,176,74,0.18); display:grid; grid-template-columns: 180px 1fr; position:relative;">
+            
+            <!-- Close icon mock -->
+            <div style="position:absolute; top:10px; right:12px; width:26px; height:26px; border-radius:50%; background:rgba(255,255,255,0.08); border:1px solid rgba(224,176,74,0.3); color:#f7dc9a; display:flex; align-items:center; justify-content:center; font-size:12px; z-index:10;">✕</div>
+
+            <!-- Left Image Column -->
+            <div id="mockImageCol" style="position:relative; min-height:220px; background:#12080d; overflow:hidden;">
+              <img id="mockImage" src="{{ draft.image_url or '/hero/hero-astrology.jpg' }}" alt="Offer Banner" style="width:100%; height:100%; object-fit:cover; object-position:{{ draft.image_position or 'center' }}; display:block;">
+              <div style="position:absolute; inset:0; background:linear-gradient(to right, transparent, rgba(14,6,11,0.6));"></div>
+            </div>
+
+            <!-- Right Offer Column -->
+            <div id="mockOfferCol" style="padding:18px 16px; display:flex; flex-direction:column; justify-content:center; text-align:left;">
+              <div style="display:inline-flex; align-items:center; gap:5px; font-size:10px; color:#e0b04a; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">
+                <span>✨</span> <span>Cosmic Blessing</span>
+              </div>
+
+              <div id="mockHighlight" style="display:inline-block; font-size:11px; font-weight:700; color:#0a0508; background:#e0b04a; padding:2px 8px; border-radius:4px; margin-bottom:6px; align-self:flex-start;">
+                {{ draft.offer_highlight or '10% OFF' }}
+              </div>
+
+              <h4 id="mockHeading" style="font-family:'Cinzel', serif; font-size:16px; color:#f7dc9a; margin:0 0 6px 0; line-height:1.25;">
+                {{ draft.heading or 'Your Cosmic Welcome' }}
+              </h4>
+
+              <p id="mockDesc" style="font-size:11px; color:#f6ecd9; margin:0 0 12px 0; line-height:1.4;">
+                {{ draft.description or 'Enjoy a special offer on your first order.' }}
+              </p>
+
+              <!-- Coupon badge mock -->
+              <div id="mockCouponBox" style="background:rgba(224,176,74,0.08); border:1px dashed #e0b04a; border-radius:6px; padding:6px 10px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                  <div style="font-size:8px; color:#b9a68c; text-transform:uppercase;">Coupon Code</div>
+                  <div id="mockCouponCode" style="font-family:'Cinzel', serif; font-size:13px; font-weight:700; color:#f7dc9a;">
+                    {{ draft.coupon_code or 'WELCOME10' }}
+                  </div>
+                </div>
+                <div style="font-size:9px; background:rgba(255,255,255,0.08); border:1px solid rgba(224,176,74,0.3); color:#f7dc9a; padding:3px 8px; border-radius:4px;">Copy</div>
+              </div>
+
+              <!-- Main Button Mock -->
+              <div id="mockBtn" style="background:linear-gradient(135deg, #e0b04a, #a8701c); color:#0a0508; text-align:center; font-weight:700; font-size:12px; padding:8px 12px; border-radius:6px; margin-bottom:6px; box-shadow:0 4px 12px rgba(224,176,74,0.25);">
+                {{ draft.button_label or 'Claim My Offer' }}
+              </div>
+
+              <!-- Maybe Later Mock -->
+              <div style="text-align:center; font-size:10px; color:#b9a68c; text-decoration:underline; margin-bottom:8px;">Maybe Later</div>
+
+              <!-- Terms Mock -->
+              <div id="mockTerms" style="font-size:8px; color:#7d6a55; line-height:1.3;">
+                {{ draft.terms or '*Valid on eligible items on your first order.' }}
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+        <div style="margin-top:1rem; font-size:0.78rem; color:var(--text-muted); text-align:center;">
+          Preview updates automatically as you edit fields.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</form>
+
+<script>
+function setPreviewMode(mode) {
+  const container = document.getElementById('previewContainer');
+  const mock = document.getElementById('mockPopup');
+  const btnD = document.getElementById('prevModeDesktop');
+  const btnM = document.getElementById('prevModeMobile');
+
+  if (mode === 'mobile') {
+    container.style.maxWidth = '320px';
+    container.style.margin = '0 auto';
+    mock.style.gridTemplateColumns = '1fr';
+    document.getElementById('mockImageCol').style.height = '140px';
+    document.getElementById('mockImageCol').style.minHeight = '140px';
+    btnM.style.background = 'var(--gold-400)';
+    btnM.style.color = '#000';
+    btnD.style.background = 'transparent';
+    btnD.style.color = 'var(--text-muted)';
+  } else {
+    container.style.maxWidth = '100%';
+    container.style.margin = '0';
+    mock.style.gridTemplateColumns = '180px 1fr';
+    document.getElementById('mockImageCol').style.height = 'auto';
+    document.getElementById('mockImageCol').style.minHeight = '220px';
+    btnD.style.background = 'var(--gold-400)';
+    btnD.style.color = '#000';
+    btnM.style.background = 'transparent';
+    btnM.style.color = 'var(--text-muted)';
+  }
+}
+
+function updateLivePreview() {
+  const heading = document.getElementById('heading_input').value || 'Your Cosmic Welcome';
+  const desc = document.getElementById('desc_input').value || 'Enjoy a special offer on your first order.';
+  const highlight = document.getElementById('highlight_input').value;
+  const couponSelect = document.getElementById('coupon_select');
+  const couponCode = couponSelect.value;
+  const btnLabel = document.getElementById('btn_label_input').value || 'Claim My Offer';
+  const terms = document.getElementById('terms_input').value || '';
+  const imgUrl = document.getElementById('image_url').value || '/hero/hero-astrology.jpg';
+  const position = document.getElementById('image_position').value || 'center';
+
+  document.getElementById('mockHeading').textContent = heading;
+  document.getElementById('mockDesc').textContent = desc;
+  document.getElementById('mockHighlight').textContent = highlight || (couponCode ? 'SPECIAL OFFER' : 'WELCOME GIFT');
+  document.getElementById('mockHighlight').style.display = (highlight || couponCode) ? 'inline-block' : 'none';
+  document.getElementById('mockBtn').textContent = btnLabel;
+  document.getElementById('mockTerms').textContent = terms;
+  document.getElementById('mockImage').style.objectPosition = position;
+  document.getElementById('imagePreviewThumb').style.objectPosition = position;
+
+  if (couponCode) {
+    document.getElementById('mockCouponBox').style.display = 'flex';
+    document.getElementById('mockCouponCode').textContent = couponCode;
+  } else {
+    document.getElementById('mockCouponBox').style.display = 'none';
+  }
+}
+
+function handleCouponSelect(selectElem) {
+  const selectedOpt = selectElem.options[selectElem.selectedIndex];
+  if (selectedOpt && selectedOpt.value) {
+    const val = selectedOpt.getAttribute('data-val');
+    const type = selectedOpt.getAttribute('data-type');
+    const highlightInput = document.getElementById('highlight_input');
+    if (!highlightInput.value || highlightInput.value.includes('%') || highlightInput.value.includes('₹')) {
+      if (type === 'percentage') {
+        highlightInput.value = parseInt(val) + '% OFF';
+      } else {
+        highlightInput.value = '₹' + parseInt(val) + ' OFF';
+      }
+    }
+  }
+  updateLivePreview();
+}
+
+function handleActionChange(selectElem) {
+  const group = document.getElementById('targetUrlGroup');
+  if (selectElem.value === 'open_link') {
+    group.style.display = 'block';
+  } else {
+    group.style.display = 'none';
+  }
+}
+
+function previewSelectedImage(input) {
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      document.getElementById('imagePreviewThumb').src = e.target.result;
+      document.getElementById('mockImage').src = e.target.result;
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
+// Initial setup
+document.addEventListener('DOMContentLoaded', function() {
+  updateLivePreview();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}Banners, Logos & Visual Assets{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Banners, Logos & Announcements</h1>
+    <p class="page-subtitle">Manage storefront hero banners, top announcements, promotional ribbons, brand logo, and background images.</p>
+  </div>
+  <div class="page-header-actions">
+    <button type="button" class="btn-primary" onclick="openModal('addBannerModal')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+      Add Asset / Banner
+    </button>
+  </div>
+</div>
+
+<div class="dashboard-card">
+  <div class="table-responsive">
+    <table class="spiritual-table">
+      <thead>
+        <tr>
+          <th style="width:70px;">Asset</th>
+          <th>Title & Subtitle</th>
+          <th>Placement / Role</th>
+          <th>Button / Link</th>
+          <th>Order</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in banners %}
+        <tr>
+          <td>
+            <div style="width:48px; height:48px; border-radius:8px; overflow:hidden; border:1px solid var(--border-color); background:var(--bg-card-subtle); display:flex; align-items:center; justify-content:center;">
+              {% if b.image_url %}
+                <img src="{{ b.image_url }}" alt="{{ b.title }}" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.parentElement.innerHTML='<span style=\'font-size:10px; color:var(--text-muted);\'>No Img</span>';">
+              {% else %}
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--text-muted);"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+              {% endif %}
+            </div>
+          </td>
+          <td>
+            <div style="font-weight:600; font-size:0.9rem;">{{ b.title }}</div>
+            <div style="font-size:0.75rem; color:var(--text-muted); max-width:320px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ b.subtitle or '-' }}</div>
+          </td>
+          <td>
+            {% if b.position == 'hero' %}
+              <span class="badge" style="background:#fef3c7; color:#b45309; font-weight:700;">HERO BANNER</span>
+            {% elif b.position == 'topbar' %}
+              <span class="badge" style="background:#eff6ff; color:#1d4ed8; font-weight:700;">TOP ANNOUNCEMENT</span>
+            {% elif b.position == 'promo' %}
+              <span class="badge" style="background:#f5f3ff; color:#6d28d9; font-weight:700;">PROMO RIBBON</span>
+            {% elif b.position == 'logo' %}
+              <span class="badge" style="background:#e6f8ef; color:#047857; font-weight:700;">BRAND LOGO</span>
+            {% elif b.position in ['hero_bg', 'bg_image'] %}
+              <span class="badge" style="background:#ffedd5; color:#c2410c; font-weight:700;">BACKGROUND IMG</span>
+            {% else %}
+              <span class="badge badge-delivered" style="text-transform:uppercase;">{{ b.position }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <div style="font-size:0.8rem; font-weight:600;">{{ b.button_text or '-' }}</div>
+            <div style="font-size:0.72rem; color:var(--text-muted); font-family:monospace;">{{ b.link_url or '-' }}</div>
+          </td>
+          <td>{{ b.sort_order }}</td>
+          <td>
+            <span class="badge badge-{{ 'delivered' if b.is_active else 'cancelled' }}">
+              {{ 'Active' if b.is_active else 'Inactive' }}
+            </span>
+          </td>
+          <td>
+            <div style="display:flex; gap:0.4rem;">
+              <button type="button" class="btn-action-outline" onclick="openEditBannerModal({{ b.id }}, '{{ b.title|replace('\'', '\\\'') }}', '{{ (b.subtitle or '')|replace('\'', '\\\'') }}', '{{ b.position }}', '{{ b.link_url or '' }}', '{{ b.button_text or '' }}', {{ b.sort_order }}, {{ 'true' if b.is_active else 'false' }}, '{{ b.image_url or '' }}')">Edit</button>
+              <form action="{{ url_for('content.banner_delete', banner_id=b.id) }}" method="POST" onsubmit="return confirm('Delete this asset / banner?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn-action-outline" style="color:var(--status-red-text); border-color:#fca5a5;">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted);">No banners, logos, or background assets recorded.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Banner Modal -->
+<div class="modal-overlay" id="addBannerModal">
+  <div class="modal-container" style="max-width:580px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Create Banner, Logo or Background</h3>
+      <button type="button" class="modal-close" onclick="closeModal('addBannerModal')">&times;</button>
+    </div>
+    <form action="{{ url_for('content.banner_create') }}" method="POST" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body">
+        
+        <div class="form-group">
+          <label class="form-label">Title / Label *</label>
+          <input type="text" name="title" class="form-control" required placeholder="e.g. Swami Guruji Official Brand Logo or परंपरेतून मार्गदर्शन">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Subtitle / Description</label>
+          <input type="text" name="subtitle" class="form-control" placeholder="e.g. Authentic Rudraksha · Certified Gemstones · Sacred Yantra">
+        </div>
+
+        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Placement Role *</label>
+            <select name="position" class="form-control" required>
+              <option value="hero">Hero Section Banner</option>
+              <option value="topbar">Top Announcement Bar</option>
+              <option value="promo">Promotional Ribbon Banner</option>
+              <option value="logo">Website Brand Logo (Navbar & Footer)</option>
+              <option value="hero_bg">Hero Background Image</option>
+              <option value="bg_image">Section / Site Background</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sort Order</label>
+            <input type="number" name="sort_order" class="form-control" value="0">
+          </div>
+        </div>
+
+        <!-- Image Upload & URL -->
+        <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:8px; padding:0.85rem; margin-bottom:1rem;">
+          <label class="form-label" style="font-weight:600; margin-bottom:0.4rem;">Banner / Logo / Background Image</label>
+          <div style="display:flex; gap:1rem; align-items:center;">
+            <div id="addImgPreviewBox" style="width:54px; height:54px; border-radius:6px; border:1px solid var(--border-color); background:#fff; overflow:hidden; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              <span style="font-size:11px; color:var(--text-muted);">Preview</span>
+            </div>
+            <div style="flex:1;">
+              <input type="file" name="banner_image" class="form-control" accept="image/*" onchange="previewModalImg(this, 'addImgPreviewBox')" style="font-size:0.82rem;">
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">Or enter path / URL below if not uploading:</div>
+              <input type="text" name="image_url" class="form-control" style="margin-top:0.25rem; font-size:0.82rem;" placeholder="/swami-guruji-logo-cropped.jpg or https://...">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Button Text</label>
+            <input type="text" name="button_text" class="form-control" value="Explore Collection →" placeholder="e.g. Shop Now →">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Link URL / Anchor</label>
+            <input type="text" name="link_url" class="form-control" value="#shop" placeholder="#shop or /products">
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('addBannerModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Create Asset</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Banner Modal -->
+<div class="modal-overlay" id="editBannerModal">
+  <div class="modal-container" style="max-width:580px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Edit Asset / Banner</h3>
+      <button type="button" class="modal-close" onclick="closeModal('editBannerModal')">&times;</button>
+    </div>
+    <form id="editBannerForm" action="" method="POST" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body">
+        
+        <div class="form-group">
+          <label class="form-label">Title / Label *</label>
+          <input type="text" name="title" id="editBannerTitle" class="form-control" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Subtitle / Description</label>
+          <input type="text" name="subtitle" id="editBannerSubtitle" class="form-control">
+        </div>
+
+        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Placement Role *</label>
+            <select name="position" id="editBannerPosition" class="form-control">
+              <option value="hero">Hero Section Banner</option>
+              <option value="topbar">Top Announcement Bar</option>
+              <option value="promo">Promotional Ribbon Banner</option>
+              <option value="logo">Website Brand Logo (Navbar & Footer)</option>
+              <option value="hero_bg">Hero Background Image</option>
+              <option value="bg_image">Section / Site Background</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sort Order</label>
+            <input type="number" name="sort_order" id="editBannerSortOrder" class="form-control">
+          </div>
+        </div>
+
+        <!-- Image Upload & URL in Edit -->
+        <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:8px; padding:0.85rem; margin-bottom:1rem;">
+          <label class="form-label" style="font-weight:600; margin-bottom:0.4rem;">Banner / Logo / Background Image</label>
+          <div style="display:flex; gap:1rem; align-items:center;">
+            <div id="editImgPreviewBox" style="width:54px; height:54px; border-radius:6px; border:1px solid var(--border-color); background:#fff; overflow:hidden; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              <img id="editImgPreviewTag" src="" alt="preview" style="width:100%; height:100%; object-fit:cover; display:none;">
+              <span id="editImgNoPreview" style="font-size:11px; color:var(--text-muted);">None</span>
+            </div>
+            <div style="flex:1;">
+              <input type="file" name="banner_image" class="form-control" accept="image/*" onchange="previewModalImg(this, 'editImgPreviewBox')" style="font-size:0.82rem;">
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">Or edit direct URL / path:</div>
+              <input type="text" name="image_url" id="editBannerImageUrl" class="form-control" style="margin-top:0.25rem; font-size:0.82rem;">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Button Text</label>
+            <input type="text" name="button_text" id="editBannerButtonText" class="form-control">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Link URL</label>
+            <input type="text" name="link_url" id="editBannerLinkUrl" class="form-control">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top:0.5rem;">
+          <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+            <input type="checkbox" name="is_active" id="editBannerIsActive" value="1">
+            <span><strong>Asset is Active & Visible</strong></span>
+          </label>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('editBannerModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function previewModalImg(input, boxId) {
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const box = document.getElementById(boxId);
+      if (box) {
+        box.innerHTML = `<img src="${e.target.result}" style="width:100%; height:100%; object-fit:cover;">`;
+      }
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
+function openEditBannerModal(id, title, subtitle, pos, link, btn, order, isActive, imgUrl) {
+  document.getElementById('editBannerForm').action = "/admin/content/banners/" + id + "/edit";
+  document.getElementById('editBannerTitle').value = title;
+  document.getElementById('editBannerSubtitle').value = subtitle;
+  document.getElementById('editBannerPosition').value = pos;
+  document.getElementById('editBannerLinkUrl').value = link;
+  document.getElementById('editBannerButtonText').value = btn;
+  document.getElementById('editBannerSortOrder').value = order;
+  document.getElementById('editBannerIsActive').checked = isActive;
+  document.getElementById('editBannerImageUrl').value = imgUrl || '';
+
+  const prevTag = document.getElementById('editImgPreviewTag');
+  const prevNone = document.getElementById('editImgNoPreview');
+  if (imgUrl) {
+    prevTag.src = imgUrl;
+    prevTag.style.display = 'block';
+    prevNone.style.display = 'none';
+  } else {
+    prevTag.style.display = 'none';
+    prevNone.style.display = 'block';
+  }
+
+  openModal('editBannerModal');
+}
+</script>
+{% endblock %}

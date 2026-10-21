@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Logs{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">System Audit Logs</h1>
+    <p class="page-subtitle">Immutable security trail of administrative logins, role updates, stock changes, and refunds.</p>
+  </div>
+</div>
+
+<!-- Filters Bar -->
+<div class="dashboard-card" style="margin-bottom:1.5rem; padding:1rem 1.25rem;">
+  <form method="GET" action="{{ url_for('system.audit_logs_list') }}" style="display:flex; gap:1rem; flex-wrap:wrap; align-items:center;">
+    <div style="min-width:180px;">
+      <select name="module" class="form-control" onchange="this.form.submit()">
+        <option value="">All Modules</option>
+        <option value="auth" {% if selected_module == 'auth' %}selected{% endif %}>Authentication</option>
+        <option value="commerce" {% if selected_module == 'commerce' %}selected{% endif %}>Commerce & Inventory</option>
+        <option value="services" {% if selected_module == 'services' %}selected{% endif %}>Services & Bookings</option>
+        <option value="system" {% if selected_module == 'system' %}selected{% endif %}>System & Roles</option>
+        <option value="operations" {% if selected_module == 'operations' %}selected{% endif %}>Operations</option>
+      </select>
+    </div>
+    <div style="min-width:180px;">
+      <select name="action" class="form-control" onchange="this.form.submit()">
+        <option value="">All Actions</option>
+        <option value="LOGIN_SUCCESS" {% if selected_action == 'LOGIN_SUCCESS' %}selected{% endif %}>LOGIN_SUCCESS</option>
+        <option value="FAILED_LOGIN" {% if selected_action == 'FAILED_LOGIN' %}selected{% endif %}>FAILED_LOGIN</option>
+        <option value="STOCK_ADJUSTMENT" {% if selected_action == 'STOCK_ADJUSTMENT' %}selected{% endif %}>STOCK_ADJUSTMENT</option>
+        <option value="ORDER_STATUS_CHANGE" {% if selected_action == 'ORDER_STATUS_CHANGE' %}selected{% endif %}>ORDER_STATUS_CHANGE</option>
+        <option value="ORDER_REFUND" {% if selected_action == 'ORDER_REFUND' %}selected{% endif %}>ORDER_REFUND</option>
+        <option value="ADMIN_ROLE_CHANGE" {% if selected_action == 'ADMIN_ROLE_CHANGE' %}selected{% endif %}>ADMIN_ROLE_CHANGE</option>
+      </select>
+    </div>
+    <button type="submit" class="btn-secondary">Filter Logs</button>
+  </form>
+</div>
+
+<!-- Audit Logs Table -->
+<div class="dashboard-card">
+  <div class="table-responsive">
+    <table class="spiritual-table">
+      <thead>
+        <tr>
+          <th>Timestamp (IST)</th>
+          <th>Actor Email</th>
+          <th>Action</th>
+          <th>Module</th>
+          <th>Entity</th>
+          <th>Change Details</th>
+          <th>Client IP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td style="white-space:nowrap; color:var(--text-muted); font-size:0.78rem;">
+            {{ format_date(log.created_at, "%b %d, %Y %I:%M:%S %p") }}
+          </td>
+          <td style="font-weight:600;">{{ log.actor_email }}</td>
+          <td>
+            <span class="badge {% if 'FAILED' in log.action or 'LOCKED' in log.action %}badge-cancelled{% elif 'SUCCESS' in log.action or 'CREATE' in log.action %}badge-delivered{% else %}badge-processing{% endif %}" style="font-family:monospace; font-size:0.7rem;">
+              {{ log.action }}
+            </span>
+          </td>
+          <td>{{ log.module|capitalize }}</td>
+          <td style="font-size:0.75rem; color:var(--text-muted);">
+            {% if log.entity_type %}{{ log.entity_type }} #{{ log.entity_id }}{% else %}-{% endif %}
+          </td>
+          <td style="font-family:monospace; font-size:0.72rem; color:var(--text-secondary); max-width:280px; word-break:break-all;">
+            {{ log.details|tojson if log.details else '-' }}
+          </td>
+          <td style="font-family:monospace; font-size:0.75rem; color:var(--text-muted);">{{ log.ip_address }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted);">No audit log entries recorded matching criteria.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

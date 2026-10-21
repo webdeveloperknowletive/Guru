@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}Jyotish Consultations{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Jyotish Consultations</h1>
+    <p class="page-subtitle">Astrological guidance, birth chart analysis, and confidential astrologer notes.</p>
+  </div>
+  <div class="page-header-actions">
+    <div style="display:flex; gap:0.5rem; align-items:center;">
+      <button type="button" class="btn-primary" onclick="openModal('addConsultationModal')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+        New Consultation
+      </button>
+      <a href="{{ url_for('services.consultations_list') }}" class="btn-secondary">All Requests</a>
+      <a href="{{ url_for('services.consultations_list', status='pending') }}" class="btn-secondary" style="color:var(--status-amber-text);">Pending Review</a>
+    </div>
+  </div>
+</div>
+
+<div class="dashboard-card">
+  <div class="table-responsive">
+    <table class="spiritual-table">
+      <thead>
+        <tr>
+          <th>Ref #</th>
+          <th>Devotee Name</th>
+          <th>Birth Details</th>
+          <th>Topic</th>
+          <th>Scheduled Date</th>
+          <th>Mode</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in consultations %}
+        <tr>
+          <td style="font-weight:700; font-family:monospace;">{{ c.consultation_number }}</td>
+          <td>
+            <div style="font-weight:600;">{{ c.customer_name }}</div>
+            <div style="font-size:0.72rem; color:var(--text-muted);">{{ c.customer_email }}</div>
+          </td>
+          <td style="font-size:0.78rem;">
+            <div>DOB: <strong>{{ c.dob.strftime('%d %b %Y') }}</strong> ({{ c.tob }})</div>
+            <div style="color:var(--text-muted);">POB: {{ c.pob }}</div>
+          </td>
+          <td>
+            <span style="font-weight:600; color:var(--saffron-700);">{{ c.topic }}</span>
+          </td>
+          <td style="white-space:nowrap;">
+            {% if c.scheduled_at %}
+              {{ format_date(c.scheduled_at, "%b %d, %Y %I:%M %p") }}
+            {% else %}
+              <span style="color:var(--text-muted); font-style:italic;">Awaiting slot</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge badge-type-consultation">
+              {{ c.consultation_type|replace('_', ' ')|capitalize }}
+            </span>
+          </td>
+          <td>
+            <span class="badge badge-{{ 'confirmed' if c.status == 'confirmed' else ('delivered' if c.status == 'completed' else 'pending') }}">
+              {{ c.status }}
+            </span>
+          </td>
+          <td>
+            <div style="display:flex; gap:0.4rem; align-items:center;">
+              <button type="button" class="btn-action-outline" onclick="openConsultationModal('{{ c.id }}', '{{ c.consultation_number }}', '{{ c.status }}', '{{ c.meeting_link or '' }}', '{{ (c.astrologer_notes or '')|escapejs }}')">
+                Manage
+              </button>
+              <form action="{{ url_for('services.consultation_delete', consultation_id=c.id) }}" method="POST" onsubmit="return confirm('Delete consultation {{ c.consultation_number }}?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn-action-outline" style="color:var(--status-red-text); border-color:#fca5a5;">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">No consultation requests found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Consultation Modal -->
+<div class="modal-overlay" id="addConsultationModal">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 class="modal-title">Book Jyotish Consultation</h3>
+      <button type="button" class="modal-close" onclick="closeModal('addConsultationModal')">&times;</button>
+    </div>
+    <form action="{{ url_for('services.consultation_create') }}" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Devotee Name *</label>
+            <input type="text" name="customer_name" class="form-control" required placeholder="e.g. Ramesh Kulkarni">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email Address *</label>
+            <input type="email" name="customer_email" class="form-control" required placeholder="ramesh@example.com">
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Phone / WhatsApp</label>
+            <input type="text" name="customer_phone" class="form-control" placeholder="+91 98220 12345">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Consultation Topic</label>
+            <select name="topic" class="form-control">
+              <option value="Kundali Consultation">Kundali Consultation (पत्रिका विश्लेषण)</option>
+              <option value="Career Guidance">Career & Business (व्यवसाय व नोकरी)</option>
+              <option value="Marriage Matchmaking">Marriage Matchmaking (विवाह / गुणमिलन)</option>
+              <option value="Gemstone Recommendation">Gemstone Recommendation (रत्न सल्ला)</option>
+              <option value="Dosha Nivarana">Dosha Nivarana (दोष निवारण व शांती)</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Birth Date *</label>
+            <input type="date" name="dob" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Birth Time (TOB)</label>
+            <input type="text" name="tob" class="form-control" placeholder="07:30 AM" value="10:00 AM">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Place of Birth *</label>
+            <input type="text" name="pob" class="form-control" placeholder="Pune, Maharashtra" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Assign Astrologer</label>
+          <input type="text" name="astrologer_name" class="form-control" value="Acharya Shastri Ji">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('addConsultationModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Create Consultation</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Manage Consultation Modal -->
+<div class="modal-overlay" id="manageConsultationModal">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modalConsultTitle">Manage Consultation</h3>
+      <button type="button" class="modal-close" onclick="closeModal('manageConsultationModal')">&times;</button>
+    </div>
+    <form id="manageConsultForm" action="" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select name="status" id="modalConsultStatus" class="form-control">
+            <option value="pending">Pending Review</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Online Meeting Link (Google Meet / Zoom)</label>
+          <input type="text" name="meeting_link" id="modalConsultLink" class="form-control" placeholder="https://meet.google.com/xyz-abc-def">
+        </div>
+
+        {% if can_view_notes %}
+          <div class="form-group">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
+              <label class="form-label" style="margin-bottom:0;">Astrologer Confidential Notes</label>
+              <span style="font-size:0.68rem; color:var(--text-muted);">Only Astrologers & Super Admin</span>
+            </div>
+            <textarea name="astrologer_notes" id="modalConsultNotes" class="form-control" rows="4" placeholder="Dasha analysis, transit notes, dosha nivarana remedies, suggested gemstone..."></textarea>
+          </div>
+        {% else %}
+          <div style="padding:10px; background:#fef2f2; border-radius:6px; font-size:0.8rem; color:#991b1b;">
+            🔒 You do not have permission to view or edit restricted astrologer birth chart notes.
+          </div>
+        {% endif %}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('manageConsultationModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Update Consultation</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function openConsultationModal(id, num, status, link, notes) {
+    document.getElementById("modalConsultTitle").innerText = "Consultation " + num;
+    document.getElementById("manageConsultForm").action = "/admin/services/consultations/" + id + "/update";
+    document.getElementById("modalConsultStatus").value = status;
+    document.getElementById("modalConsultLink").value = link;
+    const notesEl = document.getElementById("modalConsultNotes");
+    if (notesEl) {
+      notesEl.value = notes;
+    }
+    openModal("manageConsultationModal");
+  }
+</script>
+{% endblock %}

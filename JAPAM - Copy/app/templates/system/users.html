@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Users & Roles{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Admin Users & Access Control</h1>
+    <p class="page-subtitle">Manage administrative accounts, role assignments, and security privileges.</p>
+  </div>
+  <div class="page-header-actions">
+    <button type="button" class="btn-primary" onclick="openModal('addUserModal')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+      Add Admin User
+    </button>
+  </div>
+</div>
+
+<div class="dashboard-card">
+  <div class="table-responsive">
+    <table class="spiritual-table">
+      <thead>
+        <tr>
+          <th>Admin Name</th>
+          <th>Email Address</th>
+          <th>Assigned Role</th>
+          <th>Last Login (IST)</th>
+          <th>Account Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td style="font-weight:600;">
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <div class="user-avatar-placeholder" style="width:28px; height:28px; font-size:0.75rem;">
+                {{ u.full_name[:1] }}
+              </div>
+              {{ u.full_name }}
+            </div>
+          </td>
+          <td style="color:var(--text-secondary);">{{ u.email }}</td>
+          <td>
+            <span class="badge {% if u.role and u.role.code == 'super_admin' %}badge-type-puja{% else %}badge-confirmed{% endif %}">
+              {{ u.role.name if u.role else 'No Role' }}
+            </span>
+          </td>
+          <td style="white-space:nowrap; color:var(--text-muted);">
+            {% if u.last_login_at %}
+              {{ format_date(u.last_login_at, "%b %d, %Y %I:%M %p") }}
+            {% else %}
+              Never
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge badge-{{ 'delivered' if u.is_active else 'cancelled' }}">
+              {{ 'Active' if u.is_active else 'Deactivated' }}
+            </span>
+          </td>
+          <td>
+            <button type="button" class="btn-action-outline" onclick="openEditRoleModal('{{ u.id }}', '{{ u.full_name|escape }}', '{{ u.role_id }}', '{{ 1 if u.is_active else 0 }}')">
+              Edit Role
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add User Modal -->
+<div class="modal-overlay" id="addUserModal">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 class="modal-title">Create Admin User</h3>
+      <button type="button" class="modal-close-btn" onclick="closeModal('addUserModal')">&times;</button>
+    </div>
+    <form action="{{ url_for('system.user_create') }}" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Full Name *</label>
+          <input type="text" name="full_name" class="form-control" placeholder="Pandit Ramesh Joshi" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Admin Email *</label>
+          <input type="email" name="email" class="form-control" placeholder="ramesh@japam.in" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Temporary Password *</label>
+          <input type="password" name="password" class="form-control" minlength="8" placeholder="Minimum 8 characters" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Assigned Role *</label>
+          <select name="role_id" class="form-control" required>
+            {% for r in roles %}
+              <option value="{{ r.id }}">{{ r.name }} ({{ r.description }})</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('addUserModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Create User</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Role Modal -->
+<div class="modal-overlay" id="editRoleModal">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 class="modal-title" id="editRoleModalTitle">Update Role & Access</h3>
+      <button type="button" class="modal-close-btn" onclick="closeModal('editRoleModal')">&times;</button>
+    </div>
+    <form id="editRoleForm" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Assigned Role</label>
+          <select name="role_id" id="modalEditRoleId" class="form-control">
+            {% for r in roles %}
+              <option value="{{ r.id }}">{{ r.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Account Status</label>
+          <select name="is_active" id="modalEditIsActive" class="form-control">
+            <option value="1">Active Account</option>
+            <option value="0">Deactivated (Block Access)</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('editRoleModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Save Role Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function openEditRoleModal(id, name, roleId, isActive) {
+    document.getElementById("editRoleModalTitle").innerText = "Edit " + name;
+    document.getElementById("editRoleForm").action = "/admin/system/users/" + id + "/role";
+    document.getElementById("modalEditRoleId").value = roleId;
+    document.getElementById("modalEditIsActive").value = isActive;
+    openModal("editRoleModal");
+  }
+</script>
+{% endblock %}

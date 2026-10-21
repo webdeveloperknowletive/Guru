@@ -1,0 +1,494 @@
+{% extends "base.html" %}
+
+{% block title %}Spiritual Products{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Spiritual Products</h1>
+    <p class="page-subtitle">Manage Ratna, Rudraksha, Yantra, Bracelets, and Puja Samagri collections.</p>
+  </div>
+  <div class="page-header-actions">
+    <button type="button" class="btn-primary" onclick="openAddProductModal('{{ selected_category or "" }}')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+      Add Product
+    </button>
+  </div>
+</div>
+
+<!-- Active / Archived / All Quick Filter Tabs -->
+<div style="display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap; align-items:center;">
+  <a href="{{ url_for('commerce.products_list', archive_status='all', category_id=selected_category, status=selected_status, q=search_query) }}"
+     class="btn-secondary" style="padding:0.45rem 1rem; font-size:0.84rem; text-decoration:none; display:inline-flex; align-items:center; gap:6px; {% if archive_status == 'all' %}background:var(--saffron-500, #f59e0b); color:#fff; font-weight:700; border-color:var(--saffron-600, #d97706);{% endif %}">
+    <span>All Products</span>
+    <span style="font-size:0.75rem; padding:1px 6px; border-radius:99px; background:rgba(0,0,0,0.15);">{{ count_all }}</span>
+  </a>
+  <a href="{{ url_for('commerce.products_list', archive_status='active', category_id=selected_category, status=selected_status, q=search_query) }}"
+     class="btn-secondary" style="padding:0.45rem 1rem; font-size:0.84rem; text-decoration:none; display:inline-flex; align-items:center; gap:6px; {% if not archive_status or archive_status == 'active' %}background:var(--saffron-500, #f59e0b); color:#fff; font-weight:700; border-color:var(--saffron-600, #d97706);{% endif %}">
+    <span>Active</span>
+    <span style="font-size:0.75rem; padding:1px 6px; border-radius:99px; background:rgba(0,0,0,0.15);">{{ count_active }}</span>
+  </a>
+  <a href="{{ url_for('commerce.products_list', archive_status='archived', category_id=selected_category, status=selected_status, q=search_query) }}"
+     class="btn-secondary" style="padding:0.45rem 1rem; font-size:0.84rem; text-decoration:none; display:inline-flex; align-items:center; gap:6px; {% if archive_status == 'archived' %}background:var(--saffron-500, #f59e0b); color:#fff; font-weight:700; border-color:var(--saffron-600, #d97706);{% endif %}">
+    <span>Archived</span>
+    <span style="font-size:0.75rem; padding:1px 6px; border-radius:99px; background:rgba(0,0,0,0.15);">{{ count_archived }}</span>
+  </a>
+</div>
+
+<!-- Filters Bar -->
+<div class="dashboard-card" style="margin-bottom: 1.5rem; padding: 1rem 1.25rem;">
+  <form method="GET" action="{{ url_for('commerce.products_list') }}" style="display:flex; gap:1rem; flex-wrap:wrap; align-items:center;">
+    <div style="flex:1; min-width:200px;">
+      <input type="text" name="q" class="form-control" placeholder="Search by product name or SKU..." value="{{ search_query or '' }}">
+    </div>
+    <div style="min-width:160px;">
+      <select name="category_id" class="form-control" onchange="this.form.submit()">
+        <option value="">All Categories</option>
+        {% for cat in categories %}
+          <option value="{{ cat.id }}" {% if selected_category == cat.id or selected_category == cat.id|string or (selected_category|string|lower == cat.name|lower) or (selected_category|string|lower == cat.slug|lower) %}selected{% endif %}>{{ cat.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="min-width:150px;">
+      <select name="archive_status" class="form-control" onchange="this.form.submit()">
+        <option value="all" {% if not archive_status or archive_status == 'all' %}selected{% endif %}>Filter: All ({{ count_all }})</option>
+        <option value="active" {% if archive_status == 'active' %}selected{% endif %}>Filter: Active ({{ count_active }})</option>
+        <option value="archived" {% if archive_status == 'archived' %}selected{% endif %}>Filter: Archived ({{ count_archived }})</option>
+      </select>
+    </div>
+    <div style="min-width:140px;">
+      <select name="status" class="form-control" onchange="this.form.submit()">
+        <option value="">All Publication States</option>
+        <option value="published" {% if selected_status == 'published' %}selected{% endif %}>Published</option>
+        <option value="draft" {% if selected_status == 'draft' %}selected{% endif %}>Draft</option>
+      </select>
+    </div>
+    <button type="submit" class="btn-secondary">Filter</button>
+  </form>
+</div>
+
+<!-- Products Table Card -->
+<div class="dashboard-card">
+  <div class="table-responsive">
+    <table class="spiritual-table">
+      <thead>
+        <tr>
+          <th style="width:70px; text-align:center;">Rank</th>
+          <th>Product Name & Specs</th>
+          <th>SKU</th>
+          <th>Category</th>
+          <th>Price</th>
+          <th>Stock</th>
+          <th>Certification</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for prod in products %}
+        <tr>
+          <td style="text-align:center;">
+            <span style="display:inline-flex; align-items:center; justify-content:center; min-width:32px; height:26px; padding:0 6px; border-radius:99px; background:rgba(224,176,74,0.18); color:var(--saffron-600, #d97706); font-weight:800; font-size:0.8rem; border:1px solid rgba(224,176,74,0.38);">
+              #{{ prod.display_rank if prod.display_rank is not none else 1 }}
+            </span>
+          </td>
+          <td>
+            <div class="product-cell">
+              <img src="{{ prod.thumbnail or '/static/img/product-default.png' }}" alt="{{ prod.name }}" class="product-thumb" onerror="this.src='/static/img/product-default.png'">
+              <div>
+                <div style="font-weight:600;">{{ prod.name }}</div>
+                {% if prod.attributes %}
+                  <div style="font-size:0.72rem; color:var(--text-muted);">
+                    {% for k, v in prod.attributes.items() %}
+                      <span style="margin-right:6px;"><strong>{{ k|capitalize }}:</strong> {{ v }}</span>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          </td>
+          <td style="font-size:0.78rem; font-family:monospace; color:var(--text-muted);">{{ prod.sku }}</td>
+          <td>{{ prod.category.name if prod.category else '-' }}</td>
+          <td style="font-weight:600;">{{ format_currency(prod.price) }}</td>
+          <td>
+            <span class="{% if prod.is_low_stock %}stock-alert-text{% endif %}">
+              {{ prod.stock_quantity }}
+            </span>
+          </td>
+          <td>
+            <span class="badge badge-{{ 'delivered' if prod.certification_status == 'certified' else 'pending' }}">
+              {{ prod.certification_status }}
+            </span>
+          </td>
+          <td>
+            {% if prod.is_archived or prod.publishing_status == 'archived' %}
+              <span class="badge badge-cancelled">Archived</span>
+            {% elif prod.publishing_status == 'published' %}
+              <span class="badge badge-published">Published</span>
+            {% else %}
+              <span class="badge badge-processing">Draft</span>
+            {% endif %}
+          </td>
+          <td>
+            <div style="display:flex; gap:0.4rem; align-items:center;">
+              <button type="button" class="btn-action-outline" onclick="openEditProductModal({{ prod.id }}, '{{ prod.name|replace('\'', '\\\'') }}', {{ prod.category_id or 'null' }}, '{{ prod.price }}', '{{ prod.compare_price or '' }}', {{ prod.stock_quantity }}, {{ prod.low_stock_threshold }}, '{{ prod.certification_status }}', '{{ prod.publishing_status }}', '{{ (prod.thumbnail or '')|replace('\'', '\\\'') }}', '{{ (prod.description or '')|replace('\'', '\\\'')|replace('\n', ' ') }}', {{ prod.display_rank if prod.display_rank is not none else 1 }})">Edit</button>
+              {% if prod.is_archived or prod.publishing_status == 'archived' %}
+                <form action="{{ url_for('commerce.product_unarchive', product_id=prod.id) }}?archive_status={{ archive_status or 'all' }}" method="POST" onsubmit="return confirm('Are you sure you want to unarchive and restore product '{{ prod.name|replace("'", "\\'") }}'?');" style="display:inline;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit" class="btn-action-outline" style="color:var(--status-green-text, #059669); border-color:#6ee7b7; font-weight:600;">Unarchive</button>
+                </form>
+              {% else %}
+                <form action="{{ url_for('commerce.product_archive', product_id=prod.id) }}?archive_status={{ archive_status or 'all' }}" method="POST" onsubmit="return confirm('Are you sure you want to archive product '{{ prod.name|replace("'", "\\'") }}'?');" style="display:inline;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit" class="btn-action-outline" style="color:var(--status-yellow-text); border-color:#fcd34d;">Archive</button>
+                </form>
+              {% endif %}
+              <form action="{{ url_for('commerce.product_delete', product_id=prod.id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete product {{ prod.name|replace('\'', '\\\'') }}?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn-action-outline" style="color:var(--status-red-text); border-color:#fca5a5;">Delete</button>
+              </form>
+            </div>
+
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">No spiritual products found matching criteria.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Product Modal -->
+<div class="modal-overlay" id="addProductModal">
+  <div class="modal-container" style="max-width:680px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Add Spiritual Product</h3>
+      <button type="button" class="modal-close-btn" onclick="closeModal('addProductModal')">&times;</button>
+    </div>
+    <form action="{{ url_for('commerce.product_create') }}" method="POST" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body" style="max-height:75vh; overflow-y:auto;">
+        <div style="display:grid; grid-template-columns:2fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Product Title *</label>
+            <input type="text" name="name" class="form-control" placeholder="e.g. 5 Mukhi Rudraksha Mala" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">SKU *</label>
+            <input type="text" name="sku" class="form-control" placeholder="RM-005" required>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Category *</label>
+            <select name="category_id" id="addProdCategory" class="form-control" required>
+              {% for cat in categories %}
+                <option value="{{ cat.id }}" {% if selected_category == cat.id or selected_category == cat.id|string or (selected_category|string|lower == cat.name|lower) or (selected_category|string|lower == cat.slug|lower) %}selected{% endif %}>{{ cat.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Price (₹) *</label>
+            <input type="number" step="0.01" name="price" class="form-control" placeholder="2499.00" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Compare Price (₹)</label>
+            <input type="number" step="0.01" name="compare_price" class="form-control" placeholder="2999.00">
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Initial Stock</label>
+            <input type="number" name="stock_quantity" class="form-control" value="20" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Low Stock Threshold</label>
+            <input type="number" name="low_stock_threshold" class="form-control" value="10" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Certification Status</label>
+            <select name="certification_status" class="form-control">
+              <option value="certified">Lab Certified</option>
+              <option value="standard">Standard</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Publishing Status</label>
+            <select name="publishing_status" class="form-control">
+              <option value="published" selected>Published</option>
+              <option value="draft">Draft</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Spiritual Domain Specs -->
+        <div style="background-color:var(--bg-card-subtle); padding:1rem; border-radius:var(--radius-md); margin-bottom:1rem; border:1px solid var(--border-color);">
+          <span style="font-size:0.8rem; font-weight:700; color:var(--saffron-600); display:block; margin-bottom:0.75rem;">Category Specific Spiritual Attributes</span>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+            <div>
+              <label class="form-label">Mukhi (for Rudraksha)</label>
+              <input type="text" name="attr_mukhi" class="form-control" placeholder="5 Mukhi / Nepali">
+            </div>
+            <div>
+              <label class="form-label">Origin / Holy Location</label>
+              <input type="text" name="attr_origin" class="form-control" placeholder="Nepal / Ceylon / Haridwar">
+            </div>
+            <div>
+              <label class="form-label">Carat / Weight (for Gemstones)</label>
+              <input type="text" name="attr_carat" class="form-control" placeholder="5.25 Ratti / 4.8 Carat">
+            </div>
+            <div>
+              <label class="form-label">Metal Composition (for Yantra)</label>
+              <input type="text" name="attr_metal" class="form-control" placeholder="Pure Copper / Ashtadhatu">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row" style="display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:1rem; align-items:start; margin-bottom:1rem;">
+          <div class="form-group" style="grid-column: span 2;">
+            <label class="form-label" style="display:flex; justify-content:space-between; align-items:center;">
+              <span>Product Image / Thumbnail</span>
+              <span id="addImgStatus" style="font-size:0.75rem; font-weight:normal; color:#10b981;"></span>
+            </label>
+            <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.5rem;">
+              <input type="text" name="thumbnail" id="addProdThumb" class="form-control rounded-lg border-gray-300 text-sm" placeholder="Paste URL, local file path, or choose from folder" style="flex:1;">
+              <label class="btn-secondary" style="margin:0; cursor:pointer; white-space:nowrap; padding:0.5rem 0.75rem; font-size:0.825rem; display:inline-flex; align-items:center; gap:0.35rem; border-radius:6px; background:#f1f5f9; border:1px solid #cbd5e1; color:#334155; font-weight:500;">
+                📁 Choose File
+                <input type="file" name="thumbnail_file" id="addProdFileInput" accept="image/*" style="display:none;" onchange="handleImageSelection(this, 'addProdThumb', 'addProdPreview', 'addImgStatus')">
+              </label>
+            </div>
+            <div id="addProdPreviewWrap" style="display:none; align-items:center; gap:0.75rem; margin-top:0.5rem; padding:0.5rem; border:1px solid #e2e8f0; border-radius:0.5rem; background:#f8fafc;">
+              <img id="addProdPreview" src="" alt="Preview" style="width:48px; height:48px; object-fit:cover; border-radius:6px; border:1px solid #cbd5e1;">
+              <span style="font-size:0.75rem; color:#64748b;">Image selected directly from folder</span>
+            </div>
+            <small class="form-text text-muted" style="font-size:0.75rem; color:var(--text-muted, #94a3b8); display:block; margin-top:3px; line-height:1.3;">Choose image directly from local folder, or paste image URL or file path address.</small>
+          </div>
+          <div class="form-group" style="grid-column: span 1;">
+            <label class="form-label">Display Rank</label>
+            <input type="number" name="display_rank" min="1" step="1" class="form-control rounded-lg border-gray-300 text-sm" value="1" required>
+            <small class="form-text text-muted" style="font-size:0.75rem; color:var(--text-muted, #94a3b8); display:block; margin-top:3px; line-height:1.3;">Determines position on the website (1 = 1st, 2 = 2nd, etc.)</small>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea name="description" class="form-control" rows="3" placeholder="Spiritual benefits, chanting mantra, and energization details..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('addProductModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Save Product</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Product Modal -->
+<div class="modal-overlay" id="editProductModal">
+  <div class="modal-container" style="max-width:680px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Edit Spiritual Product</h3>
+      <button type="button" class="modal-close" onclick="closeModal('editProductModal')">&times;</button>
+    </div>
+    <form id="editProductForm" action="" method="POST" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body">
+        <div class="form-row" style="display:grid; grid-template-columns:2fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Product Name *</label>
+            <input type="text" name="name" id="editProdName" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Category</label>
+            <select name="category_id" id="editProdCategory" class="form-control">
+              {% for cat in categories %}
+                <option value="{{ cat.id }}">{{ cat.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Price (₹) *</label>
+            <input type="number" step="0.01" name="price" id="editProdPrice" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Compare At Price (₹)</label>
+            <input type="number" step="0.01" name="compare_price" id="editProdComparePrice" class="form-control">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Stock Quantity</label>
+            <input type="number" name="stock_quantity" id="editProdStock" class="form-control" required>
+          </div>
+        </div>
+
+        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Low Stock Threshold</label>
+            <input type="number" name="low_stock_threshold" id="editProdThreshold" class="form-control">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Certification Status</label>
+            <select name="certification_status" id="editProdCert" class="form-control">
+              <option value="certified">Certified (Lab Verified)</option>
+              <option value="standard">Standard Quality</option>
+              <option value="premium">Premium Temple Grade</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Publishing Status</label>
+            <select name="publishing_status" id="editProdStatus" class="form-control">
+              <option value="published">Published</option>
+              <option value="draft">Draft</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 3-column row: Thumbnail Image URL (2 cols) & Display Rank (1 col) -->
+        <div class="form-row" style="display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:1rem; align-items:start; margin-bottom:1rem;">
+          <div class="form-group" style="grid-column: span 2;">
+            <label class="form-label" style="display:flex; justify-content:space-between; align-items:center;">
+              <span>Product Image / Thumbnail</span>
+              <span id="editImgStatus" style="font-size:0.75rem; font-weight:normal; color:#10b981;"></span>
+            </label>
+            <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.5rem;">
+              <input type="text" name="thumbnail" id="editProdThumb" class="form-control rounded-lg border-gray-300 text-sm" placeholder="Paste URL, local file path, or choose from folder" style="flex:1;" oninput="updateEditPreviewFromInput()">
+              <label class="btn-secondary" style="margin:0; cursor:pointer; white-space:nowrap; padding:0.5rem 0.75rem; font-size:0.825rem; display:inline-flex; align-items:center; gap:0.35rem; border-radius:6px; background:#f1f5f9; border:1px solid #cbd5e1; color:#334155; font-weight:500;">
+                📁 Choose File
+                <input type="file" name="thumbnail_file" id="editProdFileInput" accept="image/*" style="display:none;" onchange="handleImageSelection(this, 'editProdThumb', 'editProdPreview', 'editImgStatus')">
+              </label>
+            </div>
+            <div id="editProdPreviewWrap" style="display:flex; align-items:center; gap:0.75rem; margin-top:0.5rem; padding:0.5rem; border:1px solid #e2e8f0; border-radius:0.5rem; background:#f8fafc;">
+              <img id="editProdPreview" src="" alt="Preview" style="width:48px; height:48px; object-fit:cover; border-radius:6px; border:1px solid #cbd5e1;" onerror="this.style.display='none'" onload="this.style.display='block'">
+              <span id="editProdPreviewText" style="font-size:0.75rem; color:#64748b;">Current product image preview</span>
+            </div>
+            <small class="form-text text-muted" style="font-size:0.75rem; color:var(--text-muted, #94a3b8); display:block; margin-top:3px; line-height:1.3;">Choose image directly from local folder, or paste image URL or file path address.</small>
+          </div>
+          <div class="form-group" style="grid-column: span 1;">
+            <label class="form-label">Display Rank</label>
+            <input type="number" name="display_rank" id="editProdDisplayRank" min="1" step="1" class="form-control rounded-lg border-gray-300 text-sm" value="1" required>
+            <small class="form-text text-muted" style="font-size:0.75rem; color:var(--text-muted, #94a3b8); display:block; margin-top:3px; line-height:1.3;">Determines position on the website (1 = 1st, 2 = 2nd, etc.)</small>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea name="description" id="editProdDesc" class="form-control" rows="3"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('editProductModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Update Product</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function handleImageSelection(fileInput, textInputId, previewImgId, statusId) {
+  if (fileInput.files && fileInput.files[0]) {
+    const file = fileInput.files[0];
+    const previewImg = document.getElementById(previewImgId);
+    const wrap = previewImg ? previewImg.parentElement : null;
+    if (wrap) wrap.style.display = 'flex';
+    if (previewImg) {
+      previewImg.style.display = 'block';
+      previewImg.src = URL.createObjectURL(file);
+    }
+    const status = document.getElementById(statusId);
+    if (status) status.innerText = '✓ ' + file.name + ' selected';
+
+    // Optional background upload to ensure instant persistence
+    const formData = new FormData();
+    formData.append('image', file);
+    const csrfEl = document.querySelector('input[name="csrf_token"]');
+    if (csrfEl) formData.append('csrf_token', csrfEl.value);
+
+    fetch('/admin/commerce/upload-image', {
+      method: 'POST',
+      body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success && data.url) {
+        document.getElementById(textInputId).value = data.url;
+        if (status) status.innerText = '✓ Uploaded: ' + file.name;
+      }
+    })
+    .catch(err => {
+      console.log('Instant upload optional notification:', err);
+    });
+  }
+}
+
+function updateEditPreviewFromInput() {
+  const val = (document.getElementById('editProdThumb').value || '').trim();
+  const preview = document.getElementById('editProdPreview');
+  const wrap = document.getElementById('editProdPreviewWrap');
+  if (val) {
+    if (wrap) wrap.style.display = 'flex';
+    if (preview) {
+      preview.style.display = 'block';
+      preview.src = val;
+    }
+  }
+}
+
+function openAddProductModal(defaultCatId) {
+  if (defaultCatId && document.getElementById('addProdCategory')) {
+    document.getElementById('addProdCategory').value = defaultCatId;
+  }
+  const addStatus = document.getElementById('addImgStatus');
+  if (addStatus) addStatus.innerText = '';
+  const addWrap = document.getElementById('addProdPreviewWrap');
+  if (addWrap) addWrap.style.display = 'none';
+  const addInp = document.getElementById('addProdFileInput');
+  if (addInp) addInp.value = '';
+  openModal('addProductModal');
+}
+
+function openEditProductModal(id, name, catId, price, comparePrice, stock, threshold, cert, status, thumb, desc, displayRank) {
+  document.getElementById('editProductForm').action = "/admin/commerce/products/" + id + "/edit";
+  document.getElementById('editProdName').value = name;
+  if (catId) document.getElementById('editProdCategory').value = catId;
+  document.getElementById('editProdPrice').value = price;
+  document.getElementById('editProdComparePrice').value = comparePrice;
+  document.getElementById('editProdStock').value = stock;
+  document.getElementById('editProdThreshold').value = threshold;
+  document.getElementById('editProdCert').value = cert;
+  document.getElementById('editProdStatus').value = status;
+  document.getElementById('editProdThumb').value = thumb || '';
+  document.getElementById('editProdDesc').value = desc;
+  var parsedRank = (displayRank !== undefined && displayRank !== null && displayRank !== '' && !isNaN(Number(displayRank))) ? Number(displayRank) : 1;
+  document.getElementById('editProdDisplayRank').value = parsedRank;
+
+  // Setup preview for existing or new image
+  const preview = document.getElementById('editProdPreview');
+  const wrap = document.getElementById('editProdPreviewWrap');
+  const statusEl = document.getElementById('editImgStatus');
+  if (statusEl) statusEl.innerText = '';
+  const fileInp = document.getElementById('editProdFileInput');
+  if (fileInp) fileInp.value = '';
+
+  if (thumb && thumb.trim()) {
+    if (wrap) wrap.style.display = 'flex';
+    if (preview) {
+      preview.style.display = 'block';
+      preview.src = thumb;
+    }
+  } else {
+    if (wrap) wrap.style.display = 'none';
+  }
+
+  openModal('editProductModal');
+}
+</script>
+{% endblock %}
+

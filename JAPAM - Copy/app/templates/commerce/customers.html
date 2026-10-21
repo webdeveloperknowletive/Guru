@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Spiritual Customers{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Customers & Devotees</h1>
+    <p class="page-subtitle">Track registered devotees, lifetime orders, and spiritual contributions.</p>
+  </div>
+</div>
+
+<div class="dashboard-card">
+  <div class="table-responsive">
+    <table class="spiritual-table">
+      <thead>
+        <tr>
+          <th>Devotee Name</th>
+          <th>Email Address</th>
+          <th>Phone</th>
+          <th>City / State</th>
+          <th>Orders Placed</th>
+          <th>Lifetime Spend</th>
+          <th>Member Since</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in customers %}
+        <tr>
+          <td style="font-weight:600;">{{ c.full_name }}</td>
+          <td style="color:var(--text-secondary);">{{ c.email }}</td>
+          <td style="color:var(--text-muted); font-size:0.8rem;">{{ c.phone or '-' }}</td>
+          <td>{{ c.city or '-' }}{% if c.state %}, {{ c.state }}{% endif %}</td>
+          <td>
+            <span style="font-weight:700;">{{ c.total_orders }}</span> orders
+          </td>
+          <td style="font-weight:700; color:var(--saffron-600);">{{ format_currency(c.total_spent) }}</td>
+          <td style="white-space:nowrap; color:var(--text-muted);">{{ format_date(c.created_at, "%b %Y") }}</td>
+          <td>
+            <button type="button" class="btn-action" title="Edit Customer"
+              onclick='openEditCustomerModal({{ c.id }}, {{ (c.full_name or "")|tojson }}, {{ (c.phone or "")|tojson }}, {{ (c.city or "")|tojson }}, {{ (c.state or "")|tojson }}, {{ (c.pincode or "")|tojson }})'>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            </button>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">No customer profiles found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Edit Customer Modal -->
+<div class="modal-overlay" id="editCustomerModal">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 class="modal-title">Edit Devotee Profile</h3>
+      <button type="button" class="modal-close-btn" onclick="closeModal('editCustomerModal')">&times;</button>
+    </div>
+    <form id="editCustomerForm" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Full Name *</label>
+          <input type="text" name="full_name" id="edit_cust_name" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone / WhatsApp</label>
+          <input type="tel" name="phone" id="edit_cust_phone" class="form-control">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">City</label>
+            <input type="text" name="city" id="edit_cust_city" class="form-control">
+          </div>
+          <div class="form-group">
+            <label class="form-label">State</label>
+            <input type="text" name="state" id="edit_cust_state" class="form-control">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Pincode</label>
+          <input type="text" name="pincode" id="edit_cust_pincode" class="form-control">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('editCustomerModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Update Profile</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openEditCustomerModal(id, name, phone, city, state, pincode) {
+  document.getElementById('editCustomerForm').action = '/admin/commerce/customers/' + id + '/edit';
+  document.getElementById('edit_cust_name').value = name;
+  document.getElementById('edit_cust_phone').value = phone;
+  document.getElementById('edit_cust_city').value = city;
+  document.getElementById('edit_cust_state').value = state;
+  document.getElementById('edit_cust_pincode').value = pincode;
+  openModal('editCustomerModal');
+}
+</script>
+{% endblock %}

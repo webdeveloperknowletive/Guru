@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Customer Enquiries{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Spiritual Enquiries</h1>
+    <p class="page-subtitle">Devotee questions regarding puja rituals, gemstone selection, and astrology guidance.</p>
+  </div>
+  <div class="page-header-actions">
+    <div style="display:flex; gap:0.5rem;">
+      <a href="{{ url_for('operations.enquiries_list') }}" class="btn-secondary">All Enquiries</a>
+      <a href="{{ url_for('operations.enquiries_list', status='open') }}" class="btn-secondary" style="color:var(--status-red-text);">Open ({{ enquiries|selectattr('status', 'equalto', 'open')|list|length }})</a>
+    </div>
+  </div>
+</div>
+
+<div class="dashboard-card">
+  <div class="table-responsive">
+    <table class="spiritual-table">
+      <thead>
+        <tr>
+          <th>Enquiry #</th>
+          <th>Devotee Name</th>
+          <th>Subject</th>
+          <th>Message</th>
+          <th>Received Date</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for eq in enquiries %}
+        <tr>
+          <td style="font-family:monospace; font-weight:700;">{{ eq.enquiry_number }}</td>
+          <td>
+            <div style="font-weight:600;">{{ eq.name }}</div>
+            <div style="font-size:0.72rem; color:var(--text-muted);">{{ eq.email }}</div>
+          </td>
+          <td style="font-weight:600; color:var(--saffron-700);">{{ eq.subject }}</td>
+          <td style="max-width:320px; line-height:1.4; color:var(--text-secondary);">
+            {{ eq.message }}
+            {% if eq.admin_response %}
+              <div style="margin-top:0.35rem; padding:0.35rem 0.5rem; background:#ecfdf5; border-radius:4px; font-size:0.72rem; color:#065f46;">
+                <strong>Response sent:</strong> {{ eq.admin_response }}
+              </div>
+            {% endif %}
+          </td>
+          <td style="white-space:nowrap; color:var(--text-muted);">{{ format_date(eq.created_at, "%b %d, %Y") }}</td>
+          <td>
+            <span class="badge badge-{{ 'delivered' if eq.status == 'responded' else ('cancelled' if eq.status == 'closed' else 'pending') }}">
+              {{ eq.status }}
+            </span>
+          </td>
+          <td>
+            {% if eq.status == 'open' %}
+              <button type="button" class="btn-primary" style="padding:0.3rem 0.75rem; font-size:0.76rem;" onclick="openEnquiryModal('{{ eq.id }}', '{{ eq.enquiry_number }}', '{{ eq.name|escape }}', '{{ eq.subject|escape }}', '{{ eq.message|escape }}')">
+                Respond
+              </button>
+            {% else %}
+              <span style="font-size:0.75rem; color:var(--text-muted);">Completed</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted);">No customer enquiries found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Enquiry Response Modal -->
+<div class="modal-overlay" id="enquiryModal">
+  <div class="modal-container" style="max-width:600px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modalEnquiryTitle">Respond to Devotee Enquiry</h3>
+      <button type="button" class="modal-close-btn" onclick="closeModal('enquiryModal')">&times;</button>
+    </div>
+    <form id="enquiryResponseForm" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body">
+        <div style="background-color:var(--bg-app); padding:0.75rem 1rem; border-radius:var(--radius-md); border:1px solid var(--border-color); margin-bottom:1rem;">
+          <div style="font-size:0.75rem; color:var(--text-muted);">From Devotee: <strong id="modalDevoteeName" style="color:var(--text-primary);"></strong></div>
+          <div style="font-weight:600; font-size:0.85rem; color:var(--saffron-700); margin:0.25rem 0;" id="modalSubject"></div>
+          <div style="font-size:0.8rem; color:var(--text-secondary); line-height:1.4;" id="modalMessage"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Official Spiritual Guidance / Response *</label>
+          <textarea name="response_text" class="form-control" rows="5" placeholder="Dear Devotee, Namaste. Regarding your query on..." required></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('enquiryModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Send Response</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function openEnquiryModal(id, num, name, subject, msg) {
+    document.getElementById("modalEnquiryTitle").innerText = "Reply to #" + num;
+    document.getElementById("modalDevoteeName").innerText = name;
+    document.getElementById("modalSubject").innerText = subject;
+    document.getElementById("modalMessage").innerText = msg;
+    document.getElementById("enquiryResponseForm").action = "/admin/operations/enquiries/" + id + "/respond";
+    openModal("enquiryModal");
+  }
+</script>
+{% endblock %}

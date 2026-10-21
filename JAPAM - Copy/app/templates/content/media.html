@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Media Assets Library{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Media Assets Library</h1>
+    <p class="page-subtitle">Upload product photography, yantra diagrams, certificates, and puja visuals.</p>
+  </div>
+  <div class="page-header-actions">
+    <button type="button" class="btn-primary" onclick="openModal('uploadMediaModal')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+      Upload Asset
+    </button>
+  </div>
+</div>
+
+<div class="dashboard-card">
+  <div class="table-responsive">
+    <table class="spiritual-table">
+      <thead>
+        <tr>
+          <th>Preview</th>
+          <th>Original File Name</th>
+          <th>Size</th>
+          <th>Format</th>
+          <th>Upload Date</th>
+          <th>URL</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in media_files %}
+        <tr>
+          <td>
+            <img src="{{ m.file_path }}" alt="{{ m.original_name }}" class="product-thumb" onerror="this.src='/static/img/product-default.png'">
+          </td>
+          <td style="font-weight:600;">{{ m.original_name }}</td>
+          <td>{{ (m.file_size / 1024)|round(1) }} KB</td>
+          <td style="font-family:monospace; font-size:0.75rem;">{{ m.mime_type }}</td>
+          <td style="white-space:nowrap; color:var(--text-muted);">{{ format_date(m.created_at, "%b %d, %Y") }}</td>
+          <td>
+            <button type="button" class="btn-action-outline" onclick="navigator.clipboard.writeText('{{ m.file_path }}'); alert('Copied path: {{ m.file_path }}');">
+              Copy Path
+            </button>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" style="text-align:center; padding:30px; color:var(--text-muted);">No uploaded media assets yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Upload Modal -->
+<div class="modal-overlay" id="uploadMediaModal">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 class="modal-title">Upload Spiritual Asset</h3>
+      <button type="button" class="modal-close-btn" onclick="closeModal('uploadMediaModal')">&times;</button>
+    </div>
+    <form action="{{ url_for('content.media_upload') }}" method="POST" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Select File (JPG, PNG, WebP, SVG, PDF - max 10MB) *</label>
+          <input type="file" name="file" class="form-control" accept="image/*,.pdf" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('uploadMediaModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Upload File</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
