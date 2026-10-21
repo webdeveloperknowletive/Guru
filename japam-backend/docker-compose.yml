@@ -1,28 +1,26 @@
+
 services:
-  # -------------------------------------------------------------
-  # 1. Flask Web Application (Gunicorn)
-  # -------------------------------------------------------------
   web:
     build:
       context: .
       dockerfile: Dockerfile
     image: japam-spiritual-admin:latest
     restart: unless-stopped
-    ports:
-      - "5000:5000"
+    expose:
+      - "5000"
     environment:
-      - FLASK_ENV=production
-      - PORT=5000
-      - DATABASE_URL=postgresql+psycopg://japam_user:secure_japam_password_2024@postgres:5432/japam_db
-      - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=${SECRET_KEY:-prod-spiritual-secret-key-replace-in-coolify}
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-jwt-spiritual-secret-key-replace-in-coolify}
-      - CSRF_SECRET_KEY=${CSRF_SECRET_KEY:-csrf-spiritual-protection-key-32chars}
-      - COOKIE_SECURE=true
-      - COOKIE_SAMESITE=Lax
-      - UPLOAD_FOLDER=/app/uploads
-      - TIMEZONE=Asia/Kolkata
-      - FRONTEND_ORIGINS=${FRONTEND_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      FLASK_ENV: production
+      PORT: "5000"
+      DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER:-japam_user}:${POSTGRES_PASSWORD:?Set_POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-japam_db}"
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:?Set_SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set_JWT_SECRET_KEY}
+      CSRF_SECRET_KEY: ${CSRF_SECRET_KEY:?Set_CSRF_SECRET_KEY}
+      COOKIE_SECURE: "true"
+      COOKIE_SAMESITE: Lax
+      UPLOAD_FOLDER: /app/uploads
+      TIMEZONE: Asia/Kolkata
+      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:?Set_FRONTEND_ORIGINS}
     volumes:
       - uploads_data:/app/uploads
     depends_on:
@@ -47,9 +45,6 @@ services:
     networks:
       - internal_net
 
-  # -------------------------------------------------------------
-  # 2. Asynchronous Background Worker
-  # -------------------------------------------------------------
   worker:
     build:
       context: .
@@ -57,11 +52,14 @@ services:
     command: ["python", "worker.py"]
     restart: unless-stopped
     environment:
-      - FLASK_ENV=production
-      - DATABASE_URL=postgresql+psycopg://japam_user:secure_japam_password_2024@postgres:5432/japam_db
-      - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=${SECRET_KEY:-prod-spiritual-secret-key-replace-in-coolify}
-      - UPLOAD_FOLDER=/app/uploads
+      FLASK_ENV: production
+      DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER:-japam_user}:${POSTGRES_PASSWORD:?Set_POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-japam_db}"
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:?Set_SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set_JWT_SECRET_KEY}
+      CSRF_SECRET_KEY: ${CSRF_SECRET_KEY:?Set_CSRF_SECRET_KEY}
+      UPLOAD_FOLDER: /app/uploads
+      TIMEZONE: Asia/Kolkata
     volumes:
       - uploads_data:/app/uploads
     depends_on:
@@ -77,20 +75,17 @@ services:
     networks:
       - internal_net
 
-  # -------------------------------------------------------------
-  # 3. PostgreSQL 16 Database
-  # -------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: japam_user
-      POSTGRES_PASSWORD: secure_japam_password_2024
-      POSTGRES_DB: japam_db
+      POSTGRES_USER: ${POSTGRES_USER:-japam_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-japam_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U japam_user -d japam_db"]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -103,13 +98,17 @@ services:
     networks:
       - internal_net
 
-  # -------------------------------------------------------------
-  # 4. Redis 7 Cache & Rate Limiter
-  # -------------------------------------------------------------
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "volatile-lru"]
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - volatile-lru
     volumes:
       - redis_data:/data
     healthcheck:
@@ -125,9 +124,6 @@ services:
     networks:
       - internal_net
 
-# ---------------------------------------------------------------
-# Persistent Volumes & Networks
-# ---------------------------------------------------------------
 volumes:
   postgres_data:
     driver: local
