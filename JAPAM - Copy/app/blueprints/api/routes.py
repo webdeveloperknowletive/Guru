@@ -1,9 +1,9 @@
 from decimal import Decimal
-from datetime import datetime, date, timezone
+from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify, current_app, session
 from app.extensions import db
 from app.models.commerce import Product, Category, Order, OrderItem, Customer, ProductReview
-from app.models.service import PujaService, PujaBooking, JyotishConsultation
+from app.models.service import PujaService, JyotishConsultation
 from app.models.operations import ReturnRequest, CustomerEnquiry, PaymentTransaction
 from app.models.content import Testimonial, BlogPost, GurujiProfile, Banner
 from app.models.user import AdminUser
@@ -776,7 +776,6 @@ def payment_webhook():
     import hmac
     import hashlib
     from app.extensions import redis_client
-    from app.models.operations import PaymentTransaction
 
     raw_payload = request.get_data(as_text=True)
     signature = request.headers.get("X-Razorpay-Signature") or request.headers.get("X-Webhook-Signature")
