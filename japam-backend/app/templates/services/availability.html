@@ -27,6 +27,7 @@
           <th>Assigned Scholar / Priest</th>
           <th>Capacity / Booked</th>
           <th>Status</th>
+          <th style="text-align:right;">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -52,10 +53,46 @@
               <span class="badge badge-delivered">Available</span>
             {% endif %}
           </td>
+          <td style="text-align:right; white-space:nowrap;">
+            <div style="display:inline-flex; align-items:center; gap:6px;">
+              <button type="button" class="btn-sm btn-secondary" onclick="openEditSlotModal({
+                id: {{ s.id }},
+                service_type: '{{ s.service_type }}',
+                slot_date: '{{ s.slot_date.strftime('%Y-%m-%d') if s.slot_date else '' }}',
+                start_time: '{{ s.start_time }}',
+                end_time: '{{ s.end_time }}',
+                max_capacity: {{ s.max_capacity }},
+                assigned: '{{ s.assigned_priest_or_astrologer or '' }}',
+                is_active: {{ 'true' if s.is_active else 'false' }}
+              })" title="Edit Slot Details">
+                ✏️ Edit
+              </button>
+
+              <form action="{{ url_for('services.availability_toggle_status', slot_id=s.id) }}" method="POST" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                {% if s.is_active %}
+                  <button type="submit" class="btn-sm btn-secondary" title="Block bookings for this slot">
+                    🚫 Block
+                  </button>
+                {% else %}
+                  <button type="submit" class="btn-sm btn-secondary" style="color:#15803d; border-color:#86efac;" title="Re-activate slot for public bookings">
+                    ✓ Unblock
+                  </button>
+                {% endif %}
+              </form>
+
+              <form action="{{ url_for('services.availability_delete', slot_id=s.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this availability slot?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn-sm btn-danger" title="Delete slot permanently" {% if s.booked_count > 0 %}disabled style="opacity:0.4; cursor:not-allowed;" title="Cannot delete slot with active bookings"{% endif %}>
+                  🗑️
+                </button>
+              </form>
+            </div>
+          </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="6" style="text-align:center; padding:30px; color:var(--text-muted);">No availability slots created.</td>
+          <td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted);">No availability slots created. Click "Add Time Slot" above to define bookable slots.</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -75,14 +112,14 @@
       <div class="modal-body">
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
           <div class="form-group">
-            <label class="form-label">Service Type</label>
+            <label class="form-label">Service Domain *</label>
             <select name="service_type" class="form-control">
               <option value="puja">Puja Ritual</option>
               <option value="jyotish">Jyotish Consultation</option>
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Date *</label>
+            <label class="form-label">Slot Date *</label>
             <input type="date" name="slot_date" class="form-control" required>
           </div>
         </div>
@@ -100,12 +137,12 @@
 
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
           <div class="form-group">
-            <label class="form-label">Max Capacity</label>
+            <label class="form-label">Max Capacity (Devotees / Clients)</label>
             <input type="number" name="max_capacity" class="form-control" value="1" min="1" required>
           </div>
           <div class="form-group">
             <label class="form-label">Assigned Priest / Astrologer</label>
-            <input type="text" name="assigned_priest_or_astrologer" class="form-control" placeholder="Acharya Shastri Ji">
+            <input type="text" name="assigned_priest_or_astrologer" class="form-control" placeholder="Pandit Ji / Acharya Ji">
           </div>
         </div>
       </div>
@@ -116,4 +153,80 @@
     </form>
   </div>
 </div>
+
+<!-- Edit Slot Modal -->
+<div class="modal-overlay" id="editSlotModal">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 class="modal-title">Edit Availability Slot</h3>
+      <button type="button" class="modal-close-btn" onclick="closeModal('editSlotModal')">&times;</button>
+    </div>
+    <form id="editSlotForm" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Service Domain *</label>
+            <select name="service_type" id="edit_service_type" class="form-control">
+              <option value="puja">Puja Ritual</option>
+              <option value="jyotish">Jyotish Consultation</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Slot Date *</label>
+            <input type="date" name="slot_date" id="edit_slot_date" class="form-control" required>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Start Time *</label>
+            <input type="text" name="start_time" id="edit_start_time" class="form-control" placeholder="10:00 AM" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">End Time *</label>
+            <input type="text" name="end_time" id="edit_end_time" class="form-control" placeholder="11:30 AM" required>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Max Capacity</label>
+            <input type="number" name="max_capacity" id="edit_max_capacity" class="form-control" min="1" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Assigned Priest / Astrologer</label>
+            <input type="text" name="assigned_priest_or_astrologer" id="edit_assigned" class="form-control" placeholder="Pandit Ji / Acharya Ji">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top:0.75rem;">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600;">
+            <input type="checkbox" name="is_active" id="edit_is_active" value="1">
+            <span>Slot is Active & Bookable by Customers</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('editSlotModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openEditSlotModal(slot) {
+  const form = document.getElementById('editSlotForm');
+  form.action = `/admin/services/availability/${slot.id}/edit`;
+  document.getElementById('edit_service_type').value = slot.service_type;
+  document.getElementById('edit_slot_date').value = slot.slot_date;
+  document.getElementById('edit_start_time').value = slot.start_time;
+  document.getElementById('edit_end_time').value = slot.end_time;
+  document.getElementById('edit_max_capacity').value = slot.max_capacity;
+  document.getElementById('edit_assigned').value = slot.assigned;
+  document.getElementById('edit_is_active').checked = !!slot.is_active;
+  openModal('editSlotModal');
+}
+</script>
 {% endblock %}

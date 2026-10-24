@@ -53,9 +53,13 @@ function matchesMukhi(product, num) {
   return false;
 }
 
-export default function RudrakshaSection({ products }) {
+export default function RudrakshaSection({ products, headerText }) {
   const [active, setActive] = useState('all');
   const rawList = products !== undefined && products !== null ? products : RUDRAKSHA;
+
+  const kicker = headerText?.kicker || 'Rudraksha';
+  const title = headerText?.title || 'रुद्राक्ष Collection';
+  const subtitle = headerText?.subtitle || 'प्रत्येक रुद्राक्ष प्रमाणित स्रोतांकडून — मुखीनुसार, आकारानुसार आणि पारंपरिक महत्त्वानुसार.';
 
   // Exclude bracelet products from Rudraksha section
   const list = rawList.filter(p => {
@@ -90,9 +94,15 @@ export default function RudrakshaSection({ products }) {
     <section id="rudraksha">
       <div className="wrap">
         <div className="sec-head reveal">
-          <span className="kicker">Rudraksha</span>
-          <h2>रुद्राक्ष <em>Collection</em></h2>
-          <p>प्रत्येक रुद्राक्ष प्रमाणित स्रोतांकडून — मुखीनुसार, आकारानुसार आणि पारंपरिक महत्त्वानुसार.</p>
+          <span className="kicker">{kicker}</span>
+          <h2>
+            {title === 'रुद्राक्ष Collection' ? (
+              <>रुद्राक्ष <em>Collection</em></>
+            ) : (
+              title
+            )}
+          </h2>
+          <p>{subtitle}</p>
         </div>
         <div className="filter-bar">
           {FILTERS.map(f => (

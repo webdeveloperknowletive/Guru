@@ -3,9 +3,9 @@ from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify, current_app, session
 from app.extensions import db
 from app.models.commerce import Product, Category, Order, OrderItem, Customer, ProductReview
-from app.models.service import PujaService, JyotishConsultation
+from app.models.service import PujaService, JyotishConsultation, AvailabilitySlot
 from app.models.operations import ReturnRequest, CustomerEnquiry, PaymentTransaction
-from app.models.content import Testimonial, BlogPost, GurujiProfile, Banner
+from app.models.content import Testimonial, BlogPost, GurujiProfile, Banner, AdBanner
 from app.models.user import AdminUser
 
 from app.services.auth_service import AuthService
@@ -265,6 +265,55 @@ def get_puja_services():
     return jsonify({"puja_services": results})
 
 
+@api_v1_bp.route("/services/availability", methods=["GET"])
+def get_availability_slots():
+    """Retrieve bookable availability slots for Puja rituals or Jyotish consultations."""
+    service_type = request.args.get("service_type", "").strip().lower()
+    date_str = request.args.get("date", "").strip()
+
+    q = AvailabilitySlot.query.filter_by(is_active=True)
+
+    if service_type in ("puja", "jyotish"):
+        q = q.filter(AvailabilitySlot.service_type == service_type)
+
+    if date_str:
+        for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y"):
+            try:
+                target_date = datetime.strptime(date_str, fmt).date()
+                q = q.filter(AvailabilitySlot.slot_date == target_date)
+                break
+            except ValueError:
+                pass
+    else:
+        # Default: list from today onwards
+        today = datetime.now(timezone.utc).date()
+        q = q.filter(AvailabilitySlot.slot_date >= today)
+
+    slots = q.order_by(AvailabilitySlot.slot_date.asc(), AvailabilitySlot.start_time.asc()).all()
+
+    results = []
+    for s in slots:
+        available_spots = max(0, s.max_capacity - s.booked_count)
+        results.append({
+            "id": s.id,
+            "service_type": s.service_type,
+            "slot_date": s.slot_date.strftime("%Y-%m-%d"),
+            "start_time": s.start_time,
+            "end_time": s.end_time,
+            "time_window": f"{s.start_time} - {s.end_time}" if s.end_time else s.start_time,
+            "max_capacity": s.max_capacity,
+            "booked_count": s.booked_count,
+            "available_spots": available_spots,
+            "is_full": available_spots <= 0,
+            "is_active": s.is_active,
+            "assigned_priest_or_astrologer": s.assigned_priest_or_astrologer,
+            "notes": s.notes or "",
+        })
+
+    resp = jsonify({"count": len(results), "slots": results})
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return resp
+
 
 @api_v1_bp.route("/services/book-puja", methods=["POST"])
 def book_puja():
@@ -346,22 +395,35 @@ def request_consultation():
     customer_name = (data.get("customer_name") or data.get("name") or "").strip()
     customer_email = (data.get("customer_email") or data.get("email") or "").strip()
     customer_phone = (data.get("customer_phone") or data.get("phone") or "").strip()
-    dob_raw = data.get("dob") or data.get("date_of_birth")
-    tob = (data.get("tob") or data.get("time") or data.get("time_of_birth") or "10:00 AM").strip()
-    pob = (data.get("pob") or data.get("place") or data.get("place_of_birth") or "Not Specified").strip()
+    service_id = (data.get("service_id") or "").strip()
     topic = (data.get("topic") or data.get("consultation_topic") or "General Jyotish Consultation").strip()
 
+    # Birth details extraction (supports direct fields or person1 in marriage matching)
+    person1 = data.get("person1") or {}
+    dob_raw = (
+        data.get("dob")
+        or data.get("date_of_birth")
+        or person1.get("dob")
+        or data.get("preferred_date")
+        or data.get("event_start_date")
+    )
+    time_unknown = data.get("time_unknown") or person1.get("time_unknown") or False
+    tob = "Time Unknown" if time_unknown else (data.get("tob") or data.get("time") or person1.get("tob") or "10:00 AM").strip()
+    pob = (data.get("pob") or data.get("place") or person1.get("pob") or data.get("event_city") or "Not Specified").strip()
+
     if not customer_name:
-        return jsonify({"error": "Field 'customer_name' is required"}), 400
+        return jsonify({"error": "Field 'customer_name' (or 'name') is required"}), 400
+    if not customer_phone:
+        return jsonify({"error": "Field 'customer_phone' (or 'phone') is required"}), 400
+
     if not customer_email and customer_phone:
         customer_email = f"{customer_phone.replace('+', '').replace(' ', '')}@astroveda.in"
     elif not customer_email:
         customer_email = "devotee@astroveda.in"
-    if not dob_raw:
-        return jsonify({"error": "Field 'dob' (date of birth) is required"}), 400
 
-    try:
-        # Parse dob with multiple formats
+    # Resolve date of birth or fall back safely for services without required DOB (e.g. Muhurat)
+    dob = None
+    if dob_raw:
         if isinstance(dob_raw, str):
             for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d"):
                 try:
@@ -369,11 +431,120 @@ def request_consultation():
                     break
                 except ValueError:
                     pass
-            else:
-                return jsonify({"error": "Invalid date format for dob. Expected YYYY-MM-DD"}), 400
-        else:
+        elif hasattr(dob_raw, "year"):
             dob = dob_raw
 
+    if not dob:
+        # For services where DOB is optional, default to today's date for database constraint
+        dob = datetime.now(timezone.utc).date()
+
+    # Compile comprehensive, structured astrologer notes for admin & consultation review
+    notes_lines = [
+        f"--- {topic} ({service_id or 'General'}) ---",
+        f"Contact Person: {customer_name} | Phone: {customer_phone} | Email: {customer_email}",
+    ]
+
+    # Marriage matching details
+    if service_id == "marriage-matching" or data.get("person2"):
+        p2 = data.get("person2") or {}
+        notes_lines.append(f"Person 1 (Self): {person1.get('name', customer_name)} | DOB: {person1.get('dob')} | TOB: {'Unknown' if person1.get('time_unknown') else person1.get('tob', 'N/A')} | POB: {person1.get('pob', 'N/A')}")
+        notes_lines.append(f"Person 2 (Partner): {p2.get('name', 'N/A')} | DOB: {p2.get('dob')} | TOB: {'Unknown' if p2.get('time_unknown') else p2.get('tob', 'N/A')} | POB: {p2.get('pob', 'N/A')}")
+        if data.get("marriage_period"):
+            notes_lines.append(f"Preferred Marriage Period: {data.get('marriage_period')}")
+        if data.get("proposed_wedding_date"):
+            notes_lines.append(f"Proposed Wedding Date: {data.get('proposed_wedding_date')}")
+        if data.get("compatibility_question"):
+            notes_lines.append(f"Compatibility Question: {data.get('compatibility_question')}")
+
+    # Muhurat details
+    elif service_id == "muhurat-selection" or data.get("event_type"):
+        notes_lines.append(f"Event Type: {data.get('event_type')}{' - ' + data.get('event_type_other') if data.get('event_type_other') else ''}")
+        notes_lines.append(f"Event Location: {data.get('event_city', pob)}")
+        notes_lines.append(f"Dates: {data.get('event_start_date')} to {data.get('event_end_date', 'N/A')} (Flexible: {'Yes' if data.get('flexible_dates') else 'No'})")
+        if data.get("preferred_time_window"):
+            notes_lines.append(f"Time Window: {data.get('preferred_time_window')}")
+        if data.get("has_birth_details") and data.get("person_name"):
+            notes_lines.append(f"Personal Details for Muhurat: {data.get('person_name')} | DOB: {data.get('dob')} | TOB: {tob} | POB: {pob}")
+
+    # Career & Business details
+    elif service_id == "career-business" or data.get("guidance_category"):
+        notes_lines.append(f"Guidance Category: {data.get('guidance_category')}{' - ' + data.get('category_other') if data.get('category_other') else ''}")
+        if data.get("current_profession"):
+            notes_lines.append(f"Current Profession: {data.get('current_profession')}")
+        if data.get("business_name_type"):
+            notes_lines.append(f"Business Name/Type: {data.get('business_name_type')}")
+        if data.get("main_challenge"):
+            notes_lines.append(f"Main Challenge: {data.get('main_challenge')}")
+
+    # Finance & Wealth details
+    elif service_id == "finance-wealth" or data.get("financial_topic"):
+        notes_lines.append(f"Financial Topic: {data.get('financial_topic')}{' - ' + data.get('topic_other') if data.get('topic_other') else ''}")
+        if data.get("financial_goal"):
+            notes_lines.append(f"Financial Goal / Concern: {data.get('financial_goal')}")
+
+    # Gemstone & Rudraksha details
+    elif service_id == "gemstone-rudraksha" or data.get("request_type"):
+        notes_lines.append(f"Request Type: {data.get('request_type')} | Purpose: {data.get('recommendation_purpose')}")
+        if data.get("existing_items"):
+            notes_lines.append(f"Existing / Desired Items: {data.get('existing_items')}")
+
+    # General question & context
+    if data.get("customer_question"):
+        notes_lines.append(f"Customer Question: {data.get('customer_question')}")
+    if data.get("specific_question"):
+        notes_lines.append(f"Specific Query: {data.get('specific_question')}")
+    if data.get("additional_context"):
+        notes_lines.append(f"Additional Context: {data.get('additional_context')}")
+    if data.get("notes") or data.get("msg"):
+        notes_lines.append(f"Customer Notes: {data.get('notes') or data.get('msg')}")
+
+    # Preferred date / scheduled date & availability slot lock
+    time_slot = (data.get("time_slot") or data.get("slot_time") or "").strip()
+    slot_id = data.get("slot_id")
+    scheduled_at = None
+    pref_date = None
+    pref_date_raw = data.get("preferred_date") or data.get("date")
+
+    if pref_date_raw:
+        for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d"):
+            try:
+                parsed_d = datetime.strptime(pref_date_raw.strip(), fmt)
+                scheduled_at = parsed_d.replace(tzinfo=timezone.utc)
+                pref_date = parsed_d.date()
+                break
+            except Exception:
+                pass
+
+    slot = None
+    if slot_id:
+        try:
+            slot = AvailabilitySlot.query.filter_by(id=int(slot_id), is_active=True).with_for_update().first()
+        except Exception:
+            slot = None
+
+    if not slot and pref_date and time_slot:
+        clean_time = time_slot.split("-")[0].strip() if "-" in time_slot else time_slot.strip()
+        slot = AvailabilitySlot.query.filter(
+            AvailabilitySlot.service_type == "jyotish",
+            AvailabilitySlot.slot_date == pref_date,
+            (AvailabilitySlot.start_time == clean_time) | (AvailabilitySlot.start_time == time_slot.strip()),
+            AvailabilitySlot.is_active == True,
+        ).with_for_update().first()
+
+    astrologer_name = "Nagesh Swami Guruji"
+    if slot:
+        if slot.booked_count >= slot.max_capacity:
+            return jsonify({"error": f"The consultation slot '{slot.start_time}' on {slot.slot_date} is fully booked."}), 400
+        slot.booked_count += 1
+        if slot.assigned_priest_or_astrologer:
+            astrologer_name = slot.assigned_priest_or_astrologer
+        notes_lines.append(f"Confirmed Slot: {slot.start_time} - {slot.end_time} on {slot.slot_date} (Scholar: {astrologer_name})")
+    elif time_slot:
+        notes_lines.append(f"Preferred Time Slot: {time_slot}")
+
+    full_astrologer_notes = "\n".join(notes_lines)
+
+    try:
         consult_count = JyotishConsultation.query.count() + 1
         consult_num = f"#JYT-{dob.strftime('%Y%m')}-{consult_count:04d}"
 
@@ -386,8 +557,11 @@ def request_consultation():
             tob=tob,
             pob=pob,
             topic=topic,
-            consultation_type=data.get("consultation_type", "online_video"),
+            consultation_type=data.get("consultation_type") or data.get("mode") or "online_video",
+            scheduled_at=scheduled_at,
             status="pending",
+            astrologer_name=astrologer_name,
+            astrologer_notes=full_astrologer_notes,
             amount_paid=Decimal("1500.00"),
             created_at=datetime.now(timezone.utc),
         )
@@ -395,8 +569,9 @@ def request_consultation():
         db.session.commit()
 
         return jsonify({
-            "message": "Jyotish consultation request submitted",
+            "message": "Jyotish consultation request submitted successfully",
             "consultation_number": consultation.consultation_number,
+            "topic": consultation.topic,
             "status": consultation.status,
         }), 201
     except Exception as e:
@@ -699,16 +874,29 @@ def api_checkout():
             if customer_phone:
                 customer.phone = customer_phone
 
-        # Concurrency-safe unique order number generation
-        for _ in range(5):
-            ts_str = datetime.now(timezone.utc).strftime("%y%m%d%H%M")
-            rand_suffix = secrets.token_hex(2).upper()
-            candidate_num = f"#ORD-{ts_str}-{rand_suffix}"
+        # Concurrency-safe sequential serial order number generation (#ORD1091, #ORD1092, ...)
+        import re
+        all_order_records = db.session.query(Order.order_number).all()
+        max_seq = 1000
+        for (onum,) in all_order_records:
+            if onum:
+                m = re.search(r'ORD(\d+)', onum, re.IGNORECASE)
+                if m:
+                    try:
+                        val = int(m.group(1))
+                        if val > max_seq:
+                            max_seq = val
+                    except ValueError:
+                        pass
+
+        candidate_seq = max_seq + 1
+        for attempt in range(50):
+            candidate_num = f"#ORD{candidate_seq + attempt}"
             if not Order.query.filter_by(order_number=candidate_num).first():
                 order_number = candidate_num
                 break
         else:
-            order_number = f"#ORD-{secrets.token_hex(6).upper()}"
+            order_number = f"#ORD{max_seq + 100}"
 
         # Generate high-entropy order access token for customer ownership protection
         order_access_token = secrets.token_urlsafe(32)
@@ -921,6 +1109,14 @@ def _find_order(order_number):
         order = Order.query.filter_by(order_number=f"#{cleaned}").first()
     if not order and cleaned.startswith("#"):
         order = Order.query.filter_by(order_number=cleaned[1:]).first()
+    if not order:
+        # If user passed only digits (e.g., '1090'), check for #ORD1090
+        digits = re.sub(r'[^\d]', '', cleaned)
+        if digits:
+            order = Order.query.filter(
+                (Order.order_number == f"#ORD{digits}") |
+                (Order.order_number == f"ORD{digits}")
+            ).first()
     return order
 
 
@@ -1063,6 +1259,7 @@ def submit_contact_enquiry():
     return jsonify({
         "message": "Your inquiry has been submitted successfully",
         "enquiry_id": enq.id,
+        "enquiry_number": enq.enquiry_number,
         "status": enq.status,
     }), 201
 
@@ -1104,29 +1301,41 @@ def get_articles():
             "slug": p.slug,
             "category": p.category,
             "tag": p.category,
+            "tags": [t.strip() for t in p.tags.split(",") if t.strip()] if p.tags else [p.category],
             "excerpt": p.excerpt,
+            "content": p.content,
             "cover_image": p.cover_image,
             "author": p.author_name,
             "created_at": p.created_at.isoformat() if p.created_at else None,
             "time": "5 min read",
+            "views_count": p.views_count,
         }
         for p in posts
     ]
-    return jsonify({"count": len(results), "articles": results})
+    resp = jsonify({"count": len(results), "articles": results})
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return resp
 
 
 @api_v1_bp.route("/content/articles/<slug>", methods=["GET"])
 def get_article_detail(slug):
-    """Retrieve single published article by slug."""
+    """Retrieve single published article by slug and increment views."""
     post = BlogPost.query.filter_by(slug=slug, is_published=True).first()
     if not post:
         return jsonify({"error": f"Article with slug '{slug}' not found"}), 404
 
-    return jsonify({
+    try:
+        post.views_count = (post.views_count or 0) + 1
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    resp = jsonify({
         "id": post.id,
         "title": post.title,
         "slug": post.slug,
         "category": post.category,
+        "tags": [t.strip() for t in post.tags.split(",") if t.strip()] if post.tags else [post.category],
         "excerpt": post.excerpt,
         "content": post.content,
         "cover_image": post.cover_image,
@@ -1134,6 +1343,8 @@ def get_article_detail(slug):
         "created_at": post.created_at.isoformat() if post.created_at else None,
         "views_count": post.views_count,
     })
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return resp
 
 
 @api_v1_bp.route("/content/banners", methods=["GET"])
@@ -1159,6 +1370,34 @@ def get_banners():
         for b in banners
     ]
     return jsonify({"count": len(results), "banners": results})
+
+
+@api_v1_bp.route("/content/ads", methods=["GET"])
+def get_ads():
+    """Retrieve active promotional ad units (Google AdSense, Meta Ads, Custom Embeds, Image Banners)."""
+    position = request.args.get("position")
+    q = AdBanner.query.filter_by(is_active=True)
+    if position and position != "all":
+        q = q.filter((AdBanner.position == position) | (AdBanner.position == "all"))
+
+    ads = q.order_by(AdBanner.sort_order.asc(), AdBanner.created_at.desc()).all()
+    results = [a.to_dict() for a in ads]
+    return jsonify({
+        "count": len(results),
+        "is_active": len(results) > 0,
+        "ads": results
+    })
+
+
+@api_v1_bp.route("/content/sections", methods=["GET"])
+def get_sections_order():
+    """Retrieve ordered homepage sections and visibility configuration."""
+    from app.services.section_service import SectionService
+    sections = SectionService.get_sections()
+    return jsonify({
+        "sections": sections,
+        "count": len(sections),
+    })
 
 
 @api_v1_bp.route("/content/guruji", methods=["GET"])
@@ -1202,6 +1441,7 @@ def get_guruji_profile():
         return jsonify({**data, "guruji": data})
 
     vis = profile.visibility
+    vis_settings = profile.visibility_settings or {}
     data = {
         "id": profile.id,
         "name": profile.full_title,
@@ -1221,8 +1461,25 @@ def get_guruji_profile():
         "profile_image": profile.profile_image or "/guruji.png",
         "image_url": profile.profile_image or "/guruji.png",
         "visibility_settings": vis,
+        "section_kicker": vis_settings.get("section_kicker") or "About Guruji",
+        "experience_label": vis_settings.get("experience_label") or "Years Experience",
+        "consultations_label": vis_settings.get("consultations_label") or "Consultations",
+        "pujas_label": vis_settings.get("pujas_label") or "Pujas Performed",
+        "darshan_label": vis_settings.get("darshan_label") or "Meeting Time:",
+        "address_label": vis_settings.get("address_label") or "Address:",
+        "contact_label": vis_settings.get("contact_label") or "Contact:",
+        "email_label": vis_settings.get("email_label") or "Email:",
     }
     return jsonify({**data, "guruji": data})
+
+
+@api_v1_bp.route("/content/site-text", methods=["GET"])
+def get_site_text():
+    """Retrieve all customizable storefront texts and section headings."""
+    from app.services.site_text_service import SiteTextService
+    texts = SiteTextService.get_all()
+    return jsonify({"site_text": texts, **texts})
+
 
 
 @api_v1_bp.route("/catalog/products/<int:product_id>", methods=["DELETE"])

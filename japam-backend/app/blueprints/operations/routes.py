@@ -217,8 +217,46 @@ def enquiries_list():
     if status:
         q = q.filter_by(status=status)
 
+    counts = {
+        "all": CustomerEnquiry.query.count(),
+        "open": CustomerEnquiry.query.filter_by(status="open").count(),
+        "responded": CustomerEnquiry.query.filter_by(status="responded").count(),
+        "closed": CustomerEnquiry.query.filter_by(status="closed").count(),
+    }
+
     enquiries = q.order_by(CustomerEnquiry.created_at.desc()).all()
-    return render_template("operations/enquiries.html", current_user=user, enquiries=enquiries, selected_status=status, active_page="enquiries")
+    return render_template(
+        "operations/enquiries.html",
+        current_user=user,
+        enquiries=enquiries,
+        selected_status=status or "all",
+        counts=counts,
+        active_page="enquiries"
+    )
+
+
+@operations_bp.route("/enquiries/<int:enquiry_id>/status", methods=["POST"])
+@login_required
+@permission_required("enquiries", "edit")
+def enquiry_status_update(enquiry_id):
+    user = get_current_admin()
+    enquiry = CustomerEnquiry.query.get_or_404(enquiry_id)
+    new_status = request.form.get("status", "").strip().lower()
+    if new_status in ["open", "responded", "closed"]:
+        old_status = enquiry.status
+        enquiry.status = new_status
+        db.session.commit()
+        AuditService.log(
+            action="ENQUIRY_STATUS_UPDATE",
+            module="operations",
+            actor_email=user.email,
+            actor_user_id=user.id,
+            entity_type="CustomerEnquiry",
+            entity_id=str(enquiry.id),
+            details={"enquiry_number": enquiry.enquiry_number, "old_status": old_status, "new_status": new_status},
+        )
+        flash(f"Enquiry #{enquiry.enquiry_number} status updated to {new_status.title()}.", "success")
+    return redirect(url_for("operations.enquiries_list"))
 
 
 @operations_bp.route("/enquiries/<int:enquiry_id>/respond", methods=["POST"])

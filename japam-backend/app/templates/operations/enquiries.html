@@ -9,9 +9,19 @@
     <p class="page-subtitle">Devotee questions regarding puja rituals, gemstone selection, and astrology guidance.</p>
   </div>
   <div class="page-header-actions">
-    <div style="display:flex; gap:0.5rem;">
-      <a href="{{ url_for('operations.enquiries_list') }}" class="btn-secondary">All Enquiries</a>
-      <a href="{{ url_for('operations.enquiries_list', status='open') }}" class="btn-secondary" style="color:var(--status-red-text);">Open ({{ enquiries|selectattr('status', 'equalto', 'open')|list|length }})</a>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+      <a href="{{ url_for('operations.enquiries_list') }}" class="{% if selected_status == 'all' %}btn-primary{% else %}btn-secondary{% endif %}">
+        All ({{ counts.all }})
+      </a>
+      <a href="{{ url_for('operations.enquiries_list', status='open') }}" class="{% if selected_status == 'open' %}btn-primary{% else %}btn-secondary{% endif %}" style="{% if selected_status != 'open' %}color:var(--status-red-text);{% endif %}">
+        Open ({{ counts.open }})
+      </a>
+      <a href="{{ url_for('operations.enquiries_list', status='responded') }}" class="{% if selected_status == 'responded' %}btn-primary{% else %}btn-secondary{% endif %}">
+        Responded ({{ counts.responded }})
+      </a>
+      <a href="{{ url_for('operations.enquiries_list', status='closed') }}" class="{% if selected_status == 'closed' %}btn-primary{% else %}btn-secondary{% endif %}">
+        Closed ({{ counts.closed }})
+      </a>
     </div>
   </div>
 </div>
@@ -22,12 +32,12 @@
       <thead>
         <tr>
           <th>Enquiry #</th>
-          <th>Devotee Name</th>
+          <th>Devotee Details</th>
           <th>Subject</th>
-          <th>Message</th>
+          <th>Devotee Query</th>
           <th>Received Date</th>
           <th>Status</th>
-          <th>Actions</th>
+          <th style="min-width:180px;">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -36,36 +46,94 @@
           <td style="font-family:monospace; font-weight:700;">{{ eq.enquiry_number }}</td>
           <td>
             <div style="font-weight:600;">{{ eq.name }}</div>
-            <div style="font-size:0.72rem; color:var(--text-muted);">{{ eq.email }}</div>
+            <div style="font-size:0.75rem; color:var(--text-muted); display:flex; flex-direction:column; gap:2px; margin-top:3px;">
+              <span>✉️ {{ eq.email }}</span>
+              {% if eq.phone %}
+                <span>📞 <a href="https://wa.me/{{ eq.phone|replace(' ', '')|replace('+', '')|replace('-', '') }}" target="_blank" rel="noopener" style="color:var(--saffron-700); text-decoration:none; font-weight:500;" title="WhatsApp / Call devotee">{{ eq.phone }}</a></span>
+              {% else %}
+                <span style="color:#a8a29e; font-style:italic;">No phone provided</span>
+              {% endif %}
+            </div>
           </td>
           <td style="font-weight:600; color:var(--saffron-700);">{{ eq.subject }}</td>
           <td style="max-width:320px; line-height:1.4; color:var(--text-secondary);">
-            {{ eq.message }}
+            <div style="max-height:80px; overflow:hidden; text-overflow:ellipsis;" id="eq-msg-{{ eq.id }}">{{ eq.message }}</div>
             {% if eq.admin_response %}
-              <div style="margin-top:0.35rem; padding:0.35rem 0.5rem; background:#ecfdf5; border-radius:4px; font-size:0.72rem; color:#065f46;">
-                <strong>Response sent:</strong> {{ eq.admin_response }}
+              <div style="margin-top:0.45rem; padding:0.4rem 0.6rem; background:#ecfdf5; border-radius:4px; font-size:0.75rem; color:#065f46; border-left:3px solid #10b981;" id="eq-resp-{{ eq.id }}">
+                <strong>Response:</strong> {{ eq.admin_response }}
+                {% if eq.responded_at %}
+                  <div style="font-size:0.7rem; color:#047857; margin-top:2px;">Sent: {{ format_date(eq.responded_at, "%b %d, %Y %I:%M %p") }}</div>
+                {% endif %}
               </div>
             {% endif %}
           </td>
-          <td style="white-space:nowrap; color:var(--text-muted);">{{ format_date(eq.created_at, "%b %d, %Y") }}</td>
+          <td style="white-space:nowrap; color:var(--text-muted); font-size:0.8rem;">
+            {{ format_date(eq.created_at, "%b %d, %Y") }}
+          </td>
           <td>
             <span class="badge badge-{{ 'delivered' if eq.status == 'responded' else ('cancelled' if eq.status == 'closed' else 'pending') }}">
-              {{ eq.status }}
+              {{ eq.status|title }}
             </span>
           </td>
           <td>
-            {% if eq.status == 'open' %}
-              <button type="button" class="btn-primary" style="padding:0.3rem 0.75rem; font-size:0.76rem;" onclick="openEnquiryModal('{{ eq.id }}', '{{ eq.enquiry_number }}', '{{ eq.name|escape }}', '{{ eq.subject|escape }}', '{{ eq.message|escape }}')">
-                Respond
-              </button>
-            {% else %}
-              <span style="font-size:0.75rem; color:var(--text-muted);">Completed</span>
-            {% endif %}
+            <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+              {% if eq.status == 'open' %}
+                <button type="button" class="btn-primary js-respond-btn"
+                  data-id="{{ eq.id }}"
+                  data-num="{{ eq.enquiry_number }}"
+                  data-name="{{ eq.name }}"
+                  data-email="{{ eq.email }}"
+                  data-phone="{{ eq.phone or '' }}"
+                  data-subject="{{ eq.subject }}"
+                  style="padding:0.35rem 0.75rem; font-size:0.76rem;">
+                  Reply
+                </button>
+                <form action="{{ url_for('operations.enquiry_status_update', enquiry_id=eq.id) }}" method="POST" style="margin:0;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="hidden" name="status" value="closed">
+                  <button type="submit" class="btn-secondary" style="padding:0.35rem 0.6rem; font-size:0.74rem;" title="Mark enquiry as resolved without reply">
+                    Close
+                  </button>
+                </form>
+              {% else %}
+                <button type="button" class="btn-secondary js-view-btn"
+                  data-id="{{ eq.id }}"
+                  data-num="{{ eq.enquiry_number }}"
+                  data-name="{{ eq.name }}"
+                  data-email="{{ eq.email }}"
+                  data-phone="{{ eq.phone or '' }}"
+                  data-subject="{{ eq.subject }}"
+                  data-status="{{ eq.status }}"
+                  data-created="{{ format_date(eq.created_at, '%b %d, %Y %I:%M %p') }}"
+                  data-responded="{{ format_date(eq.responded_at, '%b %d, %Y %I:%M %p') if eq.responded_at else '' }}"
+                  style="padding:0.35rem 0.65rem; font-size:0.74rem;">
+                  View
+                </button>
+                {% if eq.status == 'closed' %}
+                  <form action="{{ url_for('operations.enquiry_status_update', enquiry_id=eq.id) }}" method="POST" style="margin:0;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="status" value="open">
+                    <button type="submit" class="btn-secondary" style="padding:0.35rem 0.55rem; font-size:0.74rem; color:var(--saffron-700);" title="Reopen enquiry">
+                      Reopen
+                    </button>
+                  </form>
+                {% endif %}
+              {% endif %}
+
+              <form action="{{ url_for('operations.enquiry_delete', enquiry_id=eq.id) }}" method="POST" style="margin:0;" onsubmit="return confirm('Are you sure you want to delete enquiry {{ eq.enquiry_number }}?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn-secondary" style="padding:0.35rem 0.5rem; font-size:0.74rem; color:var(--status-red-text);" title="Delete enquiry">
+                  🗑️
+                </button>
+              </form>
+            </div>
           </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted);">No customer enquiries found.</td>
+          <td colspan="7" style="text-align:center; padding:35px; color:var(--text-muted);">
+            No customer enquiries found in this category.
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -75,7 +143,7 @@
 
 <!-- Enquiry Response Modal -->
 <div class="modal-overlay" id="enquiryModal">
-  <div class="modal-container" style="max-width:600px;">
+  <div class="modal-container" style="max-width:620px;">
     <div class="modal-header">
       <h3 class="modal-title" id="modalEnquiryTitle">Respond to Devotee Enquiry</h3>
       <button type="button" class="modal-close-btn" onclick="closeModal('enquiryModal')">&times;</button>
@@ -83,10 +151,13 @@
     <form id="enquiryResponseForm" method="POST">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <div class="modal-body">
-        <div style="background-color:var(--bg-app); padding:0.75rem 1rem; border-radius:var(--radius-md); border:1px solid var(--border-color); margin-bottom:1rem;">
-          <div style="font-size:0.75rem; color:var(--text-muted);">From Devotee: <strong id="modalDevoteeName" style="color:var(--text-primary);"></strong></div>
-          <div style="font-weight:600; font-size:0.85rem; color:var(--saffron-700); margin:0.25rem 0;" id="modalSubject"></div>
-          <div style="font-size:0.8rem; color:var(--text-secondary); line-height:1.4;" id="modalMessage"></div>
+        <div style="background-color:var(--bg-app); padding:0.85rem 1rem; border-radius:var(--radius-md); border:1px solid var(--border-color); margin-bottom:1rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <div style="font-size:0.8rem; color:var(--text-muted);">Devotee: <strong id="modalDevoteeName" style="color:var(--text-primary);"></strong></div>
+            <div id="modalDevoteePhone" style="font-size:0.78rem; color:var(--saffron-700);"></div>
+          </div>
+          <div style="font-weight:600; font-size:0.88rem; color:var(--saffron-700); margin:0.35rem 0;" id="modalSubject"></div>
+          <div style="font-size:0.82rem; color:var(--text-secondary); line-height:1.45; white-space:pre-wrap; background:#fff; padding:8px 10px; border-radius:4px; border:1px solid #e7e5e4;" id="modalMessage"></div>
         </div>
 
         <div class="form-group">
@@ -102,14 +173,103 @@
   </div>
 </div>
 
+<!-- Enquiry View Details Modal -->
+<div class="modal-overlay" id="enquiryDetailModal">
+  <div class="modal-container" style="max-width:620px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="viewDetailTitle">Enquiry Details</h3>
+      <button type="button" class="modal-close-btn" onclick="closeModal('enquiryDetailModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom:1rem;">
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Devotee Contact</div>
+        <div style="font-size:0.92rem; font-weight:700; color:var(--text-primary); margin-top:2px;" id="viewDevoteeName"></div>
+        <div style="font-size:0.8rem; color:var(--text-secondary);" id="viewDevoteeEmail"></div>
+        <div style="font-size:0.8rem; color:var(--saffron-700); margin-top:2px;" id="viewDevoteePhone"></div>
+      </div>
+
+      <div style="margin-bottom:1rem;">
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Subject</div>
+        <div style="font-size:0.9rem; font-weight:600; color:var(--saffron-700); margin-top:2px;" id="viewSubject"></div>
+      </div>
+
+      <div style="margin-bottom:1rem;">
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Devotee Message</div>
+        <div style="background:var(--bg-app); padding:10px 12px; border-radius:6px; border:1px solid var(--border-color); font-size:0.84rem; line-height:1.5; white-space:pre-wrap; margin-top:4px;" id="viewMessage"></div>
+      </div>
+
+      <div id="viewResponseContainer" style="display:none; margin-bottom:1rem;">
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Ashram Response</div>
+        <div style="background:#ecfdf5; padding:10px 12px; border-radius:6px; border:1px solid #a7f3d0; color:#065f46; font-size:0.84rem; line-height:1.5; white-space:pre-wrap; margin-top:4px;" id="viewResponse"></div>
+        <div style="font-size:0.74rem; color:#047857; margin-top:4px;" id="viewRespondedDate"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn-secondary" onclick="closeModal('enquiryDetailModal')">Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
-  function openEnquiryModal(id, num, name, subject, msg) {
-    document.getElementById("modalEnquiryTitle").innerText = "Reply to #" + num;
-    document.getElementById("modalDevoteeName").innerText = name;
-    document.getElementById("modalSubject").innerText = subject;
-    document.getElementById("modalMessage").innerText = msg;
-    document.getElementById("enquiryResponseForm").action = "/admin/operations/enquiries/" + id + "/respond";
-    openModal("enquiryModal");
-  }
+  document.addEventListener("DOMContentLoaded", function() {
+    // Reply / Respond modal triggers (safely reading multiline message from DOM)
+    document.querySelectorAll(".js-respond-btn").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var id = this.getAttribute("data-id");
+        var num = this.getAttribute("data-num");
+        var name = this.getAttribute("data-name");
+        var email = this.getAttribute("data-email");
+        var phone = this.getAttribute("data-phone");
+        var subject = this.getAttribute("data-subject");
+        var msgElem = document.getElementById("eq-msg-" + id);
+        var msg = msgElem ? msgElem.innerText.trim() : "";
+
+        document.getElementById("modalEnquiryTitle").innerText = "Reply to #" + num;
+        document.getElementById("modalDevoteeName").innerText = name + (email ? " (" + email + ")" : "");
+        document.getElementById("modalDevoteePhone").innerText = phone ? "📞 " + phone : "";
+        document.getElementById("modalSubject").innerText = subject;
+        document.getElementById("modalMessage").innerText = msg;
+        document.getElementById("enquiryResponseForm").action = "/admin/operations/enquiries/" + id + "/respond";
+        openModal("enquiryModal");
+      });
+    });
+
+    // View Details modal triggers
+    document.querySelectorAll(".js-view-btn").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var id = this.getAttribute("data-id");
+        var num = this.getAttribute("data-num");
+        var name = this.getAttribute("data-name");
+        var email = this.getAttribute("data-email");
+        var phone = this.getAttribute("data-phone");
+        var subject = this.getAttribute("data-subject");
+        var respondedDate = this.getAttribute("data-responded");
+
+        var msgElem = document.getElementById("eq-msg-" + id);
+        var msg = msgElem ? msgElem.innerText.trim() : "";
+
+        var respElem = document.getElementById("eq-resp-" + id);
+        var respText = respElem ? respElem.innerText.replace(/^Response:\s*/, "").trim() : "";
+
+        document.getElementById("viewDetailTitle").innerText = "Enquiry #" + num;
+        document.getElementById("viewDevoteeName").innerText = name;
+        document.getElementById("viewDevoteeEmail").innerText = email ? "✉️ " + email : "";
+        document.getElementById("viewDevoteePhone").innerText = phone ? "📞 " + phone : "";
+        document.getElementById("viewSubject").innerText = subject;
+        document.getElementById("viewMessage").innerText = msg;
+
+        var respBox = document.getElementById("viewResponseContainer");
+        if (respText) {
+          respBox.style.display = "block";
+          document.getElementById("viewResponse").innerText = respText;
+          document.getElementById("viewRespondedDate").innerText = respondedDate ? "Dispatched on: " + respondedDate : "";
+        } else {
+          respBox.style.display = "none";
+        }
+
+        openModal("enquiryDetailModal");
+      });
+    });
+  });
 </script>
 {% endblock %}

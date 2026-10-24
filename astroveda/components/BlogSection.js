@@ -24,9 +24,18 @@ const articleImageMap = [
   },
 ];
 
+const backendBase = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api/v1').replace(/\/api\/v1\/?$/, '');
+
+function resolveCoverUrl(url) {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('/static/')) return `${backendBase}${url}`;
+  return url;
+}
+
 function getArticleImage(title = '', existingCover = null) {
   if (existingCover && !existingCover.includes('default') && !existingCover.includes('placeholder')) {
-    return { image: existingCover, alt: title };
+    return { image: resolveCoverUrl(existingCover), alt: title };
   }
   const t = (title || '').toLowerCase();
   for (const item of articleImageMap) {
@@ -140,7 +149,7 @@ function getBlogIcon(tag = '') {
   );
 }
 
-export default function BlogSection({ articles: initialArticles }) {
+export default function BlogSection({ articles: initialArticles, headerText }) {
   const { openArticleModal } = useStore();
 
   const list = (initialArticles !== undefined && initialArticles !== null && initialArticles.length > 0)
@@ -160,14 +169,24 @@ export default function BlogSection({ articles: initialArticles }) {
       })
     : defaultBlogs;
 
+  const kicker = headerText?.kicker || 'Knowledge Centre';
+  const title = headerText?.title || 'Blog & Learn';
+  const subtitle = headerText?.subtitle || 'रुद्राक्ष, रत्न, यंत्र आणि पूजा यांविषयी सखोल माहिती — शास्त्राधारित, सोप्या भाषेत.';
+
   return (
     <section id="blog">
       <div id="ebook" style={{ position: 'relative', top: '-60px' }} />
       <div className="wrap">
         <div className="sec-head reveal">
-          <span className="kicker">Knowledge Centre</span>
-          <h2>Blog &amp; <em>Learn</em></h2>
-          <p>रुद्राक्ष, रत्न, यंत्र आणि पूजा यांविषयी सखोल माहिती — शास्त्राधारित, सोप्या भाषेत.</p>
+          <span className="kicker">{kicker}</span>
+          <h2>
+            {title === 'Blog & Learn' ? (
+              <>Blog &amp; <em>Learn</em></>
+            ) : (
+              title
+            )}
+          </h2>
+          <p>{subtitle}</p>
         </div>
         <div className="blog-grid">
           {list.map((b, idx) => (

@@ -2,13 +2,16 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from '@/context/StoreContext';
-import { getPujaServices, bookPuja } from '@/lib/api';
+import { getPujaServices, bookPuja, getGurujiProfile, getAvailabilitySlots } from '@/lib/api';
 
 export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle }) {
   const { showToast } = useStore();
   const [mounted, setMounted] = useState(false);
   const [pujaList, setPujaList] = useState([]);
   const [selectedServiceId, setSelectedServiceId] = useState(1);
+  const [ashramAddress, setAshramAddress] = useState('Shri Swami Astrology, Shop No. 14, Matoshri Apartment, Gaykhe Colony, Nashik Road, Nashik.');
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -16,6 +19,8 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
     date: '',
     timeSlot: '10:00 AM',
     bookingType: 'online',
+    location: '',
+    address: '',
     gotra: '',
     rashi: '',
     nakshatra: '',
@@ -25,7 +30,38 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
   const [confirmedBooking, setConfirmedBooking] = useState(null);
 
   useEffect(() => {
+    if (!form.date) {
+      setAvailableSlots([]);
+      return;
+    }
+    setLoadingSlots(true);
+    getAvailabilitySlots('puja', form.date)
+      .then(res => {
+        if (res?.slots && res.slots.length > 0) {
+          setAvailableSlots(res.slots);
+          const firstOpen = res.slots.find(s => !s.is_full);
+          if (firstOpen) {
+            setForm(prev => ({ ...prev, timeSlot: firstOpen.time_window || firstOpen.start_time }));
+          }
+        } else {
+          setAvailableSlots([]);
+        }
+      })
+      .catch(() => {
+        setAvailableSlots([]);
+      })
+      .finally(() => {
+        setLoadingSlots(false);
+      });
+  }, [form.date]);
+
+  useEffect(() => {
     setMounted(true);
+    getGurujiProfile()
+      .then(res => {
+        if (res?.ashram_address) setAshramAddress(res.ashram_address);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -39,15 +75,24 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
     };
   }, [isOpen]);
 
+  const matchPuja = (list, title) => {
+    if (!title || !list || list.length === 0) return null;
+    const clean = (s) => (s || '').toLowerCase().replace(/pooja/g, 'puja').replace(/[^a-z0-9]/g, '');
+    const target = clean(title);
+    return list.find(s => {
+      const sName = clean(s.name || s.title);
+      return sName.includes(target) || target.includes(sName);
+    });
+  };
+
   useEffect(() => {
     let isMounted = true;
     getPujaServices()
       .then(res => {
         if (isMounted && res.puja_services && res.puja_services.length > 0) {
           setPujaList(res.puja_services);
-          // Match selected title if possible
           if (selectedPujaTitle) {
-            const match = res.puja_services.find(s => s.name.toLowerCase().includes(selectedPujaTitle.toLowerCase()));
+            const match = matchPuja(res.puja_services, selectedPujaTitle);
             if (match) setSelectedServiceId(match.id);
           } else {
             setSelectedServiceId(res.puja_services[0].id);
@@ -67,6 +112,12 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
 
     return () => { isMounted = false; };
   }, [selectedPujaTitle]);
+
+  useEffect(() => {
+    if (!selectedPujaTitle || pujaList.length === 0) return;
+    const match = matchPuja(pujaList, selectedPujaTitle);
+    if (match) setSelectedServiceId(match.id);
+  }, [selectedPujaTitle, pujaList]);
 
   if (!isOpen) return null;
 
@@ -93,10 +144,16 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
         booking_date: form.date,
         time_slot: form.timeSlot,
         booking_type: form.bookingType,
+        location: form.location.trim(),
+        address: form.address.trim(),
         gotra: form.gotra.trim() || 'Kashyap',
         nakshatra: form.nakshatra.trim() || null,
         rashi: form.rashi.trim() || null,
-        sankalp_text: form.sankalp.trim() || 'Parivar Samriddhi & Arogya Sankalp',
+        sankalp_text: [
+          form.sankalp.trim() || 'Parivar Samriddhi & Arogya Sankalp',
+          form.location.trim() ? `Location: ${form.location.trim()}` : null,
+          form.address.trim() ? `Address: ${form.address.trim()}` : null,
+        ].filter(Boolean).join(' | '),
       });
 
       setConfirmedBooking(res);
@@ -193,9 +250,69 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
         ) : (
           <div>
             <span className="kicker">Traditional Vedic Sankalp</span>
-            <h3 style={{ fontFamily: 'var(--serif)', fontSize: '22px', color: 'var(--cream)', margin: '4px 0 16px' }}>
+            <h3 style={{ fontFamily: 'var(--serif)', fontSize: '22px', color: 'var(--cream)', margin: '4px 0 14px' }}>
               Book Puja Seva · शास्त्रोक्त पूजा नोंदणी
             </h3>
+
+            {selectedService && (
+              <div
+                style={{
+                  background: 'linear-gradient(135deg, rgba(224, 176, 74, 0.08), rgba(255, 140, 43, 0.04))',
+                  border: '1px solid rgba(224, 176, 74, 0.28)',
+                  borderRadius: '12px',
+                  padding: '14px 16px',
+                  marginBottom: '16px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+                  <div>
+                    <span style={{ fontSize: '11px', color: 'var(--gold-lt)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, display: 'block' }}>
+                      {selectedService.deity ? `🪔 ${selectedService.deity}` : 'शास्त्रोक्त वैदिक विधी'}
+                    </span>
+                    <h4 style={{ margin: '3px 0 4px', fontSize: '18px', color: 'var(--cream)', fontFamily: 'var(--serif)', fontWeight: 700 }}>
+                      {selectedService.name || selectedService.title}
+                    </h4>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--muted)', textTransform: 'uppercase', display: 'block' }}>Seva Dakshina</span>
+                    <strong style={{ fontSize: '18px', color: 'var(--gold-lt)' }}>
+                      ₹{Number(selectedService.price).toLocaleString('en-IN')}
+                    </strong>
+                  </div>
+                </div>
+
+                {(selectedService.description || selectedService.desc) && (
+                  <p style={{ margin: '6px 0 0', fontSize: '13px', lineHeight: 1.5, color: '#e8dbca' }}>
+                    {selectedService.description || selectedService.desc}
+                  </p>
+                )}
+
+                <div
+                  style={{
+                    marginTop: '10px',
+                    paddingTop: '8px',
+                    borderTop: '1px solid rgba(224, 176, 74, 0.18)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '5px',
+                    fontSize: '12px',
+                  }}
+                >
+                  {/* <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ color: 'var(--gold-lt)', fontWeight: 600 }}>📍 Location:</span>
+                    <span style={{ color: 'var(--cream)' }}>
+                      {selectedService.location || 'Nashik, Maharashtra'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                    <span style={{ color: 'var(--gold-lt)', fontWeight: 600, whiteSpace: 'nowrap' }}>🏛️ Address:</span>
+                    <span style={{ color: '#e8dbca', lineHeight: 1.4 }}>
+                      {selectedService.address || ashramAddress}
+                    </span>
+                  </div> */}
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} noValidate>
               <div className="form-grid" style={{ gap: '14px' }}>
@@ -265,18 +382,44 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
                 </div>
 
                 <div className="field">
-                  <label htmlFor="puj-slot">Time Slot · वेळ</label>
+                  <label htmlFor="puj-slot" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Time Slot · वेळ</span>
+                    {loadingSlots && <span style={{ fontSize: '11px', color: 'var(--gold-lt)' }}>लोड होत आहे...</span>}
+                  </label>
                   <select
                     id="puj-slot"
                     name="timeSlot"
                     value={form.timeSlot}
                     onChange={handleFieldChange}
                   >
-                    <option value="08:00 AM">08:00 AM (प्रातःकाल)</option>
-                    <option value="10:00 AM">10:00 AM (सकाळ)</option>
-                    <option value="11:30 AM">11:30 AM (माध्यान्ह)</option>
-                    <option value="04:00 PM">04:00 PM (सायंकाल)</option>
+                    {availableSlots.length > 0 ? (
+                      availableSlots.map(s => (
+                        <option
+                          key={s.id}
+                          value={s.time_window || s.start_time}
+                          disabled={s.is_full}
+                        >
+                          {s.time_window || s.start_time} — {s.is_full ? '❌ Full (पूर्ण)' : `✓ ${s.assigned_priest_or_astrologer || 'Pandit Ji'} (${s.available_spots} जागा उपलब्ध)`}
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="08:00 AM">08:00 AM (प्रातःकाल - Morning)</option>
+                        <option value="10:00 AM">10:00 AM (सकाळ - Shubha Muhurta)</option>
+                        <option value="11:30 AM">11:30 AM (माध्यान्ह - Midday)</option>
+                        <option value="04:00 PM">04:00 PM (सायंकाल - Evening Sandhya)</option>
+                      </>
+                    )}
                   </select>
+                  {availableSlots.length > 0 ? (
+                    <span style={{ fontSize: '11px', color: '#10b981', display: 'block', marginTop: '4px' }}>
+                      ⚡ {availableSlots.length} विशेष पूजा मुहूर्त वेळ उपलब्ध (Admin Calendar)
+                    </span>
+                  ) : form.date ? (
+                    <span style={{ fontSize: '11px', color: '#9ca3af', display: 'block', marginTop: '4px' }}>
+                      मानक वैदिक मुहूर्त वेळ (Standard Vedic Timings)
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className="field">
@@ -290,6 +433,30 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
                     <option value="online">Online Live Sankalp (व्हिडिओद्वारे)</option>
                     <option value="offline">At Home / Ashram (प्रत्यक्ष)</option>
                   </select>
+                </div>
+
+                <div className="field">
+                  <label htmlFor="puj-location">Location · स्थान / शहर</label>
+                  <input
+                    type="text"
+                    id="puj-location"
+                    name="location"
+                    placeholder="e.g. Pune, Nashik, Mumbai"
+                    value={form.location}
+                    onChange={handleFieldChange}
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="puj-address">Address · पत्ता</label>
+                  <input
+                    type="text"
+                    id="puj-address"
+                    name="address"
+                    placeholder="e.g. Flat No, Society, Area / Ashram"
+                    value={form.address}
+                    onChange={handleFieldChange}
+                  />
                 </div>
 
                 <div className="field">

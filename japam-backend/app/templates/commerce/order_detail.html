@@ -11,7 +11,13 @@
     <h1 class="page-title">Order {{ order.order_number }}</h1>
     <p class="page-subtitle">Placed on {{ format_date(order.placed_at, "%b %d, %Y at %I:%M %p") }} · Paid via {{ order.payment_method }}</p>
   </div>
-  <div class="page-header-actions">
+  <div class="page-header-actions" style="display:flex; gap:0.5rem; align-items:center;">
+    <a href="{{ url_for('commerce.order_invoice', order_id=order.id) }}" target="_blank" class="btn-secondary" style="display:inline-flex; align-items:center; gap:5px;">
+      📄 Print Tax Invoice
+    </a>
+    <a href="{{ url_for('commerce.order_packing_slip', order_id=order.id) }}" target="_blank" class="btn-secondary" style="display:inline-flex; align-items:center; gap:5px;">
+      📦 Print Packing Slip
+    </a>
     {% if order.payment_status != 'refunded' and order.order_status != 'cancelled' %}
       <button type="button" class="btn-secondary" style="color:var(--status-red-text); border-color:#fca5a5;" onclick="openModal('refundModal')">
         Process Refund

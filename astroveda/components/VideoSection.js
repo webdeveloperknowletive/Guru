@@ -1,7 +1,9 @@
 'use client';
 import { useRef, useEffect, useState } from 'react';
 
-export default function VideoSection() {
+export default function VideoSection({ sectionText }) {
+  const kicker = sectionText?.kicker || 'Video Experience';
+  const videoSrc = sectionText?.video_url || '/videos/guruji-video.mp4';
   const videoRef = useRef(null);
   const [isMuted, setIsMuted] = useState(true);
   const [volume, setVolume] = useState(1);
@@ -62,7 +64,7 @@ export default function VideoSection() {
     <section className="video-section" id="video-tour" style={{ position: 'relative', zIndex: 5 }}>
       <div className="wrap">
         <div className="sec-head center" style={{ marginBottom: '24px' }}>
-          <span className="kicker">Video Experience</span>
+          <span className="kicker">{kicker}</span>
         </div>
 
         <div
@@ -80,7 +82,7 @@ export default function VideoSection() {
         >
           <video
             ref={videoRef}
-            src="/videos/guruji-video.mp4"
+            src={videoSrc}
             playsInline
             muted={isMuted}
             loop

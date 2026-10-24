@@ -1,41 +1,120 @@
 // Spiritual Commerce Admin - Global Interactions
 
 document.addEventListener("DOMContentLoaded", () => {
-  // 1. Mobile Sidebar Toggle
+  // 1. Mobile Sidebar Toggle & Close Handlers
   const toggleBtn = document.getElementById("mobileSidebarToggle");
+  const closeBtn = document.getElementById("mobileSidebarClose");
   const sidebar = document.getElementById("adminSidebar");
   const backdrop = document.getElementById("sidebarBackdrop");
 
+  function openSidebar() {
+    if (sidebar) sidebar.classList.add("open");
+    if (backdrop) backdrop.classList.add("active");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeSidebar() {
+    if (sidebar) sidebar.classList.remove("open");
+    if (backdrop) backdrop.classList.remove("active");
+    document.body.style.overflow = "";
+  }
+
   if (toggleBtn && sidebar) {
     toggleBtn.addEventListener("click", () => {
-      sidebar.classList.toggle("open");
-      if (backdrop) backdrop.classList.toggle("active");
+      if (sidebar.classList.contains("open")) {
+        closeSidebar();
+      } else {
+        openSidebar();
+      }
     });
   }
 
-  if (backdrop && sidebar) {
-    backdrop.addEventListener("click", () => {
-      sidebar.classList.remove("open");
-      backdrop.classList.remove("active");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", closeSidebar);
+  }
+
+  if (backdrop) {
+    backdrop.addEventListener("click", closeSidebar);
+  }
+
+  // Auto-close sidebar on mobile when a navigation link is clicked
+  if (sidebar) {
+    const navLinks = sidebar.querySelectorAll(".nav-link");
+    navLinks.forEach((link) => {
+      link.addEventListener("click", () => {
+        if (window.innerWidth <= 992) {
+          closeSidebar();
+        }
+      });
     });
   }
 
-  // 2. User Profile Dropdown
+  // Close sidebar on Escape key
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      closeSidebar();
+    }
+  });
+
+  // 2. Notification Bell & Dropdown
+  const notifBtn = document.getElementById("notificationBellBtn");
+  const notifDropdown = document.getElementById("notificationDropdown");
+  const clearNotifsBtn = document.getElementById("clearNotifsBtn");
+  const bellBadge = document.getElementById("bellBadge");
+
+  if (notifBtn && notifDropdown) {
+    notifBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      // Close profile dropdown if open
+      if (userDropdown) userDropdown.style.display = "none";
+      const isVisible = notifDropdown.style.display === "block";
+      notifDropdown.style.display = isVisible ? "none" : "block";
+      notifBtn.setAttribute("aria-expanded", !isVisible);
+    });
+
+    notifDropdown.addEventListener("click", (e) => {
+      e.stopPropagation();
+    });
+
+    if (clearNotifsBtn) {
+      clearNotifsBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const itemsList = document.getElementById("notificationItemsList");
+        if (itemsList) {
+          itemsList.innerHTML = '<div style="padding:28px 16px; text-align:center; font-size:0.82rem; color:#8c8277;">✨ All clear! No pending notifications.</div>';
+        }
+        if (bellBadge) {
+          bellBadge.style.display = "none";
+        }
+        clearNotifsBtn.style.display = "none";
+      });
+    }
+  }
+
+  // 3. User Profile Dropdown
   const userMenuBtn = document.getElementById("userProfileMenu");
   const userDropdown = document.getElementById("userProfileDropdown");
 
   if (userMenuBtn && userDropdown) {
     userMenuBtn.addEventListener("click", (e) => {
       e.stopPropagation();
+      // Close notification dropdown if open
+      if (notifDropdown) notifDropdown.style.display = "none";
       userDropdown.style.display = userDropdown.style.display === "block" ? "none" : "block";
     });
 
-    document.addEventListener("click", () => {
-      userDropdown.style.display = "none";
+    userDropdown.addEventListener("click", (e) => {
+      e.stopPropagation();
     });
   }
 
-  // 3. Live Global Search
+  // Global outside click closes both dropdowns
+  document.addEventListener("click", () => {
+    if (userDropdown) userDropdown.style.display = "none";
+    if (notifDropdown) notifDropdown.style.display = "none";
+  });
+
+  // 4. Live Global Search
   const searchInput = document.getElementById("globalSearchInput");
   const searchResults = document.getElementById("searchResultsDropdown");
 
@@ -57,7 +136,22 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (err) {
           console.error("Search error:", err);
         }
-      }, 250);
+      }, 200);
+    });
+
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const query = searchInput.value.trim();
+        if (query) {
+          const firstLink = searchResults.querySelector("a");
+          if (firstLink) {
+            window.location.href = firstLink.href;
+          } else {
+            window.location.href = `/admin/commerce/products?q=${encodeURIComponent(query)}`;
+          }
+        }
+      }
     });
 
     document.addEventListener("click", (e) => {

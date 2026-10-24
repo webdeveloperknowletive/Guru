@@ -14,7 +14,7 @@ from app.models.service import (
     JyotishConsultation,
     AvailabilitySlot,
 )
-from app.models.content import BlogPost, Testimonial, GurujiProfile, MediaFile, Banner
+from app.models.content import BlogPost, Testimonial, GurujiProfile, MediaFile, Banner, AdBanner
 from app.models.operations import (
     PaymentTransaction,
     Coupon,
@@ -44,6 +44,7 @@ __all__ = [
     "GurujiProfile",
     "MediaFile",
     "Banner",
+    "AdBanner",
 
     "PaymentTransaction",
     "Coupon",

@@ -42,6 +42,10 @@ export default function ArticleModal() {
   const author = article?.author?.name || article?.author || 'Acharya Ji';
   const dateStr = article?.created_at ? new Date(article.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
 
+  const backendBase = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api/v1').replace(/\/api\/v1\/?$/, '');
+  const rawCover = article?.cover_image || article?.image;
+  const coverImg = rawCover ? (rawCover.startsWith('/static/') ? `${backendBase}${rawCover}` : rawCover) : null;
+
   return (
     <div
       className="pd-modal-overlay show"
@@ -78,6 +82,11 @@ export default function ArticleModal() {
           </div>
         ) : (
           <article>
+            {coverImg && (
+              <div style={{ marginBottom: '20px', borderRadius: '10px', overflow: 'hidden', maxHeight: '280px', border: '1px solid rgba(224, 176, 74, 0.25)' }}>
+                <img src={coverImg} alt={title} style={{ width: '100%', maxHeight: '280px', objectFit: 'cover', display: 'block' }} />
+              </div>
+            )}
             <div style={{ marginBottom: '16px' }}>
               <span className="kicker" style={{ display: 'inline-block', marginBottom: '6px' }}>
                 {category}

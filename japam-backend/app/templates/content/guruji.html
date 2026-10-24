@@ -60,27 +60,33 @@
       Identity & Spiritual Biography
     </h3>
     <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1.25rem;">
-      Primary titles, lineage, and Marathi narrative displayed alongside the photo.
+      Primary titles, lineage, and narrative displayed alongside the photo.
     </p>
 
-    <div class="form-group">
-      <label class="form-label">Full Spiritual Title / Name *</label>
-      <input type="text" name="full_title" class="form-control" value="{{ profile.full_title }}" required placeholder="e.g. Nagesh Guruji">
+    <div style="display:grid; grid-template-columns:1fr 2fr; gap:1rem; margin-bottom:1rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Storefront Section Kicker / Tag</label>
+        <input type="text" name="section_kicker" class="form-control" value="{{ (profile.visibility_settings or {}).get('section_kicker', 'About Guruji') }}" placeholder="About Guruji">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Full Spiritual Title / Name *</label>
+        <input type="text" name="full_title" class="form-control" value="{{ profile.full_title }}" required placeholder="e.g. Nagesh Guruji">
+      </div>
     </div>
 
     <div class="form-group">
       <label class="form-label">Spiritual Lineage / Sampradaya / Motto</label>
-      <input type="text" name="spiritual_lineage" class="form-control" value="{{ profile.spiritual_lineage or '' }}" placeholder="वेदशास्त्र संपन्न • २५+ वर्षांची साधना व ज्योतिष मार्गदर्शन">
+      <input type="text" name="spiritual_lineage" class="form-control" value="{{ profile.spiritual_lineage or '' }}" placeholder="Three Generations of Spiritual Heritage">
     </div>
 
     <div class="form-group">
       <label class="form-label">Primary Biography & Spiritual Journey * (Paragraph 1)</label>
-      <textarea name="bio" class="form-control" rows="3" required placeholder="श्रद्धेतून समाधान, परंपरेतून मार्गदर्शन...">{{ profile.bio }}</textarea>
+      <textarea name="bio" class="form-control" rows="3" required placeholder="Nagesh Swami Guruji continues a three-generation legacy...">{{ profile.bio }}</textarea>
     </div>
 
     <div class="form-group" style="margin-bottom:0;">
       <label class="form-label">Detailed Practice & Seva Information (Paragraph 2)</label>
-      <textarea name="secondary_bio" class="form-control" rows="3" placeholder="जन्मकुंडली अभ्यास, वास्तुशांती, रुद्राभिषेक, नवग्रह शांती आणि रत्न निवड...">{{ profile.secondary_bio or '' }}</textarea>
+      <textarea name="secondary_bio" class="form-control" rows="3" placeholder="Horoscope analysis, Vastu Shanti, Rudrabhisheka...">{{ profile.secondary_bio or '' }}</textarea>
     </div>
   </div>
 
@@ -91,26 +97,32 @@
       Key Statistics & Action Button
     </h3>
     <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1.25rem;">
-      The 3 milestone numbers (Years Experience, Consultations, Pujas) and the consultation call-to-action button.
+      The 3 milestone numbers and custom labels (Years Experience, Consultations, Pujas) and the consultation call-to-action button.
     </p>
 
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:1rem; margin-bottom:1.25rem;">
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:1rem; margin-bottom:1.25rem;">
       <div class="form-group" style="margin-bottom:0;">
-        <label class="form-label">Years of Experience</label>
-        <input type="text" name="experience_years" class="form-control" value="{{ profile.experience_years or '25+' }}" placeholder="25+">
-        <span style="font-size:0.72rem; color:var(--text-muted);">Displays below title</span>
+        <label class="form-label">Years of Experience Counter & Label</label>
+        <div style="display:flex; gap:0.5rem;">
+          <input type="text" name="experience_years" class="form-control" style="max-width:90px;" value="{{ profile.experience_years or '25+' }}" placeholder="25+">
+          <input type="text" name="experience_label" class="form-control" value="{{ (profile.visibility_settings or {}).get('experience_label', 'Years Experience') }}" placeholder="Years Experience">
+        </div>
       </div>
 
       <div class="form-group" style="margin-bottom:0;">
-        <label class="form-label">Consultations Completed</label>
-        <input type="text" name="consultations_count" class="form-control" value="{{ profile.consultations_count or '10K+' }}" placeholder="10K+">
-        <span style="font-size:0.72rem; color:var(--text-muted);">E.g. 10K+ or 15000+</span>
+        <label class="form-label">Consultations Counter & Label</label>
+        <div style="display:flex; gap:0.5rem;">
+          <input type="text" name="consultations_count" class="form-control" style="max-width:90px;" value="{{ profile.consultations_count or '10K+' }}" placeholder="10K+">
+          <input type="text" name="consultations_label" class="form-control" value="{{ (profile.visibility_settings or {}).get('consultations_label', 'Consultations') }}" placeholder="Consultations">
+        </div>
       </div>
 
       <div class="form-group" style="margin-bottom:0;">
-        <label class="form-label">Pujas Performed</label>
-        <input type="text" name="pujas_count" class="form-control" value="{{ profile.pujas_count or '5000+' }}" placeholder="5000+">
-        <span style="font-size:0.72rem; color:var(--text-muted);">E.g. 5000+</span>
+        <label class="form-label">Pujas Performed Counter & Label</label>
+        <div style="display:flex; gap:0.5rem;">
+          <input type="text" name="pujas_count" class="form-control" style="max-width:90px;" value="{{ profile.pujas_count or '5000+' }}" placeholder="5000+">
+          <input type="text" name="pujas_label" class="form-control" value="{{ (profile.visibility_settings or {}).get('pujas_label', 'Pujas Performed') }}" placeholder="Pujas Performed">
+        </div>
       </div>
     </div>
 
@@ -133,28 +145,40 @@
       Ashram Schedule & Direct Contacts
     </h3>
     <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1.25rem;">
-      Public timings, physical ashram location, and seva inquiry contact lines.
+      Public timings, physical ashram location, seva inquiry contact lines, and customized display labels.
     </p>
 
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
       <div class="form-group" style="margin-bottom:0;">
-        <label class="form-label">Public Darshan Timings</label>
-        <input type="text" name="darshan_timings" class="form-control" value="{{ profile.darshan_timings or '' }}" placeholder="सोमवार ते शनिवार: सकाळी ९ ते दुपारी १...">
+        <label class="form-label">Public Darshan Timings (with Label)</label>
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.35rem;">
+          <input type="text" name="darshan_label" class="form-control" style="max-width:130px;" value="{{ (profile.visibility_settings or {}).get('darshan_label', 'Meeting Time:') }}" placeholder="Meeting Time:">
+          <input type="text" name="darshan_timings" class="form-control" value="{{ profile.darshan_timings or '' }}" placeholder="Monday to Saturday: 9:00 AM to 1:00 PM & 4:00 PM to 8:00 PM">
+        </div>
       </div>
       <div class="form-group" style="margin-bottom:0;">
-        <label class="form-label">Direct Contact Phone</label>
-        <input type="text" name="contact_phone" class="form-control" value="{{ profile.contact_phone or '' }}" placeholder="+91 98220 00000">
+        <label class="form-label">Direct Contact Phone (with Label)</label>
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.35rem;">
+          <input type="text" name="contact_label" class="form-control" style="max-width:130px;" value="{{ (profile.visibility_settings or {}).get('contact_label', 'Contact:') }}" placeholder="Contact:">
+          <input type="text" name="contact_phone" class="form-control" value="{{ profile.contact_phone or '' }}" placeholder="+91 98220 00000">
+        </div>
       </div>
     </div>
 
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
       <div class="form-group" style="margin-bottom:0;">
-        <label class="form-label">Ashram Address</label>
-        <input type="text" name="ashram_address" class="form-control" value="{{ profile.ashram_address or '' }}" placeholder="सद्गुरू कृपा, वैदिक साधना केंद्र...">
+        <label class="form-label">Ashram Address (with Label)</label>
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.35rem;">
+          <input type="text" name="address_label" class="form-control" style="max-width:130px;" value="{{ (profile.visibility_settings or {}).get('address_label', 'Address:') }}" placeholder="Address:">
+          <input type="text" name="ashram_address" class="form-control" value="{{ profile.ashram_address or '' }}" placeholder="Sadguru Kripa, Vedic Sadhana Kendra, Pune / Nashik, Maharashtra">
+        </div>
       </div>
       <div class="form-group" style="margin-bottom:0;">
-        <label class="form-label">Seva Email Address</label>
-        <input type="email" name="contact_email" class="form-control" value="{{ profile.contact_email or '' }}" placeholder="seva@nageshguruji.com">
+        <label class="form-label">Seva Email Address (with Label)</label>
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.35rem;">
+          <input type="text" name="email_label" class="form-control" style="max-width:130px;" value="{{ (profile.visibility_settings or {}).get('email_label', 'Email:') }}" placeholder="Email:">
+          <input type="email" name="contact_email" class="form-control" value="{{ profile.contact_email or '' }}" placeholder="seva@nageshguruji.com">
+        </div>
       </div>
     </div>
   </div>

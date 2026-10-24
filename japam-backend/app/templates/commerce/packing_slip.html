@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Packing Slip - {{ order.order_number }} - AstroVeda</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #111827;
+      background: #f3f4f6;
+      padding: 24px 16px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .slip-wrapper {
+      max-width: 800px;
+      margin: 0 auto;
+      background: #ffffff;
+      border: 2px dashed #9ca3af;
+      padding: 36px;
+    }
+    .action-bar {
+      max-width: 800px;
+      margin: 0 auto 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 6px;
+      text-decoration: none;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .btn-primary { background: #111827; color: #fff; }
+    .btn-secondary { background: #fff; color: #374151; border-color: #d1d5db; }
+
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid #111827;
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+    }
+    .title {
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+    }
+    .fragile-badge {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 4px 10px;
+      background: #fee2e2;
+      color: #b91c1c;
+      font-weight: 800;
+      font-size: 11px;
+      border: 1px solid #f87171;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+    }
+    .order-box {
+      text-align: right;
+    }
+    .order-number {
+      font-size: 22px;
+      font-weight: 900;
+      font-family: monospace;
+      color: #b45309;
+    }
+
+    .address-card {
+      border: 2px solid #111827;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 24px;
+      background: #fafafa;
+    }
+    .address-title {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #4b5563;
+      margin-bottom: 6px;
+    }
+    .customer-name {
+      font-size: 18px;
+      font-weight: 800;
+      color: #111827;
+    }
+    .customer-phone {
+      font-size: 16px;
+      font-weight: 800;
+      color: #b45309;
+      margin-top: 4px;
+    }
+    .customer-address {
+      font-size: 14px;
+      color: #1f2937;
+      line-height: 1.5;
+      margin-top: 6px;
+    }
+
+    table.items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 24px;
+    }
+    table.items-table th {
+      background: #e5e7eb;
+      color: #111827;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+    }
+    table.items-table td {
+      padding: 12px;
+      border: 1px solid #e5e7eb;
+      font-size: 13px;
+    }
+
+    .check-box-col {
+      width: 40px;
+      text-align: center;
+      font-size: 18px;
+    }
+
+    .checklist-footer {
+      border-top: 1px solid #d1d5db;
+      padding-top: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: #4b5563;
+    }
+
+    @media print {
+      body { background: #fff; padding: 0; }
+      .no-print { display: none !important; }
+      .slip-wrapper { border: 2px solid #000; padding: 20px; max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Non-printable top action bar -->
+  <div class="action-bar no-print">
+    <a href="{{ url_for('commerce.order_detail', order_id=order.id) }}" class="btn btn-secondary">
+      &larr; Back to Order Details
+    </a>
+    <div style="display:flex; gap:8px;">
+      <a href="{{ url_for('commerce.order_invoice', order_id=order.id) }}" class="btn btn-secondary" target="_blank">
+        📄 View Tax Invoice
+      </a>
+      <button type="button" class="btn btn-primary" onclick="window.print()">
+        🖨️ Print Packing Slip
+      </button>
+    </div>
+  </div>
+
+  <div class="slip-wrapper">
+    <div class="header-row">
+      <div>
+        <div class="title">PACKING SLIP</div>
+        <div style="font-size:12px; color:#4b5563; margin-top:2px;">AstroVeda Sacred Ashram Logistics</div>
+        <div class="fragile-badge">⚠️ SACRED CONSECRATED GOODS · HANDLE WITH REVERENCE</div>
+      </div>
+      <div class="order-box">
+        <div style="font-size:11px; text-transform:uppercase; color:#6b7280; font-weight:700;">Order Identifier</div>
+        <div class="order-number">{{ order.order_number }}</div>
+        <div style="font-size:12px; color:#4b5563; margin-top:4px;">Date: {{ format_date(order.placed_at, "%d %b %Y") }}</div>
+      </div>
+    </div>
+
+    <!-- Devotee Shipping Address Card -->
+    <div class="address-card">
+      <div class="address-title">📦 SHIP TO (DELIVERY ADDRESS):</div>
+      <div class="customer-name">{{ order.customer_name }}</div>
+      <div class="customer-phone">📞 {{ order.customer_phone or 'Phone not provided' }}</div>
+      <div class="customer-address">
+        {{ order.shipping_address or 'Sacred Puja Sankalp Seva Delivery' }}
+      </div>
+    </div>
+
+    <!-- Items Checklist Table -->
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th class="check-box-col">Packed?</th>
+          <th style="text-align:left;">Item Name & Description</th>
+          <th style="width:20%; text-align:left;">SKU / Code</th>
+          <th style="width:12%; text-align:center;">Qty</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in order.items %}
+        <tr>
+          <td class="check-box-col">
+            <span style="display:inline-block; width:18px; height:18px; border:2px solid #374151; border-radius:3px;"></span>
+          </td>
+          <td>
+            <div style="font-weight:700; color:#111827;">{{ item.product_name }}</div>
+            <div style="font-size:11px; color:#6b7280;">Consecrated with Vedic Prana Pratishtha</div>
+          </td>
+          <td style="font-family:monospace; font-weight:600;">{{ item.sku or 'N/A' }}</td>
+          <td style="text-align:center; font-size:16px; font-weight:800; color:#b45309;">
+            {{ item.quantity }}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td class="check-box-col">
+            <span style="display:inline-block; width:18px; height:18px; border:2px solid #374151; border-radius:3px;"></span>
+          </td>
+          <td colspan="2">Standard Consecrated Puja Package & Samagri Kit</td>
+          <td style="text-align:center; font-size:16px; font-weight:800;">1</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="checklist-footer">
+      <div>
+        <strong>Total Items to Pack:</strong> {{ order.items|length or 1 }} item(s)
+      </div>
+      <div>
+        Packed By: ___________________ &nbsp;&nbsp;&nbsp;&nbsp; Date Checked: _______________
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

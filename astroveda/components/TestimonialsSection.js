@@ -25,7 +25,7 @@ const defaultTestimonials = [
   }
 ];
 
-export default function TestimonialsSection({ testimonials: initialTestimonials }) {
+export default function TestimonialsSection({ testimonials: initialTestimonials, headerText }) {
   const list = (initialTestimonials !== undefined && initialTestimonials !== null)
     ? initialTestimonials.map(t => ({
         initial: t.initial || (t.name ? t.name.charAt(0).toUpperCase() : 'A'),
@@ -35,13 +35,23 @@ export default function TestimonialsSection({ testimonials: initialTestimonials 
       }))
     : defaultTestimonials;
 
+  const kicker = headerText?.kicker || 'Testimonials';
+  const title = headerText?.title || 'What Our Clients Say';
+  const subtitle = headerText?.subtitle || 'प्रत्येक अभिप्राय खरा आहे — फसवे reviews आम्ही ठेवत नाही.';
+
   return (
     <section className="testi-section">
       <div className="wrap">
         <div className="sec-head center reveal">
-          <span className="kicker">Testimonials</span>
-          <h2>What Our <em>Clients</em> Say</h2>
-          <p>प्रत्येक अभिप्राय खरा आहे — फसवे reviews आम्ही ठेवत नाही.</p>
+          <span className="kicker">{kicker}</span>
+          <h2>
+            {title === 'What Our Clients Say' ? (
+              <>What Our <em>Clients</em> Say</>
+            ) : (
+              title
+            )}
+          </h2>
+          <p>{subtitle}</p>
         </div>
         <div className="testi-grid">
           {list.map((t, idx) => (

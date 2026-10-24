@@ -31,17 +31,24 @@ const reasons = [
   },
 ];
 
-export default function WhySection() {
+export default function WhySection({ sectionText }) {
+  const kicker = sectionText?.kicker || 'Why Choose';
+  const title = sectionText?.title || 'Nagesh Swami Guruji?';
+  const subtitle = sectionText?.subtitle || 'Three Generations of Tradition';
+  const reasonsList = (sectionText?.reasons && sectionText.reasons.length > 0)
+    ? sectionText.reasons
+    : reasons;
+
   return (
     <section className="why-section">
       <div className="wrap">
         <div className="sec-head center reveal">
-          <span className="kicker">Why Choose</span>
-          <h2>Nagesh Swami Guruji?</h2>
-          <p>Three Generations of Tradition</p>
+          <span className="kicker">{kicker}</span>
+          <h2>{title}</h2>
+          <p>{subtitle}</p>
         </div>
         <div className="why-grid">
-          {reasons.map((r) => (
+          {reasonsList.map((r) => (
             <div key={r.num} className="why-card reveal">
               <div className="why-num">{r.num}</div>
               <h4>{r.title}</h4>

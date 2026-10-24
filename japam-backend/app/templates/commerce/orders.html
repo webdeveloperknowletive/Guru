@@ -76,9 +76,17 @@
             </span>
           </td>
           <td>
-            <a href="{{ url_for('commerce.order_detail', order_id=o.id) }}" class="btn-action-outline">
-              Details
-            </a>
+            <div style="display:flex; gap:5px; align-items:center;">
+              <a href="{{ url_for('commerce.order_detail', order_id=o.id) }}" class="btn-action-outline">
+                Details
+              </a>
+              <a href="{{ url_for('commerce.order_invoice', order_id=o.id) }}" target="_blank" class="btn-action-outline" title="Print Tax Invoice">
+                📄
+              </a>
+              <a href="{{ url_for('commerce.order_packing_slip', order_id=o.id) }}" target="_blank" class="btn-action-outline" title="Print Packing Slip">
+                📦
+              </a>
+            </div>
           </td>
         </tr>
         {% else %}

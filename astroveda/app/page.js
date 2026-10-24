@@ -1,5 +1,6 @@
 import TopBar from '@/components/TopBar';
 import Navbar from '@/components/Navbar';
+import PromoRibbon from '@/components/PromoRibbon';
 import Hero from '@/components/Hero';
 import CategorySection from '@/components/CategorySection';
 import FeaturedSection from '@/components/FeaturedSection';
@@ -10,14 +11,15 @@ import RatnaSection from '@/components/RatnaSection';
 import YantraSection from '@/components/YantraSection';
 import BraceletsSection from '@/components/BraceletsSection';
 import PujaSamagriSection from '@/components/PujaSamagriSection';
-import SpecialCollectionsSection from '@/components/SpecialCollectionsSection';
 import VideoSection from '@/components/VideoSection';
 import WhySection from '@/components/WhySection';
 import AboutSection from '@/components/AboutSection';
 import TestimonialsSection from '@/components/TestimonialsSection';
 import BlogSection from '@/components/BlogSection';
+import AdBannerSection from '@/components/AdBannerSection';
 import Footer from '@/components/Footer';
 import WhatsAppFloat from '@/components/WhatsAppFloat';
+import ScrollToTop from '@/components/ScrollToTop';
 
 import {
   getProducts,
@@ -27,6 +29,8 @@ import {
   getArticles,
   getBanners,
   getGurujiProfile,
+  getSiteText,
+  getSections,
 } from '@/lib/api';
 import { adaptApiProduct } from '@/lib/products';
 
@@ -43,6 +47,8 @@ export default async function Home() {
     articlesRes,
     heroBannerRes,
     gurujiRes,
+    siteTextRes,
+    sectionsRes,
   ] = await Promise.all([
     getProducts().catch(() => null),
     getCategories().catch(() => null),
@@ -51,6 +57,8 @@ export default async function Home() {
     getArticles().catch(() => null),
     getBanners().catch(() => null),
     getGurujiProfile().catch(() => null),
+    getSiteText().catch(() => null),
+    getSections().catch(() => null),
   ]);
 
   // Adapt raw API products into UI format and sort by display_rank ASC
@@ -85,6 +93,7 @@ export default async function Home() {
   const ratnaProducts = sortByRank(
     allProducts.filter(p => {
       const s = `${p.cat} ${p.title} ${p.catLabel}`.toLowerCase();
+      if (s.includes('bracelet')) return false;
       return (
         s.includes('ratna') ||
         s.includes('gemstone') ||
@@ -98,7 +107,14 @@ export default async function Home() {
         s.includes('neelam') ||
         s.includes('pukhraj') ||
         s.includes('moti') ||
-        s.includes('moonga')
+        s.includes('moonga') ||
+        s.includes('gomed') ||
+        s.includes('hessonite') ||
+        s.includes('vaidurya') ||
+        s.includes('vedurya') ||
+        s.includes("cat's eye") ||
+        s.includes('diamond') ||
+        s.includes('heera')
       );
     })
   );
@@ -153,11 +169,11 @@ export default async function Home() {
 
   // Content records & Banners
   const allBanners = heroBannerRes?.banners || [];
-  const heroBanner = allBanners.find(b => b.position === 'hero') || null;
+  const heroBanners = allBanners.filter(b => b.position === 'hero');
+  const heroBanner = heroBanners[0] || null;
   const topbarBanners = allBanners.filter(b => b.position === 'topbar');
   const promoBanner = allBanners.find(b => b.position === 'promo') || null;
   const logoBanner = allBanners.find(b => b.position === 'logo') || null;
-  const bgBanner = allBanners.find(b => b.position === 'hero_bg' || b.position === 'bg_image') || null;
 
   const backendBase = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api/v1').replace(/\/api\/v1\/?$/, '');
   const resolveImg = (url) => {
@@ -167,64 +183,81 @@ export default async function Home() {
     return url;
   };
 
+  // Collect all active hero background slides (hero_bg and hero banners with uploaded images)
+  const bgBanners = allBanners.filter(b => b.position === 'hero_bg' || (b.position === 'hero' && b.image_url));
+  const dynamicHeroSlides = bgBanners
+    .map(b => resolveImg(b.image_url))
+    .filter(Boolean);
+
+  // Section / Site background image (bg_image)
+  const siteBgBanner = allBanners.find(b => b.position === 'bg_image');
+  const siteBgUrl = resolveImg(siteBgBanner?.image_url);
+
   const logoUrl = resolveImg(logoBanner?.image_url) || '/swami-guruji-logo-cropped.jpg';
-  const heroBgUrl = resolveImg(bgBanner?.image_url || heroBanner?.image_url);
+  const heroBgUrl = dynamicHeroSlides[0] || null;
 
   const categories = categoriesRes?.categories || [];
   const pujaServices = pujaRes?.puja_services || [];
   const testimonials = testimonialsRes?.testimonials || [];
   const articles = articlesRes?.articles || [];
   const guruji = gurujiRes?.guruji || gurujiRes || null;
+  const siteText = siteTextRes?.site_text || siteTextRes || {};
+
+  const topbarContactLink = siteText?.hero_section?.whatsapp_url || siteText?.footer_section?.whatsapp_url || 'https://wa.me/919623117545';
+  const topbarContactText = siteText?.hero_section?.contact_text || 'Talk to Guruji';
+
+  // Dynamic sections configuration lookup
+  const sectionsData = sectionsRes?.sections || [];
+  const SECTION_COMPONENTS = {
+    categories: <CategorySection key="categories" categories={categories} headerText={siteText.category_section} />,
+    featured: <FeaturedSection key="featured" products={featuredProducts} headerText={siteText.featured_section} />,
+    puja: <PujaSection key="puja" services={pujaServices} headerText={siteText.puja_section} />,
+    jyotish: <JyotishSection key="jyotish" sectionText={siteText.jyotish_section} />,
+    rudraksha: <RudrakshaSection key="rudraksha" products={rudrakshaProducts} headerText={siteText.rudraksha_section} />,
+    ratna: <RatnaSection key="ratna" products={ratnaProducts} headerText={siteText.ratna_section} />,
+    yantra: <YantraSection key="yantra" products={yantraProducts} headerText={siteText.yantra_section} />,
+    bracelets: <BraceletsSection key="bracelets" products={braceletsProducts} headerText={siteText.bracelets_section} />,
+    puja_samagri: <PujaSamagriSection key="puja_samagri" products={pujaSamagriProducts} headerText={siteText.puja_samagri_section} />,
+    ads_banner: <AdBannerSection key="ads_banner" position="home_mid" />,
+    video: <VideoSection key="video" sectionText={siteText.video_section} />,
+    why: <WhySection key="why" sectionText={siteText.why_section} />,
+    about: <AboutSection key="about" guruji={guruji} />,
+    testimonials: <TestimonialsSection key="testimonials" testimonials={testimonials} headerText={siteText.testimonials_section} />,
+    blog: <BlogSection key="blog" articles={articles} headerText={siteText.blog_section} />,
+  };
+
+  const DEFAULT_SEQUENCE = [
+    'categories', 'featured', 'puja', 'jyotish', 'rudraksha',
+    'ratna', 'yantra', 'bracelets', 'puja_samagri', 'ads_banner',
+    'video', 'why', 'about', 'testimonials', 'blog',
+  ];
 
   return (
     <>
-      <TopBar banners={topbarBanners} />
+      <TopBar banners={topbarBanners} contactLink={topbarContactLink} contactText={topbarContactText} />
       <Navbar logo={logoUrl} />
-      {promoBanner && (
-        <div style={{
-          background: 'linear-gradient(90deg, #d4af37, #f69145, #d4af37)',
-          color: '#1a1005',
-          padding: '8px 16px',
-          textAlign: 'center',
-          fontWeight: 600,
-          fontSize: '13px',
-          letterSpacing: '0.02em',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '12px',
-        }}>
-          <span>✨ {promoBanner.title}</span>
-          {promoBanner.subtitle && <span style={{ opacity: 0.9 }}>· {promoBanner.subtitle}</span>}
-          {promoBanner.link_url && (
-            <a href={promoBanner.link_url} style={{ color: '#1a1005', textDecoration: 'underline', fontWeight: 700 }}>
-              {promoBanner.button_text || 'Shop Now →'}
-            </a>
-          )}
-        </div>
-      )}
+      <PromoRibbon banner={promoBanner} />
       <main>
-        <Hero banner={heroBanner} bgImage={heroBgUrl} />
-        <div className="post-hero">
-          <CategorySection categories={categories} />
-          <FeaturedSection products={featuredProducts} />
-          <PujaSection services={pujaServices} />
-          <JyotishSection />
-          <RudrakshaSection products={rudrakshaProducts} />
-          <RatnaSection products={ratnaProducts} />
-          <YantraSection products={yantraProducts} />
-          <BraceletsSection products={braceletsProducts} />
-          <PujaSamagriSection products={pujaSamagriProducts} />
-          <SpecialCollectionsSection products={specialCollectionsProducts} />
-          <VideoSection />
-          <WhySection />
-          <AboutSection guruji={guruji} />
-          <TestimonialsSection testimonials={testimonials} />
-          <BlogSection articles={articles} />
+        <Hero banner={heroBanner} bgImage={heroBgUrl} bgSlides={dynamicHeroSlides} secBtn={siteText.hero_section} />
+        <div 
+          className="post-hero"
+          style={siteBgUrl ? {
+            backgroundImage: `radial-gradient(ellipse at center, rgba(16,12,8,0.88), rgba(16,12,8,0.98)), url(${siteBgUrl})`,
+            backgroundAttachment: 'fixed',
+            backgroundSize: 'cover',
+          } : undefined}
+        >
+          {sectionsData.length > 0
+            ? sectionsData
+                .filter(s => s.enabled !== false)
+                .map(s => SECTION_COMPONENTS[s.key] || null)
+            : DEFAULT_SEQUENCE.map(key => SECTION_COMPONENTS[key] || null)
+          }
         </div>
       </main>
-      <Footer logo={logoUrl} />
+      <Footer logo={logoUrl} footerText={siteText.footer_section} />
       <WhatsAppFloat />
+      <ScrollToTop />
     </>
   );
 }

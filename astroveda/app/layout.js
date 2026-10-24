@@ -11,6 +11,8 @@ import ContactModal from '@/components/ContactModal';
 import ArticleModal from '@/components/ArticleModal';
 import WelcomeOfferModal from '@/components/WelcomeOfferModal';
 import Toast from '@/components/Toast';
+import UrgencyNotification from '@/components/UrgencyNotification';
+import CookieConsentModal from '@/components/CookieConsentModal';
 import ScrollReveal from '@/components/ScrollReveal';
 
 export const viewport = {
@@ -52,6 +54,8 @@ export default function RootLayout({ children }) {
           <ArticleModal />
           <WelcomeOfferModal />
           <Toast />
+          <UrgencyNotification />
+          <CookieConsentModal />
         </StoreProvider>
       </body>
     </html>

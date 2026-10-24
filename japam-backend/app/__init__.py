@@ -200,6 +200,74 @@ def create_app(config_name=None) -> Flask:
         if admin and admin.session_token:
             csrf_tok = AuthService.generate_csrf_token(admin.session_token)
 
+        notifications = []
+        if admin:
+            try:
+                from app.models.commerce import Order, Product
+                from app.models.service import PujaBooking, JyotishConsultation
+                from app.models.operations import CustomerEnquiry
+                
+                pending_orders = Order.query.filter(Order.order_status.in_(["pending", "processing"])).count()
+                if pending_orders > 0:
+                    notifications.append({
+                        "type": "order",
+                        "title": f"{pending_orders} Orders Awaiting Fulfillment",
+                        "subtitle": "New customer orders ready to process & dispatch",
+                        "url": "/admin/commerce/orders",
+                        "badge": f"{pending_orders} orders",
+                        "icon": "📦",
+                    })
+
+                pending_consults = JyotishConsultation.query.filter_by(status="pending").count()
+                if pending_consults > 0:
+                    notifications.append({
+                        "type": "consultation",
+                        "title": f"{pending_consults} Jyotish Consultations Pending",
+                        "subtitle": "Kundali & astrology requests awaiting review",
+                        "url": "/admin/services/consultations",
+                        "badge": f"{pending_consults} requests",
+                        "icon": "🔮",
+                    })
+
+                pending_pujas = PujaBooking.query.filter_by(status="pending").count()
+                if pending_pujas > 0:
+                    notifications.append({
+                        "type": "puja",
+                        "title": f"{pending_pujas} Puja Rituals to Assign",
+                        "subtitle": "Puja bookings awaiting pandit confirmation",
+                        "url": "/admin/services/puja-bookings",
+                        "badge": f"{pending_pujas} pujas",
+                        "icon": "🪔",
+                    })
+
+                open_enquiries = CustomerEnquiry.query.filter_by(status="open").count()
+                if open_enquiries > 0:
+                    notifications.append({
+                        "type": "enquiry",
+                        "title": f"{open_enquiries} Enquiries Awaiting Response",
+                        "subtitle": "Devotee questions regarding pujas & astrology",
+                        "url": "/admin/operations/enquiries?status=open",
+                        "badge": f"{open_enquiries} open",
+                        "icon": "✉️",
+                    })
+
+                low_stock = Product.query.filter(
+                    Product.stock_quantity <= 5,
+                    (Product.is_archived.is_(False) | Product.is_archived.is_(None)),
+                    Product.publishing_status != "archived"
+                ).count()
+                if low_stock > 0:
+                    notifications.append({
+                        "type": "inventory",
+                        "title": f"{low_stock} Products Low in Stock",
+                        "subtitle": "Inventory items with 5 or fewer items remaining",
+                        "url": "/admin/commerce/inventory",
+                        "badge": "Low stock",
+                        "icon": "⚠️",
+                    })
+            except Exception:
+                notifications = []
+
         return {
             "current_user": admin,
             "format_currency": format_currency,
@@ -208,6 +276,8 @@ def create_app(config_name=None) -> Flask:
             "app_name": app.config.get("APP_NAME", "Spiritual Commerce Admin"),
             "app_subtitle": app.config.get("APP_SUBTITLE", "Seva · Sanskriti · Samṛddhi"),
             "now_utc": datetime.now(timezone.utc),
+            "notifications": notifications,
+            "unread_count": len(notifications),
         }
 
     # Error Handlers

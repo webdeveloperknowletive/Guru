@@ -1,29 +1,117 @@
 'use client';
+import { useState } from 'react';
 import { useStore } from '@/context/StoreContext';
 
 export default function ProductCard({ product, showDesc = true }) {
   const { addToCart, toggleWishlist, isInWishlist, openProductModal } = useStore();
-  const { title, catLabel, desc, price, priceOld, save, rating, reviews, badge, img } = product;
-  const priceNum = parseInt(price.replace(/[^\d]/g, ''), 10) || 0;
+  const { title, catLabel, desc, price, priceOld, save, rating, reviews, badge, img, images = [] } = product;
+  const priceNum = parseInt(String(price).replace(/[^\d]/g, ''), 10) || 0;
   const inWish = isInWishlist(title);
+
+  // Normalize image list for scrolling
+  const imgList = (images && images.length > 0)
+    ? images
+    : (img ? [img] : []);
+
+  const totalImgs = imgList.length;
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const safeIdx = totalImgs > 0 ? (currentIdx % totalImgs) : 0;
+  const currentImg = imgList[safeIdx];
 
   const badgeMap = { hot: 'badge-hot', new: 'badge-new', lab: 'badge-lab' };
   const badgeTxt = { hot: 'Bestseller', new: 'New Drop', lab: 'Lab Certified' };
 
+  const handlePrev = (e) => {
+    e.stopPropagation();
+    setCurrentIdx((prev) => (prev > 0 ? prev - 1 : totalImgs - 1));
+  };
+
+  const handleNext = (e) => {
+    e.stopPropagation();
+    setCurrentIdx((prev) => (prev < totalImgs - 1 ? prev + 1 : 0));
+  };
+
+  const handleCardClick = () => {
+    openProductModal({ ...product, activeImageIdx: safeIdx }, safeIdx);
+  };
+
   return (
-    <article className="prod-card in">
+    <article
+      className="prod-card in"
+      role="button"
+      tabIndex={0}
+      onClick={handleCardClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleCardClick();
+        }
+      }}
+      style={{ cursor: 'pointer' }}
+    >
       <div className="prod-img">
         {badge && <span className={`prod-badge ${badgeMap[badge]}`}>{badgeTxt[badge]}</span>}
         <button
           className={`wish${inWish ? ' on' : ''}`}
           aria-label="Add to wishlist"
-          onClick={() => toggleWishlist(product, priceNum)}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleWishlist(product, priceNum);
+          }}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 00-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 000-7.8z"/>
           </svg>
         </button>
-        <div className="prod-img-wrap" dangerouslySetInnerHTML={{ __html: img }} />
+
+        {totalImgs > 1 && (
+          <>
+            <button
+              type="button"
+              className="prod-img-arrow left"
+              aria-label="Previous image"
+              onClick={handlePrev}
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              className="prod-img-arrow right"
+              aria-label="Next image"
+              onClick={handleNext}
+            >
+              ›
+            </button>
+          </>
+        )}
+
+        <div className="prod-img-wrap">
+          {currentImg && currentImg.startsWith('<') ? (
+            <div dangerouslySetInnerHTML={{ __html: currentImg }} style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }} />
+          ) : (
+            <img
+              src={currentImg || ''}
+              alt={`${title} - view ${safeIdx + 1}`}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '14px' }}
+              loading="lazy"
+            />
+          )}
+        </div>
+
+        {totalImgs > 1 && (
+          <div className="prod-img-dots">
+            {imgList.map((_, i) => (
+              <span
+                key={i}
+                className={`prod-img-dot${i === safeIdx ? ' active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentIdx(i);
+                }}
+              />
+            ))}
+          </div>
+        )}
       </div>
       <div className="prod-body">
         <p className="prod-cat">{catLabel}</p>
@@ -39,8 +127,24 @@ export default function ProductCard({ product, showDesc = true }) {
           <span className="off">{save}</span>
         </div>
         <div className="prod-actions">
-          <button className="btn-add" onClick={() => addToCart(product, priceNum)}>🛒 Add to Cart</button>
-          <button className="btn-view" onClick={() => openProductModal(product)}>View Details</button>
+          <button
+            className="btn-add"
+            onClick={(e) => {
+              e.stopPropagation();
+              addToCart(product, priceNum);
+            }}
+          >
+            🛒 Add to Cart
+          </button>
+          <button
+            className="btn-view"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleCardClick();
+            }}
+          >
+            View Details
+          </button>
         </div>
       </div>
     </article>

@@ -44,10 +44,17 @@ export default function CartPanel() {
           ) : (
             cart.map((item, index) => (
               <div key={index} className="panel-item">
-                <div
-                  className="thumb"
-                  dangerouslySetInnerHTML={{ __html: item.img || '' }}
-                />
+                <div className="thumb">
+                  {item.img && typeof item.img === 'string' && item.img.startsWith('<') ? (
+                    <div dangerouslySetInnerHTML={{ __html: item.img }} style={{ width: '100%', height: '100%' }} />
+                  ) : (
+                    <img
+                      src={item.img || '/categories/rudraksha.png'}
+                      alt={item.title}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }}
+                    />
+                  )}
+                </div>
                 <div className="info">
                   <h4>{item.title}</h4>
                   <div className="price">₹{item.price.toLocaleString('en-IN')}</div>
@@ -58,8 +65,12 @@ export default function CartPanel() {
                   </div>
                 </div>
                 <button
+                  type="button"
                   className="remove"
-                  onClick={() => removeFromCart(index)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeFromCart(index);
+                  }}
                   aria-label="Remove item"
                 >
                   ✕

@@ -2,28 +2,26 @@
 
 import { useState, useEffect, useMemo } from 'react';
 
-const DEFAULT_SLIDES = [
-  '/hero/hero-rudraksha.jpg',
-  '/hero/hero-puja.jpg',
-  '/hero/hero-yantra.jpg',
-  '/hero/hero-astrology.jpg',
-  '/hero/hero-ghat.png',
+const HERO_SLIDES = [
+  '/hero/hero-trimbakeshwar.jpg',
+  '/hero/hero-aarti.jpg',
+  '/hero/hero-godavari-ghat.jpg',
 ];
 
-export default function Hero({ banner, bgImage }) {
+export default function Hero({ banner, bgImage, bgSlides = [], secBtn }) {
   const title = banner?.title;
   const subtitle = banner?.subtitle || 'Authentic Rudraksha · Certified Gemstones · Sacred Yantra · Jyotish Consultation';
   const btnText = banner?.button_text || 'Explore Collection →';
   const btnLink = banner?.link_url || '#shop';
-  const bg = bgImage || banner?.image_url;
+  const secBtnText = secBtn?.secondary_button_text || 'Book Consultation';
+  const secBtnLink = secBtn?.secondary_button_url || '#jyotish';
 
-  const slides = useMemo(() => {
-    const list = [...DEFAULT_SLIDES];
-    if (bg && !list.includes(bg)) {
-      list.unshift(bg);
-    }
-    return list;
-  }, [bg]);
+  // Use dynamic slides from admin (hero_bg or hero banners with images), or fallback to HERO_SLIDES
+  const customSlides = (bgSlides && bgSlides.length > 0)
+    ? bgSlides
+    : (bgImage ? [bgImage] : []);
+
+  const slides = customSlides.length > 0 ? customSlides : HERO_SLIDES;
 
   const [currentSlide, setCurrentSlide] = useState(0);
 
@@ -61,15 +59,12 @@ export default function Hero({ banner, bgImage }) {
           return (
             <div
               key={imgSrc}
+              className="hero-bg-slide"
               style={{
                 position: 'absolute',
                 inset: 0,
                 backgroundImage: `url(${imgSrc})`,
-                backgroundSize: '100% 100%',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
                 opacity: isActive ? 1 : 0,
-                transition: 'opacity 1s ease-in-out',
                 zIndex: isActive ? 1 : 0,
               }}
             />
@@ -100,7 +95,7 @@ export default function Hero({ banner, bgImage }) {
 
           <div className="hero-actions">
             <a href={btnLink} className="btn btn-gold">{btnText}</a>
-            <a href="#jyotish" className="btn btn-ghost">Book Consultation</a>
+            <a href={secBtnLink} className="btn btn-ghost">{secBtnText}</a>
           </div>
         </div>
       </div>

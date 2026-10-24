@@ -18,6 +18,25 @@ export default function ProductModal() {
 
   const product = passedProduct || findProduct(title);
 
+  const modalImages = (product?.images && product.images.length > 0)
+    ? product.images
+    : (product?.img ? [product.img] : []);
+
+  const [modalImgIdx, setModalImgIdx] = useState(0);
+
+  useEffect(() => {
+    if (show && product) {
+      const initIdx = typeof product.activeImageIdx === 'number'
+        ? product.activeImageIdx
+        : (typeof productModal?.activeImageIdx === 'number' ? productModal.activeImageIdx : 0);
+      setModalImgIdx(initIdx);
+    }
+  }, [show, product, productModal?.activeImageIdx]);
+
+  const totalModalImgs = modalImages.length;
+  const safeModalIdx = totalModalImgs > 0 ? (modalImgIdx % totalModalImgs) : 0;
+  const currentModalImg = modalImages[safeModalIdx];
+
   useEffect(() => {
     if (show && product && product.slug) {
       setLoadingDetails(true);
@@ -164,7 +183,65 @@ export default function ProductModal() {
           <span className="badge-float" style={badgeStyle}>
             ✓ {product.badge ? badgeTxt[product.badge] : 'Authentic'}
           </span>
-          <div dangerouslySetInnerHTML={{ __html: product.img || '' }} />
+
+          <div className="pd-img-main-wrap">
+            {currentModalImg && currentModalImg.startsWith('<') ? (
+              <div dangerouslySetInnerHTML={{ __html: currentModalImg }} style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }} />
+            ) : (
+              <img
+                src={currentModalImg || ''}
+                alt={`${product.title} - view ${safeModalIdx + 1}`}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '16px' }}
+              />
+            )}
+
+            {totalModalImgs > 1 && (
+              <>
+                <button
+                  type="button"
+                  className="pd-img-arrow left"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setModalImgIdx((prev) => (prev > 0 ? prev - 1 : totalModalImgs - 1));
+                  }}
+                  aria-label="Previous image"
+                >
+                  ‹
+                </button>
+                <button
+                  type="button"
+                  className="pd-img-arrow right"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setModalImgIdx((prev) => (prev < totalModalImgs - 1 ? prev + 1 : 0));
+                  }}
+                  aria-label="Next image"
+                >
+                  ›
+                </button>
+              </>
+            )}
+          </div>
+
+          {totalModalImgs > 1 && (
+            <div className="pd-thumbnails">
+              {modalImages.map((src, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className={`pd-thumb-btn${i === safeModalIdx ? ' active' : ''}`}
+                  onClick={() => setModalImgIdx(i)}
+                  aria-label={`View image ${i + 1}`}
+                >
+                  {src && src.startsWith('<') ? (
+                    <div dangerouslySetInnerHTML={{ __html: src }} style={{ width: '100%', height: '100%' }} />
+                  ) : (
+                    <img src={src} alt="" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="pd-info">

@@ -54,6 +54,15 @@ export default function AboutSection({ guruji }) {
                         (vis.show_ashram && guruji?.ashram_address) ||
                         (vis.show_contact && (guruji?.contact_phone || guruji?.contact_email));
 
+  const sectionKicker = guruji?.section_kicker || (guruji?.visibility_settings?.section_kicker) || 'About Guruji';
+  const expLabel = guruji?.experience_label || (guruji?.visibility_settings?.experience_label) || 'Years Experience';
+  const consultsLabel = guruji?.consultations_label || (guruji?.visibility_settings?.consultations_label) || 'Consultations';
+  const pujasLabel = guruji?.pujas_label || (guruji?.visibility_settings?.pujas_label) || 'Pujas Performed';
+  const darshanLabel = guruji?.darshan_label || (guruji?.visibility_settings?.darshan_label) || 'Meeting Time:';
+  const addressLabel = guruji?.address_label || (guruji?.visibility_settings?.address_label) || 'Address:';
+  const contactLabel = guruji?.contact_label || (guruji?.visibility_settings?.contact_label) || 'Contact:';
+  const emailLabel = guruji?.email_label || (guruji?.visibility_settings?.email_label) || 'Email:';
+
   return (
     <section id="about">
       <div className="wrap">
@@ -84,7 +93,7 @@ export default function AboutSection({ guruji }) {
 
           {/* Guruji Copy & Content */}
           <div className="guru-copy reveal">
-            <span className="kicker">About Guruji</span>
+            <span className="kicker">{sectionKicker}</span>
             <h2>{name}</h2>
 
             {/* Spiritual Lineage */}
@@ -104,13 +113,13 @@ export default function AboutSection({ guruji }) {
             {hasStats && (
               <div className="guru-stats">
                 {vis.show_experience && (
-                  <div className="st"><b>{expYears}</b><span>Years Experience</span></div>
+                  <div className="st"><b>{expYears}</b><span>{expLabel}</span></div>
                 )}
                 {vis.show_consultations && (
-                  <div className="st"><b>{consults}</b><span>Consultations</span></div>
+                  <div className="st"><b>{consults}</b><span>{consultsLabel}</span></div>
                 )}
                 {vis.show_pujas && (
-                  <div className="st"><b>{pujas}</b><span>Pujas Performed</span></div>
+                  <div className="st"><b>{pujas}</b><span>{pujasLabel}</span></div>
                 )}
               </div>
             )}
@@ -130,24 +139,36 @@ export default function AboutSection({ guruji }) {
               }}>
                 {vis.show_darshan && guruji?.darshan_timings && (
                   <div style={{ marginBottom: '4px' }}>
-                    <strong style={{ color: 'var(--accent-primary, #563B2D)' }}>Meeting Time:</strong>{' '}
-                    {guruji.darshan_timings.includes('सोमवार')
-                      ? 'Monday to Saturday: 9:00 AM to 1:00 PM & 4:00 PM to 8:00 PM'
-                      : guruji.darshan_timings}
+                    <strong style={{ color: 'var(--accent-primary, #563B2D)' }}>{darshanLabel}</strong>{' '}
+                    {guruji.darshan_timings}
                   </div>
                 )}
                 {vis.show_ashram && guruji?.ashram_address && (
                   <div style={{ marginBottom: '4px' }}>
-                    <strong style={{ color: 'var(--accent-primary, #563B2D)' }}>Address:</strong>{' '}
-                    {guruji.ashram_address.includes('सद्गुरू')
-                      ? 'Sadguru Kripa, Vedic Sadhana Kendra, Pune / Nashik, Maharashtra'
-                      : guruji.ashram_address}
+                    <strong style={{ color: 'var(--accent-primary, #563B2D)' }}>{addressLabel}</strong>{' '}
+                    {guruji.ashram_address}
                   </div>
                 )}
-                {vis.show_contact && (guruji?.contact_phone || guruji?.contact_email) && (
+                {vis.show_contact && guruji?.contact_phone && (
+                  <div style={{ marginBottom: guruji?.contact_email ? '4px' : '0' }}>
+                    <strong style={{ color: 'var(--accent-primary, #563B2D)' }}>{contactLabel}</strong>{' '}
+                    <a
+                      href={`tel:${guruji.contact_phone.replace(/\s+/g, '')}`}
+                      className="about-contact-link"
+                    >
+                      {guruji.contact_phone}
+                    </a>
+                  </div>
+                )}
+                {vis.show_contact && guruji?.contact_email && (
                   <div>
-                    <strong style={{ color: 'var(--accent-primary, #563B2D)' }}>Contact:</strong> {guruji.contact_phone}
-                    {guruji?.contact_email ? ` · ${guruji.contact_email}` : ''}
+                    <strong style={{ color: 'var(--accent-primary, #563B2D)' }}>{emailLabel}</strong>{' '}
+                    <a
+                      href={`mailto:${guruji.contact_email}`}
+                      className="about-contact-link"
+                    >
+                      {guruji.contact_email}
+                    </a>
                   </div>
                 )}
               </div>

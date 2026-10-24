@@ -1,6 +1,6 @@
 import ProductCard from '@/components/ProductCard';
 
-export default function PujaSamagriSection({ products = [] }) {
+export default function PujaSamagriSection({ products = [], headerText }) {
   if (!products || products.length === 0) return null;
 
   const sortedProducts = [...products].sort((a, b) => {
@@ -10,13 +10,23 @@ export default function PujaSamagriSection({ products = [] }) {
     return 0;
   });
 
+  const kicker = headerText?.kicker || 'Puja Samagri';
+  const title = headerText?.title || 'Sacred Puja Samagri Collection';
+  const subtitle = headerText?.subtitle || 'पूजा व धार्मिक विधींसाठी आवश्यक सर्व शुद्ध व प्रमाणित साहित्य — एकाच ठिकाणी.';
+
   return (
     <section id="puja-samagri">
       <div className="wrap">
         <div className="sec-head reveal">
-          <span className="kicker">Puja Samagri</span>
-          <h2>Sacred <em>Puja Samagri</em> Collection</h2>
-          <p>पूजा व धार्मिक विधींसाठी आवश्यक सर्व शुद्ध व प्रमाणित साहित्य — एकाच ठिकाणी.</p>
+          <span className="kicker">{kicker}</span>
+          <h2>
+            {title === 'Sacred Puja Samagri Collection' ? (
+              <>Sacred <em>Puja Samagri</em> Collection</>
+            ) : (
+              title
+            )}
+          </h2>
+          <p>{subtitle}</p>
         </div>
         <div className="prod-grid">
           {sortedProducts.map((product) => (

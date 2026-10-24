@@ -1,0 +1,471 @@
+{% extends "base.html" %}
+
+{% block title %}Ads & AdSense Manager{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Ads & AdSense Manager</h1>
+    <p class="page-subtitle">Configure, integrate, and monetize your website with Google AdSense, Meta Ads, and custom promotional banners.</p>
+  </div>
+  <div class="page-header-actions">
+    <button type="button" class="btn-primary" onclick="openModal('createAdModal')">
+      + Create Ad Unit
+    </button>
+  </div>
+</div>
+
+<!-- Quick Platforms Overview -->
+<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; margin-bottom:1.5rem;">
+  <div class="dashboard-card" style="padding:1rem 1.25rem; display:flex; align-items:center; gap:0.75rem;">
+    <div style="width:42px; height:42px; border-radius:8px; background:rgba(66, 133, 244, 0.12); display:flex; align-items:center; justify-content:center; font-size:1.3rem;">
+      🌐
+    </div>
+    <div>
+      <div style="font-weight:700; font-size:0.9rem; color:var(--text-primary);">Google AdSense</div>
+      <div style="font-size:0.75rem; color:var(--text-muted);">Paste client & slot IDs or full code</div>
+    </div>
+  </div>
+
+  <div class="dashboard-card" style="padding:1rem 1.25rem; display:flex; align-items:center; gap:0.75rem;">
+    <div style="width:42px; height:42px; border-radius:8px; background:rgba(0, 129, 251, 0.12); display:flex; align-items:center; justify-content:center; font-size:1.3rem;">
+      ♾️
+    </div>
+    <div>
+      <div style="font-weight:700; font-size:0.9rem; color:var(--text-primary);">Meta Ads</div>
+      <div style="font-size:0.75rem; color:var(--text-muted);">Audience Network & Pixel Embeds</div>
+    </div>
+  </div>
+
+  <div class="dashboard-card" style="padding:1rem 1.25rem; display:flex; align-items:center; gap:0.75rem;">
+    <div style="width:42px; height:42px; border-radius:8px; background:rgba(217, 119, 6, 0.12); display:flex; align-items:center; justify-content:center; font-size:1.3rem;">
+      🖼️
+    </div>
+    <div>
+      <div style="font-weight:700; font-size:0.9rem; color:var(--text-primary);">Direct Image Banners</div>
+      <div style="font-size:0.75rem; color:var(--text-muted);">Sponsor images with target links</div>
+    </div>
+  </div>
+
+  <div class="dashboard-card" style="padding:1rem 1.25rem; display:flex; align-items:center; gap:0.75rem;">
+    <div style="width:42px; height:42px; border-radius:8px; background:rgba(16, 185, 129, 0.12); display:flex; align-items:center; justify-content:center; font-size:1.3rem;">
+      ⚡
+    </div>
+    <div>
+      <div style="font-weight:700; font-size:0.9rem; color:var(--text-primary);">1-Click Visibility</div>
+      <div style="font-size:0.75rem; color:var(--text-muted);">Active / Inactive controls section</div>
+    </div>
+  </div>
+</div>
+
+<!-- Ad Units Table -->
+<div class="dashboard-card">
+  <div class="table-responsive">
+    <table class="spiritual-table">
+      <thead>
+        <tr>
+          <th>Ad Unit</th>
+          <th>Platform</th>
+          <th>Placement</th>
+          <th>Integration Details</th>
+          <th>Status</th>
+          <th style="min-width:200px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ad in ads %}
+        <tr>
+          <td>
+            <div style="font-weight:600; color:var(--text-primary);">{{ ad.title }}</div>
+            {% if ad.headline %}
+              <div style="font-size:0.76rem; color:var(--saffron-700);">{{ ad.headline }}</div>
+            {% endif %}
+          </td>
+          <td>
+            {% if ad.platform == 'google' %}
+              <span class="badge" style="background:#e8f0fe; color:#1a73e8; border:1px solid #d2e3fc; font-weight:600;">
+                🌐 Google AdSense
+              </span>
+            {% elif ad.platform == 'meta' %}
+              <span class="badge" style="background:#e7f5ff; color:#0064e0; border:1px solid #bae3ff; font-weight:600;">
+                ♾️ Meta Ads
+              </span>
+            {% elif ad.platform == 'image_banner' %}
+              <span class="badge" style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; font-weight:600;">
+                🖼️ Image Banner
+              </span>
+            {% else %}
+              <span class="badge" style="background:#f3e8ff; color:#7e22ce; border:1px solid #e9d5ff; font-weight:600;">
+                ⚡ Custom HTML/JS
+              </span>
+            {% endif %}
+          </td>
+          <td>
+            <span style="font-size:0.8rem; font-weight:500; color:var(--text-secondary);">
+              {% if ad.position == 'home_mid' %}
+                Home Page Mid-Section
+              {% elif ad.position == 'home_bottom' %}
+                Above Footer
+              {% else %}
+                All Placements
+              {% endif %}
+            </span>
+          </td>
+          <td>
+            <div style="font-size:0.75rem; color:var(--text-muted);">
+              {% if ad.client_id %}
+                <div><strong>Client ID:</strong> <code>{{ ad.client_id }}</code></div>
+              {% endif %}
+              {% if ad.slot_id %}
+                <div><strong>Slot ID:</strong> <code>{{ ad.slot_id }}</code></div>
+              {% endif %}
+              {% if ad.image_url %}
+                <div>
+                  <a href="{{ ad.image_url }}" target="_blank" style="color:var(--saffron-700); text-decoration:none;">
+                    📷 View Banner Image
+                  </a>
+                </div>
+              {% endif %}
+              {% if ad.target_url %}
+                <div style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                  <strong>Link:</strong> <a href="{{ ad.target_url }}" target="_blank" style="color:var(--saffron-700); text-decoration:none;">{{ ad.target_url }}</a>
+                </div>
+              {% endif %}
+              {% if ad.ad_code and not ad.client_id %}
+                <span style="color:#059669;">✓ Script Code Configured ({{ ad.ad_code|length }} chars)</span>
+              {% endif %}
+            </div>
+          </td>
+          <td>
+            {% if ad.is_active %}
+              <span class="badge badge-delivered" style="display:inline-flex; align-items:center; gap:4px;">
+                <span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span> Active
+              </span>
+            {% else %}
+              <span class="badge badge-cancelled" style="display:inline-flex; align-items:center; gap:4px;">
+                <span style="width:6px; height:6px; border-radius:50%; background:#ef4444;"></span> Inactive
+              </span>
+            {% endif %}
+          </td>
+          <td>
+            <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+              <!-- 1-Click Active / Inactive Toggle -->
+              <form action="{{ url_for('content.ad_toggle', ad_id=ad.id) }}" method="POST" style="margin:0;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                {% if ad.is_active %}
+                  <button type="submit" class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; color:#dc2626;" title="Hide this ad section from website">
+                    Deactivate
+                  </button>
+                {% else %}
+                  <button type="submit" class="btn-primary" style="padding:0.35rem 0.65rem; font-size:0.75rem; background:#16a34a; border-color:#16a34a;" title="Show this ad section on website">
+                    Activate
+                  </button>
+                {% endif %}
+              </form>
+
+              <!-- Edit button -->
+              <button type="button" class="btn-secondary js-edit-ad-btn"
+                data-id="{{ ad.id }}"
+                data-title="{{ ad.title }}"
+                data-platform="{{ ad.platform }}"
+                data-client-id="{{ ad.client_id or '' }}"
+                data-slot-id="{{ ad.slot_id or '' }}"
+                data-image-url="{{ ad.image_url or '' }}"
+                data-target-url="{{ ad.target_url or '' }}"
+                data-headline="{{ ad.headline or '' }}"
+                data-description="{{ ad.description or '' }}"
+                data-button-text="{{ ad.button_text or 'Learn More' }}"
+                data-position="{{ ad.position }}"
+                data-sort-order="{{ ad.sort_order }}"
+                data-is-active="{{ '1' if ad.is_active else '0' }}"
+                style="padding:0.35rem 0.65rem; font-size:0.75rem;">
+                Edit
+              </button>
+              <div id="ad-code-{{ ad.id }}" style="display:none;">{{ ad.ad_code or '' }}</div>
+
+              <!-- Delete button -->
+              <form action="{{ url_for('content.ad_delete', ad_id=ad.id) }}" method="POST" style="margin:0;" onsubmit="return confirm('Delete ad unit \'{{ ad.title }}\'?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn-secondary" style="padding:0.35rem 0.5rem; font-size:0.75rem; color:var(--status-red-text);" title="Delete ad unit">
+                  🗑️
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" style="text-align:center; padding:40px; color:var(--text-muted);">
+            <div>📢 No ad units configured yet.</div>
+            <div style="font-size:0.8rem; margin-top:4px;">Click "+ Create Ad Unit" above to add your Google AdSense or Meta ad banner.</div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Create Ad Modal -->
+<div class="modal-overlay" id="createAdModal">
+  <div class="modal-container" style="max-width:680px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Create New Ad Unit</h3>
+      <button type="button" class="modal-close-btn" onclick="closeModal('createAdModal')">&times;</button>
+    </div>
+    <form action="{{ url_for('content.ad_create') }}" method="POST" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body" style="max-height:75vh; overflow-y:auto;">
+        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Ad Unit Title *</label>
+            <input type="text" name="title" class="form-control" placeholder="e.g. Google AdSense Mid-Section" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Platform *</label>
+            <select name="platform" class="form-control" id="createPlatformSelect" onchange="togglePlatformFields('create')">
+              <option value="google">Google AdSense</option>
+              <option value="meta">Meta Ads / Pixel</option>
+              <option value="image_banner">Direct Image Banner (Custom Sponsor)</option>
+              <option value="custom_html">Custom HTML / Script Embed</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Website Position</label>
+            <select name="position" class="form-control">
+              <option value="home_mid">Home Page Mid-Section (Recommended)</option>
+              <option value="home_bottom">Above Footer</option>
+              <option value="all">All Available Placements</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sort Order</label>
+            <input type="number" name="sort_order" class="form-control" value="0">
+          </div>
+        </div>
+
+        <!-- Google / Meta IDs -->
+        <div id="createIdsBox" style="background:var(--bg-app); padding:0.85rem; border-radius:8px; border:1px solid var(--border-color); margin-bottom:1rem;">
+          <div style="font-size:0.78rem; font-weight:700; color:var(--text-primary); margin-bottom:0.5rem;">API & Placement IDs</div>
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-size:0.75rem;">Client / Publisher ID</label>
+              <input type="text" name="client_id" class="form-control" placeholder="e.g. ca-pub-1234567890">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-size:0.75rem;">Ad Slot / Unit ID</label>
+              <input type="text" name="slot_id" class="form-control" placeholder="e.g. 9876543210">
+            </div>
+          </div>
+        </div>
+
+        <!-- Ad Code Textarea -->
+        <div class="form-group" id="createCodeGroup">
+          <label class="form-label">Embed Script / Ad Code</label>
+          <textarea name="ad_code" class="form-control" rows="4" style="font-family:monospace; font-size:0.8rem;" placeholder="Paste Google AdSense &lt;script&gt; / &lt;ins&gt; tag or Meta embed code here..."></textarea>
+          <div style="font-size:0.72rem; color:var(--text-muted); margin-top:3px;">
+            Supports standard Google AdSense tags, Meta Audience tags, or custom JavaScript snippets.
+          </div>
+        </div>
+
+        <!-- Custom Image & Sponsor Fields -->
+        <div id="createImageBox" style="background:var(--bg-app); padding:0.85rem; border-radius:8px; border:1px solid var(--border-color); margin-bottom:1rem;">
+          <div style="font-size:0.78rem; font-weight:700; color:var(--text-primary); margin-bottom:0.5rem;">Direct Banner & Sponsor Details</div>
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.75rem;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-size:0.75rem;">Headline (Optional)</label>
+              <input type="text" name="headline" class="form-control" placeholder="e.g. Special Offer by Guruji Ashram">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-size:0.75rem;">Button Text</label>
+              <input type="text" name="button_text" class="form-control" value="Learn More">
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0.75rem;">
+            <label class="form-label" style="font-size:0.75rem;">Target Click URL (Destination)</label>
+            <input type="url" name="target_url" class="form-control" placeholder="https://example.com/sponsor-landing">
+          </div>
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-size:0.75rem;">Banner Image File</label>
+              <input type="file" name="image_file" class="form-control" accept="image/*">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-size:0.75rem;">Or Image URL</label>
+              <input type="text" name="image_url" class="form-control" placeholder="https://... or /static/uploads/...">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0.5rem;">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600;">
+            <input type="checkbox" name="is_active" value="1" checked style="width:16px; height:16px;">
+            <span>Publish and Make Active on Website Immediately</span>
+          </label>
+          <div style="font-size:0.74rem; color:var(--text-muted); margin-left:24px;">
+            When checked, the Ad Section will be visible on the storefront. When unchecked, it will be completely hidden.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('createAdModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Save & Publish Ad</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Ad Modal -->
+<div class="modal-overlay" id="editAdModal">
+  <div class="modal-container" style="max-width:680px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="editAdModalTitle">Edit Ad Unit</h3>
+      <button type="button" class="modal-close-btn" onclick="closeModal('editAdModal')">&times;</button>
+    </div>
+    <form id="editAdForm" method="POST" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body" style="max-height:75vh; overflow-y:auto;">
+        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Ad Unit Title *</label>
+            <input type="text" name="title" id="editAdTitle" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Platform *</label>
+            <select name="platform" id="editAdPlatform" class="form-control">
+              <option value="google">Google AdSense</option>
+              <option value="meta">Meta Ads / Pixel</option>
+              <option value="image_banner">Direct Image Banner (Custom Sponsor)</option>
+              <option value="custom_html">Custom HTML / Script Embed</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Website Position</label>
+            <select name="position" id="editAdPosition" class="form-control">
+              <option value="home_mid">Home Page Mid-Section (Recommended)</option>
+              <option value="home_bottom">Above Footer</option>
+              <option value="all">All Available Placements</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sort Order</label>
+            <input type="number" name="sort_order" id="editAdSortOrder" class="form-control">
+          </div>
+        </div>
+
+        <!-- Google / Meta IDs -->
+        <div style="background:var(--bg-app); padding:0.85rem; border-radius:8px; border:1px solid var(--border-color); margin-bottom:1rem;">
+          <div style="font-size:0.78rem; font-weight:700; color:var(--text-primary); margin-bottom:0.5rem;">API & Placement IDs</div>
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-size:0.75rem;">Client / Publisher ID</label>
+              <input type="text" name="client_id" id="editAdClientId" class="form-control">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-size:0.75rem;">Ad Slot / Unit ID</label>
+              <input type="text" name="slot_id" id="editAdSlotId" class="form-control">
+            </div>
+          </div>
+        </div>
+
+        <!-- Ad Code Textarea -->
+        <div class="form-group">
+          <label class="form-label">Embed Script / Ad Code</label>
+          <textarea name="ad_code" id="editAdCode" class="form-control" rows="4" style="font-family:monospace; font-size:0.8rem;"></textarea>
+        </div>
+
+        <!-- Custom Image & Sponsor Fields -->
+        <div style="background:var(--bg-app); padding:0.85rem; border-radius:8px; border:1px solid var(--border-color); margin-bottom:1rem;">
+          <div style="font-size:0.78rem; font-weight:700; color:var(--text-primary); margin-bottom:0.5rem;">Direct Banner & Sponsor Details</div>
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.75rem;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-size:0.75rem;">Headline (Optional)</label>
+              <input type="text" name="headline" id="editAdHeadline" class="form-control">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-size:0.75rem;">Button Text</label>
+              <input type="text" name="button_text" id="editAdButtonText" class="form-control">
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0.75rem;">
+            <label class="form-label" style="font-size:0.75rem;">Target Click URL (Destination)</label>
+            <input type="url" name="target_url" id="editAdTargetUrl" class="form-control">
+          </div>
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-size:0.75rem;">Replace Banner Image</label>
+              <input type="file" name="image_file" class="form-control" accept="image/*">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-size:0.75rem;">Or Image URL</label>
+              <input type="text" name="image_url" id="editAdImageUrl" class="form-control">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0.5rem;">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600;">
+            <input type="checkbox" name="is_active" id="editAdIsActive" value="1" style="width:16px; height:16px;">
+            <span>Active and Visible on Storefront</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('editAdModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Update Ad Unit</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    document.querySelectorAll(".js-edit-ad-btn").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var id = this.getAttribute("data-id");
+        var title = this.getAttribute("data-title");
+        var platform = this.getAttribute("data-platform");
+        var clientId = this.getAttribute("data-client-id");
+        var slotId = this.getAttribute("data-slot-id");
+        var imageUrl = this.getAttribute("data-image-url");
+        var targetUrl = this.getAttribute("data-target-url");
+        var headline = this.getAttribute("data-headline");
+        var buttonText = this.getAttribute("data-button-text");
+        var position = this.getAttribute("data-position");
+        var sortOrder = this.getAttribute("data-sort-order");
+        var isActive = this.getAttribute("data-is-active") === "1";
+
+        var codeElem = document.getElementById("ad-code-" + id);
+        var adCode = codeElem ? codeElem.innerText : "";
+
+        document.getElementById("editAdModalTitle").innerText = "Edit: " + title;
+        document.getElementById("editAdForm").action = "/admin/content/ads/" + id + "/edit";
+        document.getElementById("editAdTitle").value = title;
+        document.getElementById("editAdPlatform").value = platform;
+        document.getElementById("editAdClientId").value = clientId;
+        document.getElementById("editAdSlotId").value = slotId;
+        document.getElementById("editAdImageUrl").value = imageUrl;
+        document.getElementById("editAdTargetUrl").value = targetUrl;
+        document.getElementById("editAdHeadline").value = headline;
+        document.getElementById("editAdButtonText").value = buttonText;
+        document.getElementById("editAdPosition").value = position;
+        document.getElementById("editAdSortOrder").value = sortOrder;
+        document.getElementById("editAdCode").value = adCode;
+        document.getElementById("editAdIsActive").checked = isActive;
+
+        openModal("editAdModal");
+      });
+    });
+  });
+
+  function togglePlatformFields(prefix) {
+    // Dynamic field highlights if needed
+  }
+</script>
+{% endblock %}

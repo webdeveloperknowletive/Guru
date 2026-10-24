@@ -16,17 +16,34 @@ const POPULAR_SEARCHES = [
 ];
 
 export default function Navbar({ logo }) {
-  const { cartCount, wishlist, setCartOpen, setWishOpen, searchOpen, setSearchOpen, setDrawerOpen, openTracking, openContact, openProductModal } = useStore();
+  const { cartCount, wishlist, setCartOpen, setWishOpen, searchOpen, setSearchOpen, setDrawerOpen, openTracking, openContact, openProductModal, setBrandLogo, t } = useStore();
   const logoSrc = logo || '/swami-guruji-logo-cropped.jpg';
 
-  const [searchActive, setSearchActive] = useState(false);
+  useEffect(() => {
+    if (logo && setBrandLogo) {
+      setBrandLogo(logo);
+    }
+  }, [logo, setBrandLogo]);
+
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [liveProducts, setLiveProducts] = useState([]);
+  const [isScrolled, setIsScrolled] = useState(false);
   const searchInputRef = useRef(null);
   const searchContainerRef = useRef(null);
 
-  const openCart = () => { setCartOpen(true); setWishOpen(false); setSearchActive(false); setDrawerOpen(false); };
-  const openWish = () => { setWishOpen(true); setCartOpen(false); setSearchActive(false); setDrawerOpen(false); };
+  const openCart = () => { setCartOpen(true); setWishOpen(false); setDropdownOpen(false); setDrawerOpen(false); };
+  const openWish = () => { setWishOpen(true); setCartOpen(false); setDropdownOpen(false); setDrawerOpen(false); };
+
+  // Track scroll position to smoothly adapt sticky navbar appearance
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Fetch live products for search lookup
   useEffect(() => {
@@ -39,12 +56,13 @@ export default function Navbar({ logo }) {
       .catch(() => {});
   }, []);
 
-  // Global hotkey: Ctrl+K or Cmd+K to open direct search
+  // Global hotkey: Ctrl+K or Cmd+K to focus search bar
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setSearchActive(true);
+        searchInputRef.current?.focus();
+        setDropdownOpen(true);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -54,33 +72,23 @@ export default function Navbar({ logo }) {
   // Sync with external searchOpen triggers (e.g. from mobile drawer)
   useEffect(() => {
     if (searchOpen) {
-      setSearchActive(true);
+      searchInputRef.current?.focus();
+      setDropdownOpen(true);
       setSearchOpen(false);
     }
   }, [searchOpen, setSearchOpen]);
 
-  // Auto-focus input when search is activated
+  // Click outside and Escape key to close search dropdown
   useEffect(() => {
-    if (searchActive) {
-      setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 60);
-    } else {
-      setQuery('');
-    }
-  }, [searchActive]);
-
-  // Click outside and Escape key to close direct search
-  useEffect(() => {
-    if (!searchActive) return;
+    if (!dropdownOpen) return;
     const handleClickOutside = (e) => {
       if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
-        setSearchActive(false);
+        setDropdownOpen(false);
       }
     };
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        setSearchActive(false);
+        setDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -89,7 +97,7 @@ export default function Navbar({ logo }) {
       document.removeEventListener('mousedown', handleClickOutside);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [searchActive]);
+  }, [dropdownOpen]);
 
   // Filter matching products
   const allProducts = liveProducts.length > 0 ? liveProducts : getAllProducts();
@@ -106,13 +114,13 @@ export default function Navbar({ logo }) {
     : [];
 
   const handlePickProduct = (product) => {
-    setSearchActive(false);
+    setDropdownOpen(false);
     setQuery('');
     openProductModal(product);
   };
 
   return (
-    <nav className={`nav${searchActive ? ' search-mode' : ''}`} id="top" ref={searchContainerRef}>
+    <nav className={`nav${isScrolled ? ' is-scrolled' : ''}`} id="top">
       <a href="#top" className="brand" aria-label="Swami Guruji Home">
         <img
           src={logoSrc}
@@ -125,122 +133,107 @@ export default function Navbar({ logo }) {
         />
       </a>
 
-      {/* Nav Links (hidden when searching to give full inline bar) */}
-      {!searchActive && (
-        <ul className="nav-links">
-          <li><a href="#top">Home</a></li>
-          <li><a href="#about">About Guruji</a></li>
-          <li><a href="#puja">Pooja Services</a></li>
-          <li><a href="#jyotish">Astrology Consultation</a></li>
-          <li><a href="#rudraksha">Rudraksha</a></li>
-          <li><a href="#yantra">Yantra</a></li>
-          <li><a href="#ratna">Gemstones</a></li>
-          <li><a href="#bracelets">Bracelets</a></li>
-          <li><a href="#ebook">E-Book</a></li>
-        </ul>
-      )}
+      {/* Nav Links */}
+      <ul className="nav-links">
+        <li><a href="#top">{t ? t('nav_home', 'Home') : 'Home'}</a></li>
+        <li><a href="#about">{t ? t('nav_about', 'About Guruji') : 'About Guruji'}</a></li>
+        <li><a href="#puja">{t ? t('nav_puja', 'Pooja Services') : 'Pooja Services'}</a></li>
+        <li><a href="#jyotish">{t ? t('nav_jyotish', 'Astrology Consultation') : 'Astrology Consultation'}</a></li>
+        <li><a href="#rudraksha">{t ? t('nav_rudraksha', 'Rudraksha') : 'Rudraksha'}</a></li>
+        <li><a href="#yantra">{t ? t('nav_yantras', 'Yantra') : 'Yantra'}</a></li>
+        <li><a href="#ratna">{t ? t('nav_gemstones', 'Gemstones') : 'Gemstones'}</a></li>
+        <li><a href="#bracelets">{t ? t('nav_bracelets', 'Bracelets') : 'Bracelets'}</a></li>
+        <li><a href="#ebook">{t ? t('nav_ebook', 'E-Book') : 'E-Book'}</a></li>
+      </ul>
 
-      {/* Direct In-Navbar Search Bar */}
-      {searchActive && (
-        <div className="nav-search-direct-bar">
+      <div className="nav-actions">
+        {/* Search Bar in Navbar */}
+        <div className="nav-search-bar" ref={searchContainerRef}>
           <svg className="nav-search-bar-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
           </svg>
           <input
             ref={searchInputRef}
             type="text"
-            className="nav-search-direct-input"
-            placeholder="Search Rudraksha, Gemstones, Shri Yantra, Pujas..."
+            className="nav-search-input"
+            placeholder={t ? t('search_placeholder', 'Search Rudraksha, Gems, Pujas...') : 'Search Rudraksha, Gems, Pujas...'}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            aria-label="Direct Navbar Search"
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setDropdownOpen(true);
+            }}
+            onFocus={() => setDropdownOpen(true)}
+            aria-label="Search sacred products and services"
           />
-          {query && (
+          {query ? (
             <button
               type="button"
-              className="nav-search-direct-clear"
-              onClick={() => setQuery('')}
+              className="nav-search-clear-btn"
+              onClick={() => {
+                setQuery('');
+                searchInputRef.current?.focus();
+              }}
               aria-label="Clear query"
             >
               ✕
             </button>
+          ) : (
+            <kbd className="nav-search-kbd">⌘K</kbd>
           )}
-          <button
-            type="button"
-            className="nav-search-direct-close"
-            onClick={() => setSearchActive(false)}
-            aria-label="Close search"
-          >
-            <span>Close</span> ✕
-          </button>
 
-          {/* Floating Dropdown Results directly beneath the navbar */}
-          <div className="nav-search-results-dropdown">
-            {!q ? (
-              <div className="nav-search-suggestions">
-                <span className="nav-search-suggest-title">Popular Searches:</span>
-                <div className="nav-search-chips">
-                  {POPULAR_SEARCHES.map(term => (
-                    <button
-                      key={term}
-                      type="button"
-                      className="nav-search-chip"
-                      onClick={() => setQuery(term)}
+          {/* Floating Dropdown Results directly beneath the search bar */}
+          {dropdownOpen && (
+            <div className="nav-search-results-dropdown">
+              {!q ? (
+                <div className="nav-search-suggestions">
+                  <span className="nav-search-suggest-title">Popular Searches:</span>
+                  <div className="nav-search-chips">
+                    {POPULAR_SEARCHES.map(term => (
+                      <button
+                        key={term}
+                        type="button"
+                        className="nav-search-chip"
+                        onClick={() => {
+                          setQuery(term);
+                          searchInputRef.current?.focus();
+                        }}
+                      >
+                        {term}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : matches.length > 0 ? (
+                <div className="nav-search-matches-list">
+                  {matches.map(p => (
+                    <div
+                      key={p.id || p.title}
+                      className="nav-search-match-item"
+                      onClick={() => handlePickProduct(p)}
                     >
-                      {term}
-                    </button>
+                      <div
+                        className="nav-search-match-thumb"
+                        dangerouslySetInnerHTML={{ __html: p.img || '' }}
+                      />
+                      <div className="nav-search-match-info">
+                        <div className="nav-search-match-title">{p.title}</div>
+                        <div className="nav-search-match-meta">
+                          <span className="nav-search-match-cat">{p.catLabel || 'Spiritual'}</span>
+                          <span className="nav-search-match-price">{p.price}</span>
+                        </div>
+                      </div>
+                      <span className="nav-search-match-arrow">→</span>
+                    </div>
                   ))}
                 </div>
-              </div>
-            ) : matches.length > 0 ? (
-              <div className="nav-search-matches-list">
-                {matches.map(p => (
-                  <div
-                    key={p.id || p.title}
-                    className="nav-search-match-item"
-                    onClick={() => handlePickProduct(p)}
-                  >
-                    <div
-                      className="nav-search-match-thumb"
-                      dangerouslySetInnerHTML={{ __html: p.img || '' }}
-                    />
-                    <div className="nav-search-match-info">
-                      <div className="nav-search-match-title">{p.title}</div>
-                      <div className="nav-search-match-meta">
-                        <span className="nav-search-match-cat">{p.catLabel || 'Spiritual'}</span>
-                        <span className="nav-search-match-price">{p.price}</span>
-                      </div>
-                    </div>
-                    <span className="nav-search-match-arrow">→</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="nav-search-empty">
-                No products or services found for &quot;{query}&quot;
-              </div>
-            )}
-          </div>
+              ) : (
+                <div className="nav-search-empty">
+                  No products or services found for &quot;{query}&quot;
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      )}
-
-      <div className="nav-actions">
-        {/* Search Action Button */}
-        {!searchActive && (
-          <button
-            className="icon-btn search-icon-btn"
-            id="searchBtn"
-            aria-label="Search directly from navbar"
-            title="Search directly from navbar (Ctrl + K)"
-            onClick={() => setSearchActive(true)}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
-            </svg>
-            <span className="search-pill-label">Search</span>
-            <kbd className="search-pill-kbd">⌘K</kbd>
-          </button>
-        )}
 
         {/* Wishlist Action Button */}
         <button
@@ -272,21 +265,17 @@ export default function Navbar({ logo }) {
         </button>
 
         {/* Track Order Button */}
-        {!searchActive && (
-          <>
-            <button
-              type="button"
-              onClick={() => openTracking()}
-              className="btn-track-nav"
-              title="Track your order status"
-            >
-              <span>📦</span> <span className="btn-track-text">Track Order</span>
-            </button>
+        <button
+          type="button"
+          onClick={() => openTracking()}
+          className="btn-track-nav"
+          title="Track your order status"
+        >
+          <span>📦</span> <span className="btn-track-text">{t ? t('nav_track_order', 'Track Order') : 'Track Order'}</span>
+        </button>
 
-            {/* Book Consultation Button */}
-            <a href="#jyotish" className="btn-book">Book Consultation</a>
-          </>
-        )}
+        {/* Book Consultation Button */}
+        <a href="#jyotish" className="btn-book">{t ? t('book_consultation', 'Book Consultation') : 'Book Consultation'}</a>
 
         {/* Mobile/Tablet Menu Hamburger Button */}
         <button

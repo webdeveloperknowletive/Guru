@@ -39,7 +39,7 @@ export default function ContactModal() {
         message: form.message.trim(),
       });
 
-      setSubmittedRef(res.enquiry_id || 'Submitted');
+      setSubmittedRef(res.enquiry_number || res.enquiry_id || 'Submitted');
       showToast('तुमची चौकशी यशस्वीपणे पाठवली गेली आहे (Enquiry submitted successfully)');
       setForm({
         name: '',
@@ -100,8 +100,21 @@ export default function ContactModal() {
           }}>
             <div style={{ fontSize: '36px', marginBottom: '10px' }}>🕉️</div>
             <h4 style={{ color: 'var(--gold-lt)', marginBottom: '8px' }}>चौकशी प्राप्त झाली! (Enquiry Received)</h4>
+            <div style={{
+              display: 'inline-block',
+              margin: '8px 0 14px',
+              padding: '6px 14px',
+              background: 'rgba(0,0,0,0.25)',
+              borderRadius: '20px',
+              fontSize: '13px',
+              fontFamily: 'monospace',
+              color: 'var(--gold)',
+              fontWeight: 700
+            }}>
+              Ref: {submittedRef}
+            </div>
             <p style={{ fontSize: '13px', color: 'var(--ink)', marginBottom: '16px' }}>
-              आमचे आश्रम सेवक 24 तासांच्या आत आपल्याशी संपर्क साधतील.
+              आमचे आश्रम सेवक 24 तासांच्या आत आपल्याशी संपर्क साधतील. (Our ashram seva team will reach out within 24 hours.)
             </p>
             <button
               type="button"

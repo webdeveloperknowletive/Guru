@@ -621,7 +621,13 @@ def orders_list():
     if status:
         q = q.filter_by(order_status=status)
     if query_str:
-        q = q.filter((Order.order_number.ilike(f"%{query_str}%")) | (Order.customer_name.ilike(f"%{query_str}%")))
+        clean_num = query_str.lstrip('#').strip()
+        q = q.filter(
+            (Order.order_number.ilike(f"%{query_str}%")) |
+            (Order.order_number.ilike(f"%{clean_num}%")) |
+            (Order.customer_name.ilike(f"%{query_str}%")) |
+            (Order.customer_email.ilike(f"%{query_str}%"))
+        )
 
     orders_paginated = q.order_by(Order.placed_at.desc()).paginate(page=page, per_page=15, error_out=False)
     return render_template(
@@ -673,6 +679,24 @@ def order_refund(order_id):
     except Exception as e:
         flash(str(e), "danger")
     return redirect(url_for("commerce.order_detail", order_id=order_id))
+
+
+@commerce_bp.route("/orders/<int:order_id>/invoice")
+@login_required
+@permission_required("orders", "view")
+def order_invoice(order_id):
+    user = get_current_admin()
+    order = Order.query.get_or_404(order_id)
+    return render_template("commerce/invoice.html", current_user=user, order=order)
+
+
+@commerce_bp.route("/orders/<int:order_id>/packing-slip")
+@login_required
+@permission_required("orders", "view")
+def order_packing_slip(order_id):
+    user = get_current_admin()
+    order = Order.query.get_or_404(order_id)
+    return render_template("commerce/packing_slip.html", current_user=user, order=order)
 
 
 # -------------------------------------------------------------

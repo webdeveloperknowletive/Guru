@@ -73,51 +73,32 @@ export default function WelcomeOfferModal() {
     };
   }, []);
 
-  // Get campaign-specific storage key
-  const getStorageKey = useCallback(() => {
-    const campId = popupConfig?.campaign_id || 'camp_1';
-    return `astroveda_welcome_popup_${campId}`;
-  }, [popupConfig]);
+  const sessionDismissedRef = useRef(false);
+  const hasTriggeredRef = useRef(false);
 
-  // Check whether this specific campaign has already been seen/dismissed/claimed
+  // Clear any legacy localStorage blocking keys
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        Object.keys(window.localStorage).forEach((key) => {
+          if (key.startsWith('astroveda_welcome_popup')) {
+            window.localStorage.removeItem(key);
+          }
+        });
+      }
+    } catch {}
+  }, []);
+
+  // Check whether campaign was already dismissed in the current page session
   const hasBeenShown = useCallback(() => {
     if (isPreview) return false;
-    if (!popupConfig) return false; // Not shown if configuration has not arrived yet
+    return sessionDismissedRef.current;
+  }, [isPreview]);
 
-    const key = getStorageKey();
-    if (isStorageAvailable()) {
-      try {
-        const val = window.localStorage.getItem(key);
-        return Boolean(val && (val === 'claimed' || val === 'dismissed' || val === 'maybe_later'));
-      } catch {
-        const val = window.__astroveda_welcome_sessions && window.__astroveda_welcome_sessions[key];
-        return Boolean(val && (val === 'claimed' || val === 'dismissed' || val === 'maybe_later'));
-      }
-    }
-    const val = window.__astroveda_welcome_sessions && window.__astroveda_welcome_sessions[key];
-    return Boolean(val && (val === 'claimed' || val === 'dismissed' || val === 'maybe_later'));
-  }, [isPreview, popupConfig, getStorageKey, isStorageAvailable]);
-
-  // Mark this specific campaign as shown
+  // Mark this campaign as shown/dismissed for current page view only
   const markAsShown = useCallback((status = 'dismissed') => {
-    if (isPreview) return; // In preview mode, never pollute visitor tracking storage
-
-    const key = getStorageKey();
-    const storedStatus = status === 'claimed' ? 'claimed' : 'dismissed';
-    if (isStorageAvailable()) {
-      try {
-        window.localStorage.setItem(key, storedStatus);
-      } catch {
-        if (typeof window !== 'undefined') {
-          window.__astroveda_welcome_sessions = window.__astroveda_welcome_sessions || {};
-          window.__astroveda_welcome_sessions[key] = storedStatus;
-        }
-      }
-    } else if (typeof window !== 'undefined') {
-      window.__astroveda_welcome_sessions = window.__astroveda_welcome_sessions || {};
-      window.__astroveda_welcome_sessions[key] = storedStatus;
-    }
-  }, [isPreview, getStorageKey, isStorageAvailable]);
+    sessionDismissedRef.current = true;
+  }, []);
 
   // Check if current page is excluded (cart, checkout, payment, account routes)
   const isRestrictedPage = useCallback(() => {
@@ -156,25 +137,43 @@ export default function WelcomeOfferModal() {
     articleModal?.show,
   ]);
 
-  // Trigger popup after configured delay for first-time visitors
+  // Trigger popup after 3 seconds or when user scrolls, and resets on page refresh
   useEffect(() => {
     if (isPreview) return; // Preview handles its own instant trigger
     if (!popupConfig || !popupConfig.is_enabled) return;
     if (hasBeenShown()) return;
 
-    const delayMs = Math.max(1, popupConfig.delay_seconds || 5) * 1000;
-    const timer = setTimeout(() => {
-      if (hasBeenShown()) return;
+    const triggerPopup = () => {
+      if (hasTriggeredRef.current || hasBeenShown()) return;
       if (isRestrictedPage()) return;
       if (isAnyModalOpen()) return;
 
+      hasTriggeredRef.current = true;
       if (typeof document !== 'undefined') {
         lastActiveElementRef.current = document.activeElement;
       }
       setIsOpen(true);
+    };
+
+    // 1. Timer: Trigger after 3 seconds on page load / refresh
+    const delayMs = Math.max(1, popupConfig.delay_seconds || 3) * 1000;
+    const timer = setTimeout(() => {
+      triggerPopup();
     }, delayMs);
 
-    return () => clearTimeout(timer);
+    // 2. Scroll: Trigger when user scrolls
+    const handleScroll = () => {
+      if (window.scrollY > 20) {
+        triggerPopup();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('scroll', handleScroll);
+    };
   }, [isPreview, popupConfig, hasBeenShown, isRestrictedPage, isAnyModalOpen]);
 
   // Scroll lock & keyboard focus management

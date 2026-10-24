@@ -2,6 +2,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { findProduct, getAllProducts } from '@/lib/products';
 import { calculateCart, checkoutOrder } from '@/lib/api';
+import { getTranslation } from '@/lib/translations';
 
 const StoreContext = createContext(null);
 
@@ -40,6 +41,31 @@ export function StoreProvider({ children }) {
   const [trackingModal, setTrackingModal] = useState({ show: false, orderNumber: '', token: '', email: '' });
   const [contactModal, setContactModal] = useState({ show: false });
   const [articleModal, setArticleModal] = useState({ show: false, slug: '', article: null });
+  const [brandLogo, setBrandLogo] = useState('/swami-guruji-logo-cropped.jpg');
+
+  // Multilingual state ('mr' | 'hi' | 'en')
+  const [lang, setLangState] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('astroveda_lang_v1');
+        if (saved) return saved;
+      } catch (e) {}
+    }
+    return 'mr';
+  });
+
+  const setLang = useCallback((newLang) => {
+    setLangState(newLang);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('astroveda_lang_v1', newLang);
+      } catch (e) {}
+    }
+  }, []);
+
+  const t = useCallback((key, fallback = '') => {
+    return getTranslation(lang, key, fallback);
+  }, [lang]);
 
   // Server calculation & checkout states
   const [couponCode, setCouponCode] = useState('');
@@ -204,12 +230,14 @@ export function StoreProvider({ children }) {
       canonical = findProduct(productOrTitle);
     }
 
-    const title = canonical ? canonical.title : String(productOrTitle);
-    const id = canonical ? canonical.id : 3; // fallback to 5 Mukhi Mala ID
-    const price = canonical ? canonical.priceNum : (parseInt(String(rawPrice).replace(/[^\d]/g, ''), 10) || 0);
-    const img = canonical ? canonical.img : '';
-    const sku = canonical ? canonical.sku : 'RM-005';
-    const slug = canonical ? canonical.slug : 'product';
+    const title = canonical ? (canonical.title || canonical.name) : String(productOrTitle);
+    const id = canonical ? canonical.id : 3;
+    const price = canonical
+      ? (canonical.priceNum ?? (parseInt(String(canonical.price || rawPrice).replace(/[^\d]/g, ''), 10) || 0))
+      : (parseInt(String(rawPrice).replace(/[^\d]/g, ''), 10) || 0);
+    const img = canonical ? (canonical.img || (canonical.images && canonical.images[0]) || '') : '';
+    const sku = canonical ? (canonical.sku || 'BRC-NAV') : 'BRC-NAV';
+    const slug = canonical ? (canonical.slug || 'product') : 'product';
 
     setCart(prev => {
       const existing = prev.find(it => it.id === id || it.title === title);
@@ -219,6 +247,14 @@ export function StoreProvider({ children }) {
       return [...prev, { id, title, price, qty: 1, img, sku, slug }];
     });
 
+    // Link cart additions to wishlist so user never sees a disconnected empty wishlist
+    setWishlist(prev => {
+      if (prev.some(it => it.id === id || it.title === title)) {
+        return prev;
+      }
+      return [...prev, { id, title, price, img, sku, slug }];
+    });
+
     setCartOpen(true);
     setWishOpen(false);
     setSearchOpen(false);
@@ -226,7 +262,12 @@ export function StoreProvider({ children }) {
   }, [showToast]);
 
   const removeFromCart = useCallback((idOrIndex) => {
-    setCart(prev => prev.filter((it, i) => (typeof idOrIndex === 'number' && idOrIndex >= 0 && idOrIndex < prev.length && i !== idOrIndex) ? false : it.id !== idOrIndex));
+    setCart(prev => prev.filter((it, i) => {
+      if (typeof idOrIndex === 'number' && idOrIndex >= 0 && idOrIndex < prev.length) {
+        return i !== idOrIndex;
+      }
+      return it.id !== idOrIndex;
+    }));
     showToast('Item removed from cart');
   }, [showToast]);
 
@@ -255,16 +296,20 @@ export function StoreProvider({ children }) {
       canonical = findProduct(productOrTitle);
     }
 
-    const title = canonical ? canonical.title : String(productOrTitle);
+    const title = canonical ? (canonical.title || canonical.name) : String(productOrTitle);
     const id = canonical ? canonical.id : 3;
-    const price = canonical ? canonical.priceNum : (parseInt(String(rawPrice).replace(/[^\d]/g, ''), 10) || 0);
-    const img = canonical ? canonical.img : '';
+    const price = canonical
+      ? (canonical.priceNum ?? (parseInt(String(canonical.price || rawPrice).replace(/[^\d]/g, ''), 10) || 0))
+      : (parseInt(String(rawPrice).replace(/[^\d]/g, ''), 10) || 0);
+    const img = canonical ? (canonical.img || (canonical.images && canonical.images[0]) || '') : '';
+    const sku = canonical ? (canonical.sku || 'BRC-NAV') : 'BRC-NAV';
+    const slug = canonical ? (canonical.slug || 'product') : 'product';
 
     setWishlist(prev => {
       const idx = prev.findIndex(it => it.id === id || it.title === title);
       if (idx === -1) {
         showToast(`${title} — wishlist मध्ये जोडले`);
-        return [...prev, { id, title, price, img }];
+        return [...prev, { id, title, price, img, sku, slug }];
       } else {
         showToast(`${title} — wishlist मधून काढले`);
         return prev.filter((_, i) => i !== idx);
@@ -297,17 +342,26 @@ export function StoreProvider({ children }) {
     setArticleModal({ show: false, slug: '', article: null });
   }, []);
 
-  const openProductModal = useCallback((titleOrProduct) => {
+  const openProductModal = useCallback((titleOrProduct, initialImageIdx = 0) => {
     let prod = null;
     let titleStr = '';
+    let selectedIdx = 0;
     if (typeof titleOrProduct === 'object' && titleOrProduct !== null) {
       prod = titleOrProduct;
       titleStr = titleOrProduct.title || titleOrProduct.name;
+      if (typeof titleOrProduct.activeImageIdx === 'number') {
+        selectedIdx = titleOrProduct.activeImageIdx;
+      } else if (typeof initialImageIdx === 'number') {
+        selectedIdx = initialImageIdx;
+      }
     } else {
       prod = findProduct(titleOrProduct);
       titleStr = prod ? prod.title : String(titleOrProduct);
+      if (typeof initialImageIdx === 'number') {
+        selectedIdx = initialImageIdx;
+      }
     }
-    setProductModal({ show: true, product: prod, title: titleStr });
+    setProductModal({ show: true, product: prod, title: titleStr, activeImageIdx: selectedIdx });
   }, []);
 
   const closeProductModal = useCallback(() => {
@@ -433,6 +487,9 @@ export function StoreProvider({ children }) {
       trackingModal, openTracking, closeTracking,
       contactModal, openContact, closeContact,
       articleModal, openArticleModal, closeArticleModal,
+      brandLogo, setBrandLogo,
+      // Multilingual
+      lang, setLang, t,
     }}>
       {children}
     </StoreContext.Provider>

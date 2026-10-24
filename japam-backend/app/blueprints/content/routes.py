@@ -5,10 +5,11 @@ from datetime import datetime, timezone
 from werkzeug.utils import secure_filename
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, jsonify
 from app.extensions import db
-from app.models.content import BlogPost, Testimonial, GurujiProfile, MediaFile, Banner, WelcomePopupSetting
+from app.models.content import BlogPost, Testimonial, GurujiProfile, MediaFile, Banner, WelcomePopupSetting, AdBanner
 from app.models.operations import Coupon
 from app.services.rbac_service import login_required, permission_required, get_current_admin
 from app.services.audit_service import AuditService
+from app.services.section_service import SectionService
 
 content_bp = Blueprint("content", __name__, url_prefix="/admin/content")
 
@@ -35,21 +36,43 @@ def blog_create():
     content = request.form.get("content", "").strip()
     excerpt = request.form.get("excerpt", "").strip()
     cover_image = request.form.get("cover_image", "").strip()
+    author_name = request.form.get("author_name", "").strip() or user.full_name
+    tags = request.form.get("tags", "").strip()
+    is_published = request.form.get("is_published") in ("1", "true", "on", "True", True) or ("is_published" not in request.form)
 
     if not title or not content:
         flash("Title and content are required.", "danger")
         return redirect(url_for("content.blog_list"))
 
-    slug = title.lower().replace(" ", "-").replace("/", "-")[:80] + f"-{int(datetime.now(timezone.utc).timestamp())}"
+    # Handle image file upload if provided
+    cover_file = request.files.get("cover_image_file")
+    if cover_file and cover_file.filename != "":
+        orig_name = secure_filename(cover_file.filename)
+        ext = orig_name.rsplit(".", 1)[-1].lower() if "." in orig_name else ""
+        allowed = current_app.config.get("ALLOWED_IMAGE_EXTENSIONS", {"jpg", "jpeg", "png", "webp", "svg"})
+        if ext in allowed:
+            unique_filename = f"blog_{uuid.uuid4().hex[:8]}_{orig_name}"
+            upload_folder = os.path.join(current_app.root_path, "static", "uploads")
+            os.makedirs(upload_folder, exist_ok=True)
+            cover_file.save(os.path.join(upload_folder, unique_filename))
+            cover_image = f"/static/uploads/{unique_filename}"
+
+    slug_base = "".join(c if c.isalnum() or c in (" ", "-", "_") else "" for c in title.lower())
+    slug_base = slug_base.strip().replace(" ", "-")[:60]
+    if not slug_base:
+        slug_base = "vedic-article"
+    slug = f"{slug_base}-{int(datetime.now(timezone.utc).timestamp())}"
+
     post = BlogPost(
         title=title,
         slug=slug,
         category=category,
         content=content,
         excerpt=excerpt or content[:160],
-        cover_image=cover_image or "/static/img/blog-default.jpg",
-        author_name=user.full_name,
-        is_published=True,
+        cover_image=cover_image or None,
+        author_name=author_name,
+        tags=tags or None,
+        is_published=is_published,
     )
     db.session.add(post)
     db.session.commit()
@@ -61,7 +84,7 @@ def blog_create():
         actor_user_id=user.id,
         entity_type="BlogPost",
         entity_id=str(post.id),
-        details={"title": title},
+        details={"title": title, "slug": slug},
     )
     flash("Blog article published successfully.", "success")
     return redirect(url_for("content.blog_list"))
@@ -79,7 +102,24 @@ def blog_update(post_id):
     content = request.form.get("content", "").strip()
     excerpt = request.form.get("excerpt", "").strip()
     cover_image = request.form.get("cover_image", "").strip()
-    is_published = request.form.get("is_published") == "1" or request.form.get("is_published") == "on"
+    author_name = request.form.get("author_name", "").strip()
+    tags = request.form.get("tags", "").strip()
+    is_published = request.form.get("is_published") in ("1", "true", "on", "True", True)
+
+    # Handle image file upload if provided
+    cover_file = request.files.get("cover_image_file")
+    if cover_file and cover_file.filename != "":
+        orig_name = secure_filename(cover_file.filename)
+        ext = orig_name.rsplit(".", 1)[-1].lower() if "." in orig_name else ""
+        allowed = current_app.config.get("ALLOWED_IMAGE_EXTENSIONS", {"jpg", "jpeg", "png", "webp", "svg"})
+        if ext in allowed:
+            unique_filename = f"blog_{uuid.uuid4().hex[:8]}_{orig_name}"
+            upload_folder = os.path.join(current_app.root_path, "static", "uploads")
+            os.makedirs(upload_folder, exist_ok=True)
+            cover_file.save(os.path.join(upload_folder, unique_filename))
+            post.cover_image = f"/static/uploads/{unique_filename}"
+    elif cover_image:
+        post.cover_image = cover_image
 
     if title:
         post.title = title
@@ -88,8 +128,10 @@ def blog_update(post_id):
     post.category = category
     if excerpt:
         post.excerpt = excerpt
-    if cover_image:
-        post.cover_image = cover_image
+    if author_name:
+        post.author_name = author_name
+    if tags is not None:
+        post.tags = tags
     post.is_published = is_published
     post.updated_at = datetime.now(timezone.utc)
     db.session.commit()
@@ -465,11 +507,13 @@ def guruji_profile():
         if img_url and ("profile_photo" not in request.files or not request.files["profile_photo"].filename):
             profile.profile_image = img_url
 
-        # Visibility settings map
+        # Visibility settings map & custom labels
         def is_on(key):
             return request.form.get(key) in ("1", "true", "on")
 
+        existing_vis = profile.visibility_settings or {}
         visibility = {
+            **existing_vis,
             "show_photo": is_on("show_photo"),
             "show_lineage": is_on("show_lineage"),
             "show_bio": is_on("show_bio"),
@@ -482,6 +526,14 @@ def guruji_profile():
             "show_darshan": is_on("show_darshan"),
             "show_ashram": is_on("show_ashram"),
             "show_contact": is_on("show_contact"),
+            "section_kicker": request.form.get("section_kicker", existing_vis.get("section_kicker", "About Guruji")).strip(),
+            "experience_label": request.form.get("experience_label", existing_vis.get("experience_label", "Years Experience")).strip(),
+            "consultations_label": request.form.get("consultations_label", existing_vis.get("consultations_label", "Consultations")).strip(),
+            "pujas_label": request.form.get("pujas_label", existing_vis.get("pujas_label", "Pujas Performed")).strip(),
+            "darshan_label": request.form.get("darshan_label", existing_vis.get("darshan_label", "Meeting Time:")).strip(),
+            "address_label": request.form.get("address_label", existing_vis.get("address_label", "Address:")).strip(),
+            "contact_label": request.form.get("contact_label", existing_vis.get("contact_label", "Contact:")).strip(),
+            "email_label": request.form.get("email_label", existing_vis.get("email_label", "Email:")).strip(),
         }
         profile.visibility_settings = visibility
 
@@ -819,4 +871,412 @@ def welcome_popup_save():
         flash("Draft saved successfully. The last published version remains active on the storefront.", "info")
 
     return redirect(url_for("content.welcome_popup_page"))
+
+
+# -------------------------------------------------------------
+# Storefront Sections & Texts
+# -------------------------------------------------------------
+@content_bp.route("/site-text", methods=["GET", "POST"])
+@login_required
+@permission_required("content", "view")
+def site_text_page():
+    from app.services.site_text_service import SiteTextService
+    user = get_current_admin()
+    
+    if request.method == "POST":
+        if not user.has_permission("content", "edit") and not (user.role and user.role.code == "super_admin"):
+            abort(403)
+        
+        current_texts = SiteTextService.get_all()
+        f = request.form
+
+        # 1. Why Section
+        why = current_texts.get("why_section", {})
+        why["kicker"] = f.get("why_kicker", why.get("kicker", "Why Choose")).strip()
+        why["title"] = f.get("why_title", why.get("title", "Nagesh Swami Guruji?")).strip()
+        why["subtitle"] = f.get("why_subtitle", why.get("subtitle", "Three Generations of Tradition")).strip()
+        reasons = []
+        for i in range(1, 7):
+            reasons.append({
+                "num": f.get(f"why_num_{i}", f"0{i}").strip(),
+                "title": f.get(f"why_title_{i}", "").strip(),
+                "desc": f.get(f"why_desc_{i}", "").strip(),
+            })
+        why["reasons"] = reasons
+        current_texts["why_section"] = why
+
+        # 2. Jyotish Section
+        jyotish = current_texts.get("jyotish_section", {})
+        jyotish["kicker"] = f.get("jyotish_kicker", jyotish.get("kicker", "Jyotish Consultation")).strip()
+        jyotish["title"] = f.get("jyotish_title", jyotish.get("title", "Kundali & Astrology")).strip()
+        jyotish["subtitle"] = f.get("jyotish_subtitle", jyotish.get("subtitle", "Personalised Jyotish Guidance by Nagesh Swami Guruji")).strip()
+        jyotish["wa_button_text"] = f.get("jyotish_wa_text", jyotish.get("wa_button_text", "📲 WhatsApp गुरुजी")).strip()
+        jyotish["wa_link"] = f.get("jyotish_wa_link", jyotish.get("wa_link", "https://wa.me/919000000000")).strip()
+        jyotish["form_title"] = f.get("jyotish_form_title", jyotish.get("form_title", "Book Your Consultation")).strip()
+        jyotish["form_sub"] = f.get("jyotish_form_sub", jyotish.get("form_sub", "कृपया खालील माहिती भरा — आम्ही 24 तासांत संपर्क करू.")).strip()
+        jyotish["form_note"] = f.get("jyotish_form_note", jyotish.get("form_note", "🔒 तुमची माहिती सुरक्षित आहे. Payment consultation confirm झाल्यावर.")).strip()
+        current_texts["jyotish_section"] = jyotish
+
+        # 3. Puja Section
+        puja = current_texts.get("puja_section", {})
+        puja["kicker"] = f.get("puja_kicker", puja.get("kicker", "Puja Services")).strip()
+        puja["title"] = f.get("puja_title", puja.get("title", "Traditional Puja Services")).strip()
+        puja["subtitle"] = f.get("puja_subtitle", puja.get("subtitle", "")).strip()
+        puja["button_text"] = f.get("puja_btn_text", puja.get("button_text", "Book a Puja →")).strip()
+        current_texts["puja_section"] = puja
+
+        # 4. Hero Secondary Button
+        hero = current_texts.get("hero_section", {})
+        hero["secondary_button_text"] = f.get("hero_sec_btn_text", hero.get("secondary_button_text", "Book Consultation")).strip()
+        hero["secondary_button_url"] = f.get("hero_sec_btn_url", hero.get("secondary_button_url", "#jyotish")).strip()
+        current_texts["hero_section"] = hero
+
+        # 5. Category Section
+        cat = current_texts.get("category_section", {})
+        cat["kicker"] = f.get("cat_kicker", cat.get("kicker", "Shop by Category")).strip()
+        cat["title"] = f.get("cat_title", cat.get("title", "The Right Choice for You")).strip()
+        cat["subtitle"] = f.get("cat_subtitle", cat.get("subtitle", "")).strip()
+        current_texts["category_section"] = cat
+
+        # 6. Featured Section
+        feat = current_texts.get("featured_section", {})
+        feat["kicker"] = f.get("feat_kicker", feat.get("kicker", "Featured")).strip()
+        feat["title"] = f.get("feat_title", feat.get("title", "Our Sacred Collection")).strip()
+        feat["subtitle"] = f.get("feat_subtitle", feat.get("subtitle", "")).strip()
+        current_texts["featured_section"] = feat
+
+        # 7. Rudraksha Section
+        rud = current_texts.get("rudraksha_section", {})
+        rud["kicker"] = f.get("rud_kicker", rud.get("kicker", "Rudraksha")).strip()
+        rud["title"] = f.get("rud_title", rud.get("title", "रुद्राक्ष Collection")).strip()
+        rud["subtitle"] = f.get("rud_subtitle", rud.get("subtitle", "")).strip()
+        current_texts["rudraksha_section"] = rud
+
+        # 8. Ratna Section
+        ratna = current_texts.get("ratna_section", {})
+        ratna["kicker"] = f.get("ratna_kicker", ratna.get("kicker", "Ratna")).strip()
+        ratna["title"] = f.get("ratna_title", ratna.get("title", "Choose Your Gemstone With Guidance")).strip()
+        ratna["subtitle"] = f.get("ratna_subtitle", ratna.get("subtitle", "")).strip()
+        ratna["consultation_cta"] = f.get("ratna_cta", ratna.get("consultation_cta", "Not sure which gemstone is right for you? · Get Gemstone Consultation →")).strip()
+        current_texts["ratna_section"] = ratna
+
+        # 9. Yantra Section
+        yantra = current_texts.get("yantra_section", {})
+        yantra["kicker"] = f.get("yantra_kicker", yantra.get("kicker", "Yantra")).strip()
+        yantra["title"] = f.get("yantra_title", yantra.get("title", "Sacred Yantra Collection")).strip()
+        yantra["subtitle"] = f.get("yantra_subtitle", yantra.get("subtitle", "")).strip()
+        current_texts["yantra_section"] = yantra
+
+        # 10. Bracelets Section
+        bra = current_texts.get("bracelets_section", {})
+        bra["kicker"] = f.get("bra_kicker", bra.get("kicker", "Bracelets")).strip()
+        bra["title"] = f.get("bra_title", bra.get("title", "Spiritual Bracelets")).strip()
+        bra["subtitle"] = f.get("bra_subtitle", bra.get("subtitle", "")).strip()
+        current_texts["bracelets_section"] = bra
+
+        # 11. Puja Samagri Section
+        sam = current_texts.get("puja_samagri_section", {})
+        sam["kicker"] = f.get("sam_kicker", sam.get("kicker", "Puja Samagri")).strip()
+        sam["title"] = f.get("sam_title", sam.get("title", "Sacred Puja Samagri Collection")).strip()
+        sam["subtitle"] = f.get("sam_subtitle", sam.get("subtitle", "")).strip()
+        current_texts["puja_samagri_section"] = sam
+
+        # 12. Special Collections
+        spc = current_texts.get("special_collections_section", {})
+        spc["kicker"] = f.get("spc_kicker", spc.get("kicker", "Special Collections")).strip()
+        spc["title"] = f.get("spc_title", spc.get("title", "Sacred Special Collections")).strip()
+        spc["subtitle"] = f.get("spc_subtitle", spc.get("subtitle", "")).strip()
+        current_texts["special_collections_section"] = spc
+
+        # 13. Video Section
+        vid = current_texts.get("video_section", {})
+        vid["kicker"] = f.get("vid_kicker", vid.get("kicker", "Video Experience")).strip()
+        vid["video_url"] = f.get("vid_url", vid.get("video_url", "/videos/guruji-video.mp4")).strip()
+        current_texts["video_section"] = vid
+
+        # 14. Testimonials Section
+        testi = current_texts.get("testimonials_section", {})
+        testi["kicker"] = f.get("testi_kicker", testi.get("kicker", "Testimonials")).strip()
+        testi["title"] = f.get("testi_title", testi.get("title", "What Our Clients Say")).strip()
+        testi["subtitle"] = f.get("testi_subtitle", testi.get("subtitle", "")).strip()
+        current_texts["testimonials_section"] = testi
+
+        # 15. Blog Section
+        blog = current_texts.get("blog_section", {})
+        blog["kicker"] = f.get("blog_kicker", blog.get("kicker", "Knowledge Centre")).strip()
+        blog["title"] = f.get("blog_title", blog.get("title", "Blog & Learn")).strip()
+        blog["subtitle"] = f.get("blog_subtitle", blog.get("subtitle", "")).strip()
+        current_texts["blog_section"] = blog
+
+        # 16. Footer Section
+        foot = current_texts.get("footer_section", {})
+        foot["brand_desc"] = f.get("foot_brand_desc", foot.get("brand_desc", "")).strip()
+        foot["shloka"] = f.get("foot_shloka", foot.get("shloka", "॥ सर्वे भवन्तु सुखिनः ॥")).strip()
+        foot["phone"] = f.get("foot_phone", foot.get("phone", "+91 90000 00000")).strip()
+        foot["email"] = f.get("foot_email", foot.get("email", "seva@astroveda.in")).strip()
+        foot["whatsapp_url"] = f.get("foot_wa_url", foot.get("whatsapp_url", "https://wa.me/919000000000")).strip()
+        current_texts["footer_section"] = foot
+
+        SiteTextService.save_all(current_texts)
+
+        AuditService.log(
+            action="SITE_TEXT_UPDATE",
+            module="content",
+            actor_email=user.email,
+            actor_user_id=user.id,
+            entity_type="SystemSetting",
+            entity_id="storefront_texts",
+        )
+        flash("Storefront website texts and headings updated successfully!", "success")
+
+    texts = SiteTextService.get_all()
+    return render_template("content/site_text.html", current_user=user, texts=texts, active_page="site_text")
+
+
+# -------------------------------------------------------------
+# Ads & Ad Banners (Google AdSense, Meta Ads, Custom Embeds)
+# -------------------------------------------------------------
+@content_bp.route("/ads")
+@login_required
+@permission_required("content", "view")
+def ads_list():
+    user = get_current_admin()
+    ads = AdBanner.query.order_by(AdBanner.sort_order.asc(), AdBanner.created_at.desc()).all()
+    return render_template("content/ads.html", current_user=user, ads=ads, active_page="ads")
+
+
+@content_bp.route("/ads/create", methods=["POST"])
+@login_required
+@permission_required("content", "create")
+def ad_create():
+    user = get_current_admin()
+    title = request.form.get("title", "").strip()
+    platform = request.form.get("platform", "google").strip().lower()
+    ad_code = request.form.get("ad_code", "").strip()
+    client_id = request.form.get("client_id", "").strip()
+    slot_id = request.form.get("slot_id", "").strip()
+    image_url = request.form.get("image_url", "").strip()
+    target_url = request.form.get("target_url", "").strip()
+    headline = request.form.get("headline", "").strip()
+    description = request.form.get("description", "").strip()
+    button_text = request.form.get("button_text", "Learn More").strip() or "Learn More"
+    position = request.form.get("position", "home_mid").strip()
+    sort_order = int(request.form.get("sort_order", 0) or 0)
+    is_active = request.form.get("is_active") in ("1", "true", "on", "True", True)
+
+    if not title:
+        flash("Ad Banner title is required.", "danger")
+        return redirect(url_for("content.ads_list"))
+
+    # File upload handling if image banner
+    img_file = request.files.get("image_file")
+    if img_file and img_file.filename != "":
+        orig_name = secure_filename(img_file.filename)
+        ext = orig_name.rsplit(".", 1)[-1].lower() if "." in orig_name else ""
+        allowed = current_app.config.get("ALLOWED_IMAGE_EXTENSIONS", {"jpg", "jpeg", "png", "webp", "svg", "gif"})
+        if ext in allowed:
+            unique_filename = f"ad_{uuid.uuid4().hex[:8]}_{orig_name}"
+            upload_folder = os.path.join(current_app.root_path, "static", "uploads")
+            os.makedirs(upload_folder, exist_ok=True)
+            img_file.save(os.path.join(upload_folder, unique_filename))
+            image_url = f"/static/uploads/{unique_filename}"
+
+    ad = AdBanner(
+        title=title,
+        platform=platform,
+        ad_code=ad_code,
+        client_id=client_id,
+        slot_id=slot_id,
+        image_url=image_url,
+        target_url=target_url,
+        headline=headline,
+        description=description,
+        button_text=button_text,
+        position=position,
+        sort_order=sort_order,
+        is_active=is_active,
+    )
+    db.session.add(ad)
+    db.session.commit()
+
+    AuditService.log(
+        action="AD_BANNER_CREATE",
+        module="content",
+        actor_email=user.email,
+        actor_user_id=user.id,
+        entity_type="AdBanner",
+        entity_id=str(ad.id),
+        details={"title": title, "platform": platform, "is_active": is_active},
+    )
+    flash(f"Ad unit '{title}' created successfully.", "success")
+    return redirect(url_for("content.ads_list"))
+
+
+@content_bp.route("/ads/<int:ad_id>/edit", methods=["POST"])
+@login_required
+@permission_required("content", "edit")
+def ad_edit(ad_id):
+    user = get_current_admin()
+    ad = AdBanner.query.get_or_404(ad_id)
+
+    title = request.form.get("title", "").strip()
+    if not title:
+        flash("Ad Banner title is required.", "danger")
+        return redirect(url_for("content.ads_list"))
+
+    ad.title = title
+    ad.platform = request.form.get("platform", ad.platform).strip().lower()
+    ad.ad_code = request.form.get("ad_code", "").strip()
+    ad.client_id = request.form.get("client_id", "").strip()
+    ad.slot_id = request.form.get("slot_id", "").strip()
+    ad.target_url = request.form.get("target_url", "").strip()
+    ad.headline = request.form.get("headline", "").strip()
+    ad.description = request.form.get("description", "").strip()
+    ad.button_text = request.form.get("button_text", "Learn More").strip() or "Learn More"
+    ad.position = request.form.get("position", "home_mid").strip()
+    ad.sort_order = int(request.form.get("sort_order", ad.sort_order) or 0)
+    ad.is_active = request.form.get("is_active") in ("1", "true", "on", "True", True)
+
+    img_url = request.form.get("image_url", "").strip()
+    if img_url:
+        ad.image_url = img_url
+
+    img_file = request.files.get("image_file")
+    if img_file and img_file.filename != "":
+        orig_name = secure_filename(img_file.filename)
+        ext = orig_name.rsplit(".", 1)[-1].lower() if "." in orig_name else ""
+        allowed = current_app.config.get("ALLOWED_IMAGE_EXTENSIONS", {"jpg", "jpeg", "png", "webp", "svg", "gif"})
+        if ext in allowed:
+            unique_filename = f"ad_{uuid.uuid4().hex[:8]}_{orig_name}"
+            upload_folder = os.path.join(current_app.root_path, "static", "uploads")
+            os.makedirs(upload_folder, exist_ok=True)
+            img_file.save(os.path.join(upload_folder, unique_filename))
+            ad.image_url = f"/static/uploads/{unique_filename}"
+
+    db.session.commit()
+
+    AuditService.log(
+        action="AD_BANNER_EDIT",
+        module="content",
+        actor_email=user.email,
+        actor_user_id=user.id,
+        entity_type="AdBanner",
+        entity_id=str(ad.id),
+        details={"title": title, "platform": ad.platform, "is_active": ad.is_active},
+    )
+    flash(f"Ad unit '{title}' updated successfully.", "success")
+    return redirect(url_for("content.ads_list"))
+
+
+@content_bp.route("/ads/<int:ad_id>/toggle", methods=["POST"])
+@login_required
+@permission_required("content", "edit")
+def ad_toggle(ad_id):
+    user = get_current_admin()
+    ad = AdBanner.query.get_or_404(ad_id)
+    ad.is_active = not ad.is_active
+    db.session.commit()
+
+    state_str = "activated" if ad.is_active else "deactivated"
+    AuditService.log(
+        action="AD_BANNER_TOGGLE",
+        module="content",
+        actor_email=user.email,
+        actor_user_id=user.id,
+        entity_type="AdBanner",
+        entity_id=str(ad.id),
+        details={"title": ad.title, "new_active_state": ad.is_active},
+    )
+    flash(f"Ad unit '{ad.title}' has been {state_str}.", "success")
+    return redirect(url_for("content.ads_list"))
+
+
+@content_bp.route("/ads/<int:ad_id>/delete", methods=["POST"])
+@login_required
+@permission_required("content", "delete")
+def ad_delete(ad_id):
+    user = get_current_admin()
+    ad = AdBanner.query.get_or_404(ad_id)
+    title = ad.title
+    db.session.delete(ad)
+    db.session.commit()
+
+    AuditService.log(
+        action="AD_BANNER_DELETE",
+        module="content",
+        actor_email=user.email,
+        actor_user_id=user.id,
+        entity_type="AdBanner",
+        entity_id=str(ad_id),
+        details={"title": title},
+    )
+    flash(f"Ad unit '{title}' deleted.", "success")
+    return redirect(url_for("content.ads_list"))
+
+
+# -------------------------------------------------------------
+# Homepage Sections Drag & Drop Layout Manager
+# -------------------------------------------------------------
+@content_bp.route("/sections")
+@login_required
+@permission_required("content", "view")
+def sections_manager():
+    user = get_current_admin()
+    sections = SectionService.get_sections()
+    return render_template("content/sections.html", current_user=user, sections=sections, active_page="sections")
+
+
+@content_bp.route("/sections/reorder", methods=["POST"])
+@login_required
+@permission_required("content", "edit")
+def sections_reorder():
+    user = get_current_admin()
+    data = request.get_json(silent=True)
+    if data and "sections" in data:
+        ordered_list = data["sections"]
+    else:
+        order_str = request.form.get("section_order", "")
+        keys = [k.strip() for k in order_str.split(",") if k.strip()]
+        ordered_list = []
+        for k in keys:
+            enabled = request.form.get(f"section_{k}_enabled") in ("1", "true", "on", "True", True)
+            ordered_list.append({"key": k, "enabled": enabled})
+
+    saved = SectionService.save_sections(ordered_list)
+    AuditService.log(
+        action="HOMEPAGE_SECTIONS_REORDER",
+        module="content",
+        actor_email=user.email,
+        actor_user_id=user.id,
+        entity_type="SystemSetting",
+        entity_id="homepage_sections_order",
+        details={"sections_count": len(saved)},
+    )
+    if request.is_json:
+        return jsonify({"success": True, "message": "Homepage sections order updated successfully."})
+
+    flash("Homepage sections order and visibility updated successfully!", "success")
+    return redirect(url_for("content.sections_manager"))
+
+
+@content_bp.route("/sections/reset", methods=["POST"])
+@login_required
+@permission_required("content", "edit")
+def sections_reset():
+    user = get_current_admin()
+    SectionService.reset_sections()
+    AuditService.log(
+        action="HOMEPAGE_SECTIONS_RESET",
+        module="content",
+        actor_email=user.email,
+        actor_user_id=user.id,
+        entity_type="SystemSetting",
+        entity_id="homepage_sections_order",
+        details={"action": "reset_to_default"},
+    )
+    flash("Homepage sections order reset to canonical defaults.", "success")
+    return redirect(url_for("content.sections_manager"))
+
+
+
 

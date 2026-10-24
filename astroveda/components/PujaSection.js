@@ -15,12 +15,12 @@ const defaultPujaServices = [
 
 const pujaImageMap = [
   { match: ['laghu', 'लघुरुद्र', 'rudrayag'], image: '/puja/laghurudra.jpg' },
-  { match: ['navagraha', 'नवग्रह', 'graha'], image: '/puja/navagraha-shanti.jpg' },
+  { match: ['navagraha', 'नवग्रह', 'graha', 'navgarh'], image: '/puja/navagraha-shanti.jpg' },
   { match: ['navchandi', 'नवचंडी', 'chandi', 'durga'], image: '/puja/navchandi.jpg' },
-  { match: ['satyanarayan', 'सत्यनारायण', 'satya'], image: '/puja/satyanarayan.jpg' },
+  { match: ['satyanarayan', 'सत्यनारायण', 'satya'], image: '/puja/satynarayanimg.jpeg' },
   { match: ['udak', 'उदक'], image: '/puja/udak-shanti.jpg' },
   { match: ['vastu', 'गृहप्रवेश', 'वास्तु'], image: '/puja/vastu-shanti.jpg' },
-  { match: ['vivah', 'विवाह', 'marriage'], image: '/puja/vedic-vivah.jpg' },
+  { match: ['vivah', 'विवाह', 'marriage'], image: '/puja/vedic-vivah.jpeg' },
   { match: ['abhishek', 'अभिषेक'], image: '/puja/abhishek.jpg' },
   { match: ['kaal sarp', 'कालसर्प', 'काल सर्प', 'kalsarp'], image: '/puja/kaal-sarp-shanti.jpg' },
 ];
@@ -35,7 +35,7 @@ function getPujaBgImage(title = '') {
   return '/puja/vastu-shanti.jpg';
 }
 
-export default function PujaSection({ services: initialServices }) {
+export default function PujaSection({ services: initialServices, headerText }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPuja, setSelectedPuja] = useState('');
 
@@ -47,6 +47,11 @@ export default function PujaSection({ services: initialServices }) {
     }))
     : defaultPujaServices;
 
+  const kicker = headerText?.kicker || 'Puja Services';
+  const title = headerText?.title || 'Traditional Puja Services';
+  const subtitle = headerText?.subtitle || 'परंपरागत विधी, योग्य मंत्रोच्चार, शास्त्रोक्त पद्धती — तुमच्या घरी किंवा ऑनलाइन Sankalp Seva द्वारे.';
+  const btnText = headerText?.button_text || 'Book a Puja →';
+
   const handleOpenBooking = (pujaTitle = '') => {
     setSelectedPuja(pujaTitle);
     setModalOpen(true);
@@ -56,35 +61,51 @@ export default function PujaSection({ services: initialServices }) {
     <section className="puja-section" id="puja">
       <div className="wrap">
         <div className="sec-head center reveal">
-          <span className="kicker">Puja Services</span>
-          <h2>Traditional <em>Puja</em> Services</h2>
-          <p>परंपरागत विधी, योग्य मंत्रोच्चार, शास्त्रोक्त पद्धती — तुमच्या घरी किंवा ऑनलाइन Sankalp Seva द्वारे.</p>
+          <span className="kicker">{kicker}</span>
+          <h2>
+            {title === 'Traditional Puja Services' ? (
+              <>Traditional <em>Puja</em> Services</>
+            ) : (
+              title
+            )}
+          </h2>
+          <p>{subtitle}</p>
         </div>
         <div className="puja-grid">
           {services.map((puja) => {
-            const bgImage = getPujaBgImage(puja.title);
+            const rawTitle = puja.title || puja.name || '';
+            const displayTitle = rawTitle.replace(/\bPooja\b/g, 'Puja');
+            const bgImage = getPujaBgImage(displayTitle);
             return (
               <div
-                key={puja.title}
+                key={puja.id || displayTitle}
                 className="puja-card reveal"
+                role="button"
+                tabIndex={0}
+                onClick={() => handleOpenBooking(displayTitle)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleOpenBooking(displayTitle);
+                  }
+                }}
+                aria-label={`View details and book ${displayTitle}`}
                 style={{
                   backgroundImage: `url("${bgImage}")`,
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
                   backgroundRepeat: 'no-repeat',
+                  cursor: 'pointer',
                 }}
               >
                 <div className="puja-card-content">
-                  <h4 className="puja-title">{puja.title}</h4>
-                  <p className="puja-desc">{puja.desc}</p>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenBooking(puja.title)}
-                    className="puja-link"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}
-                  >
+                  <div className="puja-card-text">
+                    <h4 className="puja-title">{displayTitle}</h4>
+                    <p className="puja-desc">Why {displayTitle}?</p>
+                  </div>
+                  <span className="puja-link">
                     View Puja Details →
-                  </button>
+                  </span>
                 </div>
               </div>
             );
@@ -96,7 +117,7 @@ export default function PujaSection({ services: initialServices }) {
             onClick={() => handleOpenBooking('')}
             className="btn btn-gold"
           >
-            Book a Puja →
+            {btnText}
           </button>
         </div>
       </div>

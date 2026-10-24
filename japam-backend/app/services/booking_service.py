@@ -30,11 +30,12 @@ class BookingService:
             raise ValueError(f"Puja service ID {service_id} not found or inactive.")
 
         # Check and lock slot if configured in availability_slots
-        slot = AvailabilitySlot.query.filter_by(
-            service_type="puja",
-            slot_date=booking_date,
-            start_time=time_slot,
-            is_active=True
+        clean_time = time_slot.split("-")[0].strip() if "-" in time_slot else time_slot.strip()
+        slot = AvailabilitySlot.query.filter(
+            AvailabilitySlot.service_type == "puja",
+            AvailabilitySlot.slot_date == booking_date,
+            (AvailabilitySlot.start_time == clean_time) | (AvailabilitySlot.start_time == time_slot.strip()),
+            AvailabilitySlot.is_active == True,
         ).with_for_update().first()
 
         if slot:

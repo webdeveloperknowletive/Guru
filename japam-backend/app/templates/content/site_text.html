@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+
+{% block title %}Website Text & Headings{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Website Text & Headings</h1>
+    <p class="page-subtitle">Customize titles, subtitles, kickers, button labels, and descriptions across all storefront sections.</p>
+  </div>
+</div>
+
+<form method="POST" action="{{ url_for('content.site_text_page') }}" style="max-width:1040px;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+  <!-- Quick Navigation Tabs -->
+  <div style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:1.5rem; background:var(--bg-app); padding:0.5rem; border-radius:10px; border:1px solid var(--border-color);">
+    <a href="#sec-why" class="btn-action-outline" style="font-size:0.8rem; text-decoration:none;">Why Choose Us</a>
+    <a href="#sec-jyotish" class="btn-action-outline" style="font-size:0.8rem; text-decoration:none;">Jyotish Consultation</a>
+    <a href="#sec-puja" class="btn-action-outline" style="font-size:0.8rem; text-decoration:none;">Puja Services</a>
+    <a href="#sec-store" class="btn-action-outline" style="font-size:0.8rem; text-decoration:none;">Shop Collections</a>
+    <a href="#sec-media" class="btn-action-outline" style="font-size:0.8rem; text-decoration:none;">Video & Social</a>
+    <a href="#sec-footer" class="btn-action-outline" style="font-size:0.8rem; text-decoration:none;">Footer & Contact</a>
+  </div>
+
+  <!-- 1. Why Choose Us Section -->
+  <div class="dashboard-card" id="sec-why" style="margin-bottom:1.75rem;">
+    <h3 style="font-size:1.1rem; font-weight:700; color:var(--saffron-600); margin-bottom:0.35rem; display:flex; align-items:center; gap:0.5rem;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      Why Choose Nagesh Swami Guruji Section
+    </h3>
+    <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1.25rem;">
+      Edit the section banner and the 6 Vedic value propositions shown to devotees.
+    </p>
+
+    <div style="display:grid; grid-template-columns:1fr 2fr 2fr; gap:1rem; margin-bottom:1.25rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Section Tag / Kicker</label>
+        <input type="text" name="why_kicker" class="form-control" value="{{ texts.why_section.kicker }}" placeholder="Why Choose">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Section Heading</label>
+        <input type="text" name="why_title" class="form-control" value="{{ texts.why_section.title }}" placeholder="Nagesh Swami Guruji?">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Section Subtitle</label>
+        <input type="text" name="why_subtitle" class="form-control" value="{{ texts.why_section.subtitle }}" placeholder="Three Generations of Tradition">
+      </div>
+    </div>
+
+    <h4 style="font-size:0.9rem; font-weight:700; margin-bottom:0.75rem; color:var(--text-primary); border-top:1px dashed var(--border-color); padding-top:1rem;">
+      6 Reasons / Feature Cards
+    </h4>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:1rem;">
+      {% for r in texts.why_section.reasons %}
+      <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:8px; padding:0.85rem;">
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.5rem;">
+          <input type="text" name="why_num_{{ loop.index }}" class="form-control" style="max-width:60px; font-weight:700;" value="{{ r.num }}">
+          <input type="text" name="why_title_{{ loop.index }}" class="form-control" style="font-weight:600;" value="{{ r.title }}" placeholder="Card Title">
+        </div>
+        <textarea name="why_desc_{{ loop.index }}" class="form-control" rows="3" placeholder="Card Description">{{ r.desc }}</textarea>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- 2. Jyotish Consultation Section -->
+  <div class="dashboard-card" id="sec-jyotish" style="margin-bottom:1.75rem;">
+    <h3 style="font-size:1.1rem; font-weight:700; color:var(--saffron-600); margin-bottom:0.35rem; display:flex; align-items:center; gap:0.5rem;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Jyotish Consultation & Kundali Section
+    </h3>
+    <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1.25rem;">
+      Customize headlines, consultation form prompt texts, and direct WhatsApp booking options.
+    </p>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; margin-bottom:1rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Kicker / Tag</label>
+        <input type="text" name="jyotish_kicker" class="form-control" value="{{ texts.jyotish_section.kicker }}" placeholder="Jyotish Consultation">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Section Heading</label>
+        <input type="text" name="jyotish_title" class="form-control" value="{{ texts.jyotish_section.title }}" placeholder="Kundali & Astrology">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Section Subtitle</label>
+        <input type="text" name="jyotish_subtitle" class="form-control" value="{{ texts.jyotish_section.subtitle }}" placeholder="Personalised Jyotish Guidance...">
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">WhatsApp Button Text</label>
+        <input type="text" name="jyotish_wa_text" class="form-control" value="{{ texts.jyotish_section.wa_button_text }}" placeholder="📲 WhatsApp गुरुजी">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">WhatsApp Link / Number URL</label>
+        <input type="text" name="jyotish_wa_link" class="form-control" value="{{ texts.jyotish_section.wa_link }}" placeholder="https://wa.me/919000000000">
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Form Title</label>
+        <input type="text" name="jyotish_form_title" class="form-control" value="{{ texts.jyotish_section.form_title }}" placeholder="Book Your Consultation">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Form Subtitle / Instructions</label>
+        <input type="text" name="jyotish_form_sub" class="form-control" value="{{ texts.jyotish_section.form_sub }}" placeholder="कृपया खालील माहिती भरा...">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Form Security / Privacy Note</label>
+        <input type="text" name="jyotish_form_note" class="form-control" value="{{ texts.jyotish_section.form_note }}" placeholder="🔒 तुमची माहिती सुरक्षित आहे...">
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Puja Services Section -->
+  <div class="dashboard-card" id="sec-puja" style="margin-bottom:1.75rem;">
+    <h3 style="font-size:1.1rem; font-weight:700; color:var(--saffron-600); margin-bottom:0.35rem; display:flex; align-items:center; gap:0.5rem;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      Puja Services Section
+    </h3>
+    <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1.25rem;">
+      Section banner, description, and primary call-to-action button for booking pujas.
+    </p>
+
+    <div style="display:grid; grid-template-columns:1fr 2fr 1fr; gap:1rem; margin-bottom:1rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Kicker / Tag</label>
+        <input type="text" name="puja_kicker" class="form-control" value="{{ texts.puja_section.kicker }}" placeholder="Puja Services">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Heading</label>
+        <input type="text" name="puja_title" class="form-control" value="{{ texts.puja_section.title }}" placeholder="Traditional Puja Services">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Call-to-Action Button Text</label>
+        <input type="text" name="puja_btn_text" class="form-control" value="{{ texts.puja_section.button_text }}" placeholder="Book a Puja →">
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label">Section Subtitle / Description</label>
+      <input type="text" name="puja_subtitle" class="form-control" value="{{ texts.puja_section.subtitle }}" placeholder="परंपरागत विधी, योग्य मंत्रोच्चार...">
+    </div>
+  </div>
+
+  <!-- 4. Shop Collections & Product Headings -->
+  <div class="dashboard-card" id="sec-store" style="margin-bottom:1.75rem;">
+    <h3 style="font-size:1.1rem; font-weight:700; color:var(--saffron-600); margin-bottom:0.35rem; display:flex; align-items:center; gap:0.5rem;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><line x1="3" x2="21" y1="6" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      Store Collections & Category Headings
+    </h3>
+    <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1.25rem;">
+      Customize kickers, titles, and subheadings for every product category on the storefront.
+    </p>
+
+    <!-- Categories Grid Grid -->
+    <div style="display:flex; flex-direction:column; gap:1.25rem;">
+      <!-- Shop By Category Grid -->
+      <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:8px; padding:1rem;">
+        <strong style="color:var(--saffron-600); font-size:0.9rem; display:block; margin-bottom:0.5rem;">Category Navigation Grid</strong>
+        <div style="display:grid; grid-template-columns:1fr 2fr 3fr; gap:0.75rem;">
+          <input type="text" name="cat_kicker" class="form-control" value="{{ texts.category_section.kicker }}" placeholder="Shop by Category">
+          <input type="text" name="cat_title" class="form-control" value="{{ texts.category_section.title }}" placeholder="The Right Choice for You">
+          <input type="text" name="cat_subtitle" class="form-control" value="{{ texts.category_section.subtitle }}" placeholder="Subtitle / Description">
+        </div>
+      </div>
+
+      <!-- Featured Collection -->
+      <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:8px; padding:1rem;">
+        <strong style="color:var(--saffron-600); font-size:0.9rem; display:block; margin-bottom:0.5rem;">Featured Collection</strong>
+        <div style="display:grid; grid-template-columns:1fr 2fr 3fr; gap:0.75rem;">
+          <input type="text" name="feat_kicker" class="form-control" value="{{ texts.featured_section.kicker }}" placeholder="Featured">
+          <input type="text" name="feat_title" class="form-control" value="{{ texts.featured_section.title }}" placeholder="Our Sacred Collection">
+          <input type="text" name="feat_subtitle" class="form-control" value="{{ texts.featured_section.subtitle }}" placeholder="Subtitle / Description">
+        </div>
+      </div>
+
+      <!-- Rudraksha Section -->
+      <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:8px; padding:1rem;">
+        <strong style="color:var(--saffron-600); font-size:0.9rem; display:block; margin-bottom:0.5rem;">Rudraksha Collection</strong>
+        <div style="display:grid; grid-template-columns:1fr 2fr 3fr; gap:0.75rem;">
+          <input type="text" name="rud_kicker" class="form-control" value="{{ texts.rudraksha_section.kicker }}" placeholder="Rudraksha">
+          <input type="text" name="rud_title" class="form-control" value="{{ texts.rudraksha_section.title }}" placeholder="रुद्राक्ष Collection">
+          <input type="text" name="rud_subtitle" class="form-control" value="{{ texts.rudraksha_section.subtitle }}" placeholder="Subtitle / Description">
+        </div>
+      </div>
+
+      <!-- Ratna & Gemstones -->
+      <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:8px; padding:1rem;">
+        <strong style="color:var(--saffron-600); font-size:0.9rem; display:block; margin-bottom:0.5rem;">Ratna & Gemstones Collection</strong>
+        <div style="display:grid; grid-template-columns:1fr 2fr 3fr; gap:0.75rem; margin-bottom:0.5rem;">
+          <input type="text" name="ratna_kicker" class="form-control" value="{{ texts.ratna_section.kicker }}" placeholder="Ratna">
+          <input type="text" name="ratna_title" class="form-control" value="{{ texts.ratna_section.title }}" placeholder="Choose Your Gemstone With Guidance">
+          <input type="text" name="ratna_subtitle" class="form-control" value="{{ texts.ratna_section.subtitle }}" placeholder="Subtitle / Description">
+        </div>
+        <input type="text" name="ratna_cta" class="form-control" value="{{ texts.ratna_section.consultation_cta }}" placeholder="Consultation Banner CTA Text">
+      </div>
+
+      <!-- Sacred Yantra -->
+      <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:8px; padding:1rem;">
+        <strong style="color:var(--saffron-600); font-size:0.9rem; display:block; margin-bottom:0.5rem;">Sacred Yantra Collection</strong>
+        <div style="display:grid; grid-template-columns:1fr 2fr 3fr; gap:0.75rem;">
+          <input type="text" name="yantra_kicker" class="form-control" value="{{ texts.yantra_section.kicker }}" placeholder="Yantra">
+          <input type="text" name="yantra_title" class="form-control" value="{{ texts.yantra_section.title }}" placeholder="Sacred Yantra Collection">
+          <input type="text" name="yantra_subtitle" class="form-control" value="{{ texts.yantra_section.subtitle }}" placeholder="Subtitle / Description">
+        </div>
+      </div>
+
+      <!-- Spiritual Bracelets -->
+      <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:8px; padding:1rem;">
+        <strong style="color:var(--saffron-600); font-size:0.9rem; display:block; margin-bottom:0.5rem;">Spiritual Bracelets Collection</strong>
+        <div style="display:grid; grid-template-columns:1fr 2fr 3fr; gap:0.75rem;">
+          <input type="text" name="bra_kicker" class="form-control" value="{{ texts.bracelets_section.kicker }}" placeholder="Bracelets">
+          <input type="text" name="bra_title" class="form-control" value="{{ texts.bracelets_section.title }}" placeholder="Spiritual Bracelets">
+          <input type="text" name="bra_subtitle" class="form-control" value="{{ texts.bracelets_section.subtitle }}" placeholder="Subtitle / Description">
+        </div>
+      </div>
+
+      <!-- Puja Samagri -->
+      <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:8px; padding:1rem;">
+        <strong style="color:var(--saffron-600); font-size:0.9rem; display:block; margin-bottom:0.5rem;">Puja Samagri Collection</strong>
+        <div style="display:grid; grid-template-columns:1fr 2fr 3fr; gap:0.75rem;">
+          <input type="text" name="sam_kicker" class="form-control" value="{{ texts.puja_samagri_section.kicker }}" placeholder="Puja Samagri">
+          <input type="text" name="sam_title" class="form-control" value="{{ texts.puja_samagri_section.title }}" placeholder="Sacred Puja Samagri Collection">
+          <input type="text" name="sam_subtitle" class="form-control" value="{{ texts.puja_samagri_section.subtitle }}" placeholder="Subtitle / Description">
+        </div>
+      </div>
+
+      <!-- Special Collections -->
+      <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:8px; padding:1rem;">
+        <strong style="color:var(--saffron-600); font-size:0.9rem; display:block; margin-bottom:0.5rem;">Special Collections & Gift Sets</strong>
+        <div style="display:grid; grid-template-columns:1fr 2fr 3fr; gap:0.75rem;">
+          <input type="text" name="spc_kicker" class="form-control" value="{{ texts.special_collections_section.kicker }}" placeholder="Special Collections">
+          <input type="text" name="spc_title" class="form-control" value="{{ texts.special_collections_section.title }}" placeholder="Sacred Special Collections">
+          <input type="text" name="spc_subtitle" class="form-control" value="{{ texts.special_collections_section.subtitle }}" placeholder="Subtitle / Description">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Video, Testimonials, Blog -->
+  <div class="dashboard-card" id="sec-media" style="margin-bottom:1.75rem;">
+    <h3 style="font-size:1.1rem; font-weight:700; color:var(--saffron-600); margin-bottom:0.35rem; display:flex; align-items:center; gap:0.5rem;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2"/></svg>
+      Video Experience & Knowledge Headings
+    </h3>
+    <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1.25rem;">
+      Configure the Video Experience player path and section banners for Testimonials and Blog articles.
+    </p>
+
+    <div style="display:grid; grid-template-columns:1fr 2fr; gap:1rem; margin-bottom:1rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Video Section Kicker</label>
+        <input type="text" name="vid_kicker" class="form-control" value="{{ texts.video_section.kicker }}" placeholder="Video Experience">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Video File Source URL</label>
+        <input type="text" name="vid_url" class="form-control" value="{{ texts.video_section.video_url }}" placeholder="/videos/guruji-video.mp4">
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 2fr 3fr; gap:1rem; margin-bottom:1rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Testimonials Kicker</label>
+        <input type="text" name="testi_kicker" class="form-control" value="{{ texts.testimonials_section.kicker }}" placeholder="Testimonials">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Testimonials Heading</label>
+        <input type="text" name="testi_title" class="form-control" value="{{ texts.testimonials_section.title }}" placeholder="What Our Clients Say">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Testimonials Subtitle</label>
+        <input type="text" name="testi_subtitle" class="form-control" value="{{ texts.testimonials_section.subtitle }}" placeholder="प्रत्येक अभिप्राय खरा आहे...">
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 2fr 3fr; gap:1rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Blog Kicker</label>
+        <input type="text" name="blog_kicker" class="form-control" value="{{ texts.blog_section.kicker }}" placeholder="Knowledge Centre">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Blog Heading</label>
+        <input type="text" name="blog_title" class="form-control" value="{{ texts.blog_section.title }}" placeholder="Blog & Learn">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Blog Subtitle</label>
+        <input type="text" name="blog_subtitle" class="form-control" value="{{ texts.blog_section.subtitle }}" placeholder="रुद्राक्ष, रत्न, यंत्र आणि पूजा...">
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. Hero Secondary Button & Footer -->
+  <div class="dashboard-card" id="sec-footer" style="margin-bottom:1.75rem;">
+    <h3 style="font-size:1.1rem; font-weight:700; color:var(--saffron-600); margin-bottom:0.35rem; display:flex; align-items:center; gap:0.5rem;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Hero Secondary Button & Footer Brand Information
+    </h3>
+    <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1.25rem;">
+      Edit the Hero's secondary consultation button and footer branding narratives.
+    </p>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Hero Secondary Button Text</label>
+        <input type="text" name="hero_sec_btn_text" class="form-control" value="{{ texts.hero_section.secondary_button_text }}" placeholder="Book Consultation">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Hero Secondary Button Target URL</label>
+        <input type="text" name="hero_sec_btn_url" class="form-control" value="{{ texts.hero_section.secondary_button_url }}" placeholder="#jyotish">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Footer Brand Bio / Statement</label>
+      <textarea name="foot_brand_desc" class="form-control" rows="2" placeholder="परंपरेतून मार्गदर्शन, श्रद्धेतून समाधान...">{{ texts.footer_section.brand_desc }}</textarea>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:1rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Sacred Shloka</label>
+        <input type="text" name="foot_shloka" class="form-control" value="{{ texts.footer_section.shloka }}" placeholder="॥ सर्वे भवन्तु सुखिनः ॥">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Direct Phone Helpline</label>
+        <input type="text" name="foot_phone" class="form-control" value="{{ texts.footer_section.phone }}" placeholder="+91 90000 00000">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Support Email Address</label>
+        <input type="text" name="foot_email" class="form-control" value="{{ texts.footer_section.email }}" placeholder="seva@astroveda.in">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">WhatsApp Contact Link</label>
+        <input type="text" name="foot_wa_url" class="form-control" value="{{ texts.footer_section.whatsapp_url }}" placeholder="https://wa.me/919000000000">
+      </div>
+    </div>
+  </div>
+
+  <!-- Submit Bar -->
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 0;">
+    <button type="submit" class="btn-primary" style="padding:0.75rem 2.25rem; font-size:1rem; font-weight:700; display:inline-flex; align-items:center; gap:0.5rem;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      Save All Website Texts & Headings
+    </button>
+    <a href="{{ url_for('dashboard.overview') }}" class="btn-secondary" style="text-decoration:none;">Cancel</a>
+  </div>
+</form>
+{% endblock %}

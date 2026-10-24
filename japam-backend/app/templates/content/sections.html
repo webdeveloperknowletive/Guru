@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block title %}Homepage Sections & Layout Manager{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Homepage Sections & Layout Manager</h1>
+    <p class="page-subtitle">Drag and drop sections to decide which content appears first, second, or subsequent on the storefront. Toggle visibility on/off anytime.</p>
+  </div>
+  <div class="page-header-actions" style="display:flex; gap:0.5rem;">
+    <form action="{{ url_for('content.sections_reset') }}" method="POST" style="margin:0;" onsubmit="return confirm('Reset all homepage sections to canonical Vedic default sequence?');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="btn-secondary" title="Restore default section order">
+        ↺ Reset Defaults
+      </button>
+    </form>
+    <button type="button" class="btn-primary" id="saveOrderBtnTop" onclick="saveSectionsOrder()">
+      💾 Save Changes
+    </button>
+  </div>
+</div>
+
+<div class="dashboard-card" style="padding:1.5rem;">
+  <div style="background:rgba(224, 176, 74, 0.08); border:1px solid rgba(224, 176, 74, 0.3); border-radius:10px; padding:12px 18px; margin-bottom:1.5rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="font-size:1.3rem;">ℹ️</span>
+      <span style="font-size:0.85rem; color:var(--text-primary);">
+        Grab any card using the <strong>⠿ handle</strong> or use the <strong>🔼 / 🔽</strong> arrows to move sections up or down. Changes apply immediately to the website when saved.
+      </span>
+    </div>
+    <div id="saveStatusIndicator" style="font-size:0.8rem; font-weight:600; color:#059669; display:none;">
+      ✓ All changes saved
+    </div>
+  </div>
+
+  <form id="sectionsOrderForm" action="{{ url_for('content.sections_reorder') }}" method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="section_order" id="sectionOrderInput" value="">
+
+    <!-- Drag & Drop Container -->
+    <div id="sectionContainer" style="display:flex; flex-direction:column; gap:0.65rem;">
+      {% for sec in sections %}
+      <div class="section-card"
+        draggable="true"
+        data-key="{{ sec.key }}"
+        style="display:flex; align-items:center; justify-content:space-between; padding:0.9rem 1.25rem; background:var(--bg-app); border:1px solid var(--border-color); border-radius:10px; cursor:grab; transition:all 0.2s ease; user-select:none;">
+        
+        <!-- Left: Drag Handle, Number, Icon & Title -->
+        <div style="display:flex; align-items:center; gap:1rem; flex:1;">
+          <div class="drag-handle" style="font-size:1.4rem; color:var(--text-muted); cursor:grab;" title="Drag to reorder">
+            ⠿
+          </div>
+          <div class="order-badge" style="width:28px; height:28px; border-radius:50%; background:rgba(224, 176, 74, 0.15); color:var(--saffron-700); font-weight:700; font-size:0.82rem; display:flex; align-items:center; justify-content:center; border:1px solid rgba(224, 176, 74, 0.3);">
+            {{ loop.index }}
+          </div>
+          <div style="font-size:1.5rem; line-height:1;">
+            {{ sec.icon }}
+          </div>
+          <div>
+            <div style="font-weight:700; font-size:0.94rem; color:var(--text-primary);" class="sec-title">
+              {{ sec.name }}
+            </div>
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">
+              {{ sec.desc }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Up/Down Buttons & Visibility Toggle -->
+        <div style="display:flex; align-items:center; gap:1.25rem;">
+          <!-- Move Up/Down Quick Buttons -->
+          <div style="display:flex; gap:0.25rem;">
+            <button type="button" class="btn-secondary move-up-btn" style="padding:0.25rem 0.5rem; font-size:0.75rem;" title="Move up one position">
+              ▲
+            </button>
+            <button type="button" class="btn-secondary move-down-btn" style="padding:0.25rem 0.5rem; font-size:0.75rem;" title="Move down one position">
+              ▼
+            </button>
+          </div>
+
+          <!-- Visibility Switch -->
+          <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; font-size:0.82rem; font-weight:600; color:var(--text-primary); margin:0;" title="Toggle section visibility on storefront">
+            <input type="checkbox"
+              name="section_{{ sec.key }}_enabled"
+              class="sec-visibility-cb"
+              value="1"
+              {% if sec.enabled %}checked{% endif %}
+              style="width:17px; height:17px; cursor:pointer;">
+            <span class="status-label" style="font-size:0.78rem; color:{{ '#10b981' if sec.enabled else '#a8a29e' }};">
+              {{ 'Visible' if sec.enabled else 'Hidden' }}
+            </span>
+          </label>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Bottom Save Action -->
+    <div style="margin-top:2rem; padding-top:1.25rem; border-top:1px solid var(--border-color); display:flex; justify-content:flex-end; gap:0.75rem;">
+      <button type="button" class="btn-primary" style="padding:0.6rem 1.8rem; font-size:0.9rem;" onclick="saveSectionsOrder()">
+        💾 Save Section Order & Visibility
+      </button>
+    </div>
+  </form>
+</div>
+
+<style>
+  .section-card.dragging {
+    opacity: 0.45;
+    border: 2px dashed var(--saffron-700) !important;
+    background: rgba(224, 176, 74, 0.1) !important;
+  }
+  .section-card.drag-over {
+    border-top: 3px solid var(--saffron-700) !important;
+    transform: translateY(2px);
+  }
+</style>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    var container = document.getElementById("sectionContainer");
+    var draggedCard = null;
+
+    // Attach Drag and Drop handlers
+    function attachDragListeners(card) {
+      card.addEventListener("dragstart", function(e) {
+        draggedCard = card;
+        card.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", card.dataset.key);
+      });
+
+      card.addEventListener("dragend", function() {
+        card.classList.remove("dragging");
+        document.querySelectorAll(".section-card").forEach(function(c) {
+          c.classList.remove("drag-over");
+        });
+        updateOrderBadges();
+      });
+
+      card.addEventListener("dragover", function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+      });
+
+      card.addEventListener("dragenter", function(e) {
+        e.preventDefault();
+        if (card !== draggedCard) {
+          card.classList.add("drag-over");
+        }
+      });
+
+      card.addEventListener("dragleave", function() {
+        card.classList.remove("drag-over");
+      });
+
+      card.addEventListener("drop", function(e) {
+        e.preventDefault();
+        card.classList.remove("drag-over");
+        if (draggedCard && card !== draggedCard) {
+          var allCards = Array.from(container.querySelectorAll(".section-card"));
+          var fromIdx = allCards.indexOf(draggedCard);
+          var toIdx = allCards.indexOf(card);
+
+          if (fromIdx < toIdx) {
+            container.insertBefore(draggedCard, card.nextSibling);
+          } else {
+            container.insertBefore(draggedCard, card);
+          }
+          updateOrderBadges();
+        }
+      });
+    }
+
+    // Attach to all existing cards
+    document.querySelectorAll(".section-card").forEach(function(card) {
+      attachDragListeners(card);
+    });
+
+    // Move Up / Down Buttons
+    container.addEventListener("click", function(e) {
+      var upBtn = e.target.closest(".move-up-btn");
+      if (upBtn) {
+        var card = upBtn.closest(".section-card");
+        var prev = card.previousElementSibling;
+        if (prev) {
+          container.insertBefore(card, prev);
+          updateOrderBadges();
+        }
+        return;
+      }
+
+      var downBtn = e.target.closest(".move-down-btn");
+      if (downBtn) {
+        var card = downBtn.closest(".section-card");
+        var next = card.nextElementSibling;
+        if (next) {
+          container.insertBefore(next, card);
+          updateOrderBadges();
+        }
+        return;
+      }
+    });
+
+    // Visibility Checkbox label updates
+    container.addEventListener("change", function(e) {
+      if (e.target.classList.contains("sec-visibility-cb")) {
+        var label = e.target.parentElement.querySelector(".status-label");
+        if (label) {
+          label.innerText = e.target.checked ? "Visible" : "Hidden";
+          label.style.color = e.target.checked ? "#10b981" : "#a8a29e";
+        }
+      }
+    });
+
+    function updateOrderBadges() {
+      container.querySelectorAll(".section-card").forEach(function(card, idx) {
+        var badge = card.querySelector(".order-badge");
+        if (badge) badge.innerText = idx + 1;
+      });
+    }
+
+    window.updateOrderBadges = updateOrderBadges;
+  });
+
+  function saveSectionsOrder() {
+    var container = document.getElementById("sectionContainer");
+    var cards = container.querySelectorAll(".section-card");
+    var keys = [];
+    var payload = [];
+
+    cards.forEach(function(card) {
+      var key = card.dataset.key;
+      keys.push(key);
+      var cb = card.querySelector(".sec-visibility-cb");
+      payload.push({
+        key: key,
+        enabled: cb ? cb.checked : true
+      });
+    });
+
+    document.getElementById("sectionOrderInput").value = keys.join(",");
+
+    // Submit via AJAX for instant feedback with graceful fallback
+    var form = document.getElementById("sectionsOrderForm");
+    var csrfToken = form.querySelector('input[name="csrf_token"]').value;
+
+    var btn = document.getElementById("saveOrderBtnTop");
+    if (btn) btn.innerText = "Saving...";
+
+    fetch("/admin/content/sections/reorder", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrfToken
+      },
+      body: JSON.stringify({ sections: payload })
+    })
+    .then(function(res) {
+      return res.json();
+    })
+    .then(function(data) {
+      if (btn) btn.innerText = "💾 Save Changes";
+      var ind = document.getElementById("saveStatusIndicator");
+      if (ind) {
+        ind.style.display = "block";
+        ind.innerText = "✓ Changes saved and live on website!";
+        setTimeout(function() { ind.style.display = "none"; }, 3500);
+      }
+    })
+    .catch(function(err) {
+      // Fallback to normal form submit if fetch fails
+      form.submit();
+    });
+  }
+</script>
+{% endblock %}

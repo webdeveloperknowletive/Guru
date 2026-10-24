@@ -295,12 +295,44 @@ export async function getWelcomePopup(isPreview = false) {
   return request(`/welcome-popup${query}`);
 }
 
+export async function getSiteText() {
+  return request('/content/site-text', { method: 'GET' });
+}
+
+/**
+ * GET /api/v1/content/ads?position=...
+ */
+export async function getAds(position = '') {
+  const qs = position ? `?position=${encodeURIComponent(position)}` : '';
+  return request(`/content/ads${qs}`, { method: 'GET' });
+}
+
+/**
+ * GET /api/v1/content/sections
+ */
+export async function getSections() {
+  return request('/content/sections', { method: 'GET' });
+}
+
+/**
+ * GET /api/v1/services/availability?service_type=...&date=...
+ */
+export async function getAvailabilitySlots(serviceType = null, date = null) {
+  const params = new URLSearchParams();
+  if (serviceType) params.append('service_type', serviceType);
+  if (date) params.append('date', date);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return request(`/services/availability${qs}`, { method: 'GET' });
+}
+
+
 const api = {
   getProducts,
   getProductDetail,
   submitProductReview,
   getCategories,
   getPujaServices,
+  getAvailabilitySlots,
   bookPuja,
   requestConsultation,
   calculateCart,
@@ -316,7 +348,11 @@ const api = {
   getGurujiProfile,
   getConsultations,
   getWelcomePopup,
+  getSiteText,
+  getAds,
+  getSections,
 };
 
 export default api;
+
 

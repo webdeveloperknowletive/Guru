@@ -192,3 +192,46 @@ class WelcomePopupSetting(db.Model):
         return f"<WelcomePopupSetting {self.status}:{self.campaign_id}>"
 
 
+class AdBanner(db.Model):
+    __tablename__ = "ad_banners"
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    platform = db.Column(db.String(50), default="google", nullable=False)  # 'google', 'meta', 'custom_html', 'image_banner'
+    ad_code = db.Column(db.Text, nullable=True)  # Full Google AdSense / Meta script or embed tag
+    client_id = db.Column(db.String(100), nullable=True)  # ca-pub-XXXXX or Meta Placement ID
+    slot_id = db.Column(db.String(100), nullable=True)  # Ad Unit / Slot ID
+    image_url = db.Column(db.String(500), nullable=True)  # Direct banner image URL
+    target_url = db.Column(db.String(500), nullable=True)  # Destination click-through URL
+    headline = db.Column(db.String(255), nullable=True)
+    description = db.Column(db.Text, nullable=True)
+    button_text = db.Column(db.String(100), default="Learn More", nullable=True)
+    position = db.Column(db.String(50), default="home_mid", nullable=False, index=True)  # 'home_mid', 'home_bottom', 'all'
+    is_active = db.Column(db.Boolean, default=True, nullable=False, index=True)
+    sort_order = db.Column(db.Integer, default=0, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "platform": self.platform,
+            "ad_code": self.ad_code or "",
+            "client_id": self.client_id or "",
+            "slot_id": self.slot_id or "",
+            "image_url": self.image_url or "",
+            "target_url": self.target_url or "",
+            "headline": self.headline or "",
+            "description": self.description or "",
+            "button_text": self.button_text or "Learn More",
+            "position": self.position,
+            "is_active": self.is_active,
+            "sort_order": self.sort_order,
+        }
+
+    def __repr__(self):
+        return f"<AdBanner {self.title} ({self.platform})>"
+
+
+

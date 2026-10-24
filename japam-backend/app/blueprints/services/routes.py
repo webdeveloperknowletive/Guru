@@ -391,3 +391,93 @@ def availability_create():
     )
     flash("Availability slot created.", "success")
     return redirect(url_for("services.availability_list"))
+
+
+@services_bp.route("/availability/<int:slot_id>/edit", methods=["POST"])
+@login_required
+@permission_required("availability", "edit")
+def availability_update(slot_id):
+    user = get_current_admin()
+    slot = AvailabilitySlot.query.get_or_404(slot_id)
+
+    svc_type = request.form.get("service_type", slot.service_type)
+    slot_date_str = request.form.get("slot_date")
+    start_time = request.form.get("start_time", slot.start_time).strip()
+    end_time = request.form.get("end_time", slot.end_time).strip()
+    capacity = request.form.get("max_capacity", slot.max_capacity, type=int)
+    assigned = request.form.get("assigned_priest_or_astrologer", "").strip()
+    is_active = request.form.get("is_active") in ("1", "true", "on", "True")
+
+    if slot_date_str:
+        slot.slot_date = datetime.strptime(slot_date_str, "%Y-%m-%d").date()
+    slot.service_type = svc_type
+    slot.start_time = start_time
+    slot.end_time = end_time
+    slot.max_capacity = max(1, capacity)
+    slot.assigned_priest_or_astrologer = assigned or "Pandit Ji"
+    slot.is_active = is_active
+
+    db.session.commit()
+
+    AuditService.log(
+        action="AVAILABILITY_SLOT_UPDATE",
+        module="services",
+        actor_email=user.email,
+        actor_user_id=user.id,
+        entity_type="AvailabilitySlot",
+        entity_id=str(slot.id),
+        details={"service_type": slot.service_type, "date": str(slot.slot_date), "is_active": slot.is_active},
+    )
+    flash(f"Slot on {slot.slot_date} ({slot.start_time}) updated successfully.", "success")
+    return redirect(url_for("services.availability_list"))
+
+
+@services_bp.route("/availability/<int:slot_id>/toggle-status", methods=["POST"])
+@login_required
+@permission_required("availability", "edit")
+def availability_toggle_status(slot_id):
+    user = get_current_admin()
+    slot = AvailabilitySlot.query.get_or_404(slot_id)
+    slot.is_active = not slot.is_active
+    db.session.commit()
+
+    status_label = "Active (Bookable)" if slot.is_active else "Blocked"
+    AuditService.log(
+        action="AVAILABILITY_SLOT_TOGGLE",
+        module="services",
+        actor_email=user.email,
+        actor_user_id=user.id,
+        entity_type="AvailabilitySlot",
+        entity_id=str(slot.id),
+        details={"is_active": slot.is_active},
+    )
+    flash(f"Slot {slot.start_time} status changed to {status_label}.", "info")
+    return redirect(url_for("services.availability_list"))
+
+
+@services_bp.route("/availability/<int:slot_id>/delete", methods=["POST", "DELETE"])
+@login_required
+@permission_required("availability", "delete")
+def availability_delete(slot_id):
+    user = get_current_admin()
+    slot = AvailabilitySlot.query.get_or_404(slot_id)
+    
+    if slot.booked_count > 0:
+        flash(f"Cannot delete slot with {slot.booked_count} confirmed booking(s). Block it instead.", "warning")
+        return redirect(url_for("services.availability_list"))
+
+    db.session.delete(slot)
+    db.session.commit()
+
+    AuditService.log(
+        action="AVAILABILITY_SLOT_DELETE",
+        module="services",
+        actor_email=user.email,
+        actor_user_id=user.id,
+        entity_type="AvailabilitySlot",
+        entity_id=str(slot_id),
+        details={"date": str(slot.slot_date), "start_time": slot.start_time},
+    )
+    flash("Availability slot deleted successfully.", "success")
+    return redirect(url_for("services.availability_list"))
+
