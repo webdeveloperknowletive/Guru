@@ -32,13 +32,14 @@ import {
   getSiteText,
   getSections,
 } from '@/lib/api';
+
 import { adaptApiProduct } from '@/lib/products';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function Home() {
-  // Fetch live database records across all modules in parallel with error shielding
+  // Fetch live database records across all modules in parallel.
   const [
     productsRes,
     categoriesRes,
@@ -61,39 +62,58 @@ export default async function Home() {
     getSections().catch(() => null),
   ]);
 
-  // Adapt raw API products into UI format and sort by display_rank ASC
+  // Adapt API products into the storefront UI format.
   const rawProducts = productsRes?.products || [];
+
   const allProducts = rawProducts
     .map(adaptApiProduct)
     .filter(Boolean)
     .sort((a, b) => {
       const rankA = Number(a.display_rank ?? a.rank ?? 999);
       const rankB = Number(b.display_rank ?? b.rank ?? 999);
-      if (rankA !== rankB) return rankA - rankB;
+
+      if (rankA !== rankB) {
+        return rankA - rankB;
+      }
+
       return 0;
     });
 
-  // Helper sort function for product slices
+  // Sort product lists by display rank.
   const sortByRank = (arr) =>
     [...arr].sort((a, b) => {
       const rankA = Number(a.display_rank ?? a.rank ?? 999);
       const rankB = Number(b.display_rank ?? b.rank ?? 999);
-      if (rankA !== rankB) return rankA - rankB;
+
+      if (rankA !== rankB) {
+        return rankA - rankB;
+      }
+
       return 0;
     });
 
-  // Group products by domain category
+  // Rudraksha products.
   const rudrakshaProducts = sortByRank(
-    allProducts.filter(p => {
+    allProducts.filter((p) => {
       const s = `${p.cat} ${p.title} ${p.catLabel}`.toLowerCase();
-      return s.includes('rudraksha') || s.includes('mukhi') || s.includes('mala');
+
+      return (
+        s.includes('rudraksha') ||
+        s.includes('mukhi') ||
+        s.includes('mala')
+      );
     })
   );
 
+  // Gemstone products.
   const ratnaProducts = sortByRank(
-    allProducts.filter(p => {
+    allProducts.filter((p) => {
       const s = `${p.cat} ${p.title} ${p.catLabel}`.toLowerCase();
-      if (s.includes('bracelet')) return false;
+
+      if (s.includes('bracelet')) {
+        return false;
+      }
+
       return (
         s.includes('ratna') ||
         s.includes('gemstone') ||
@@ -119,23 +139,29 @@ export default async function Home() {
     })
   );
 
+  // Yantra products.
   const yantraProducts = sortByRank(
-    allProducts.filter(p => {
+    allProducts.filter((p) => {
       const s = `${p.cat} ${p.title} ${p.catLabel}`.toLowerCase();
+
       return s.includes('yantra');
     })
   );
 
+  // Bracelet products.
   const braceletsProducts = sortByRank(
-    allProducts.filter(p => {
+    allProducts.filter((p) => {
       const s = `${p.cat} ${p.title} ${p.catLabel}`.toLowerCase();
+
       return s.includes('bracelet');
     })
   );
 
+  // Puja Samagri products.
   const pujaSamagriProducts = sortByRank(
-    allProducts.filter(p => {
+    allProducts.filter((p) => {
       const s = `${p.cat} ${p.title} ${p.catLabel}`.toLowerCase();
+
       return (
         s.includes('puja') ||
         s.includes('samagri') ||
@@ -148,9 +174,11 @@ export default async function Home() {
     })
   );
 
+  // Special collection products.
   const specialCollectionsProducts = sortByRank(
-    allProducts.filter(p => {
+    allProducts.filter((p) => {
       const s = `${p.cat} ${p.title} ${p.catLabel}`.toLowerCase();
+
       return (
         s.includes('special') ||
         s.includes('collection') ||
@@ -161,102 +189,494 @@ export default async function Home() {
     })
   );
 
-  // Featured selection: products with hot badge or top 4
+  // Featured selection.
   const featuredCandidates = sortByRank(
-    allProducts.filter(p => p.badge === 'hot' || p.badge === 'new' || p.badge === 'lab')
+    allProducts.filter(
+      (p) =>
+        p.badge === 'hot' ||
+        p.badge === 'new' ||
+        p.badge === 'lab'
+    )
   );
-  const featuredProducts = featuredCandidates.length >= 4 ? featuredCandidates.slice(0, 4) : allProducts.slice(0, 4);
 
-  // Content records & Banners
-  const allBanners = heroBannerRes?.banners || [];
-  const heroBanners = allBanners.filter(b => b.position === 'hero');
-  const heroBanner = heroBanners[0] || null;
-  const topbarBanners = allBanners.filter(b => b.position === 'topbar');
-  const promoBanner = allBanners.find(b => b.position === 'promo') || null;
-  const logoBanner = allBanners.find(b => b.position === 'logo') || null;
+  const featuredProducts =
+    featuredCandidates.length >= 4
+      ? featuredCandidates.slice(0, 4)
+      : allProducts.slice(0, 4);
 
-  const backendBase = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api/v1').replace(/\/api\/v1\/?$/, '');
-  const resolveImg = (url) => {
-    if (!url) return null;
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
-    if (url.startsWith('/static/')) return `${backendBase}${url}`;
+  // -----------------------------------------------------------
+  // Content records and admin-managed banners.
+  // Supports multiple response shapes from the banners API.
+  // -----------------------------------------------------------
+
+  const allBanners = Array.isArray(heroBannerRes)
+    ? heroBannerRes
+    : Array.isArray(heroBannerRes?.banners)
+      ? heroBannerRes.banners
+      : Array.isArray(heroBannerRes?.data?.banners)
+        ? heroBannerRes.data.banners
+        : Array.isArray(heroBannerRes?.assets)
+          ? heroBannerRes.assets
+          : [];
+
+  // Normalize banner placement names.
+  // Example: "BACKGROUND IMG" becomes "background_img".
+  const getBannerPosition = (banner) =>
+    String(
+      banner?.position ??
+      banner?.placement ??
+      banner?.role ??
+      banner?.asset_type ??
+      banner?.type ??
+      ''
+    )
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, '_');
+
+  // Support different possible banner image field names.
+  const getBannerImage = (banner) => {
+    const candidates = [
+      banner?.image_url,
+      banner?.asset_url,
+      banner?.file_url,
+      banner?.image,
+      banner?.url,
+      banner?.path,
+      banner?.asset?.url,
+      banner?.file?.url,
+    ];
+
+    for (const candidate of candidates) {
+      if (
+        typeof candidate === 'string' &&
+        candidate.trim()
+      ) {
+        return candidate.trim();
+      }
+
+      if (
+        candidate &&
+        typeof candidate === 'object'
+      ) {
+        const nested =
+          candidate.url ??
+          candidate.path ??
+          candidate.src;
+
+        if (
+          typeof nested === 'string' &&
+          nested.trim()
+        ) {
+          return nested.trim();
+        }
+      }
+    }
+
+    return '';
+  };
+
+  // Ignore disabled banners.
+  const isBannerActive = (banner) => {
+    if (
+      banner?.is_active === false ||
+      banner?.active === false
+    ) {
+      return false;
+    }
+
+    const status = String(
+      banner?.status ?? ''
+    )
+      .trim()
+      .toLowerCase();
+
+    return ![
+      'inactive',
+      'disabled',
+      'draft',
+      'archived',
+    ].includes(status);
+  };
+
+  const activeBanners = allBanners.filter(isBannerActive);
+
+  const positionIs = (banner, values) =>
+    values.includes(getBannerPosition(banner));
+
+  // Standard hero content banner.
+  const heroBanner =
+    activeBanners.find((banner) =>
+      positionIs(banner, [
+        'hero',
+        'hero_banner',
+        'hero_section',
+      ])
+    ) || null;
+
+  // Top announcement banners.
+  const topbarBanners = activeBanners.filter((banner) =>
+    positionIs(banner, [
+      'topbar',
+      'top_bar',
+      'top_announcement',
+      'announcement',
+    ])
+  );
+
+  // Promotional ribbon.
+  const promoBanner =
+    activeBanners.find((banner) =>
+      positionIs(banner, [
+        'promo',
+        'promo_ribbon',
+        'promotional_ribbon',
+        'promotional_banner',
+      ])
+    ) || null;
+
+  // Logo or brand image.
+  const logoBanner =
+    activeBanners.find((banner) =>
+      positionIs(banner, [
+        'logo',
+        'brand_logo',
+        'site_logo',
+      ])
+    ) || null;
+
+  // -----------------------------------------------------------
+  // Image URL resolver.
+  //
+  // Keep uploaded /static paths relative to the public website.
+  // The Next.js rewrite should forward /static/* to Flask.
+  // This avoids exposing internal Docker service URLs.
+  // -----------------------------------------------------------
+
+  const resolveImg = (value) => {
+    if (
+      !value ||
+      typeof value !== 'string'
+    ) {
+      return null;
+    }
+
+    const url = value.trim();
+
+    if (!url) {
+      return null;
+    }
+
+    if (/^https?:\/\//i.test(url)) {
+      try {
+        const parsed = new URL(url);
+
+        // Uploaded static media should use the storefront origin.
+        if (parsed.pathname.startsWith('/static/')) {
+          return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+        }
+      } catch {
+        return null;
+      }
+
+      return url;
+    }
+
+    if (url.startsWith('static/')) {
+      return `/${url}`;
+    }
+
+    if (url.startsWith('/static/')) {
+      return url;
+    }
+
     return url;
   };
 
-  // Collect all active hero background slides (hero_bg and hero banners with uploaded images)
-  const bgBanners = allBanners.filter(b => b.position === 'hero_bg' || (b.position === 'hero' && b.image_url));
+  // Accepted hero background placement names.
+  const backgroundPositions = [
+    'hero_bg',
+    'hero_background',
+    'hero_background_image',
+    'background_img',
+    'background_image',
+    'background',
+    'bg_image',
+    'site_background',
+  ];
+
+  // Select active background banners.
+  const bgBanners = activeBanners.filter((banner) => {
+    const position = getBannerPosition(banner);
+    const hasImage = Boolean(getBannerImage(banner));
+
+    return (
+      backgroundPositions.includes(position) ||
+      (
+        positionIs(banner, [
+          'hero',
+          'hero_banner',
+          'hero_section',
+        ]) &&
+        hasImage
+      )
+    );
+  });
+
   const dynamicHeroSlides = bgBanners
-    .map(b => resolveImg(b.image_url))
+    .map((banner) =>
+      resolveImg(getBannerImage(banner))
+    )
     .filter(Boolean);
 
-  // Section / Site background image (bg_image)
-  const siteBgBanner = allBanners.find(b => b.position === 'bg_image');
-  const siteBgUrl = resolveImg(siteBgBanner?.image_url);
+  // Optional site-wide background image.
+  const siteBgBanner =
+    activeBanners.find((banner) =>
+      positionIs(banner, [
+        'site_background',
+        'bg_image',
+        'page_background',
+      ])
+    ) || null;
 
-  const logoUrl = resolveImg(logoBanner?.image_url) || '/swami-guruji-logo-cropped.jpg';
+  const siteBgUrl = resolveImg(
+    getBannerImage(siteBgBanner)
+  );
+
+  // Logo fallback.
+  const logoUrl =
+    resolveImg(getBannerImage(logoBanner)) ||
+    '/swami-guruji-logo-cropped.jpg';
+
+  // First admin-managed hero background image.
   const heroBgUrl = dynamicHeroSlides[0] || null;
+
+  // -----------------------------------------------------------
+  // Normalize fetched API responses.
+  // -----------------------------------------------------------
 
   const categories = categoriesRes?.categories || [];
   const pujaServices = pujaRes?.puja_services || [];
   const testimonials = testimonialsRes?.testimonials || [];
   const articles = articlesRes?.articles || [];
-  const guruji = gurujiRes?.guruji || gurujiRes || null;
-  const siteText = siteTextRes?.site_text || siteTextRes || {};
 
-  const topbarContactLink = siteText?.hero_section?.whatsapp_url || siteText?.footer_section?.whatsapp_url || 'https://wa.me/919623117545';
-  const topbarContactText = siteText?.hero_section?.contact_text || 'Talk to Guruji';
+  const guruji =
+    gurujiRes?.guruji ||
+    gurujiRes ||
+    null;
 
-  // Dynamic sections configuration lookup
+  const siteText =
+    siteTextRes?.site_text ||
+    siteTextRes ||
+    {};
+
+  const topbarContactLink =
+    siteText?.hero_section?.whatsapp_url ||
+    siteText?.footer_section?.whatsapp_url ||
+    'https://wa.me/919623117545';
+
+  const topbarContactText =
+    siteText?.hero_section?.contact_text ||
+    'Talk to Guruji';
+
+  // -----------------------------------------------------------
+  // Dynamic homepage section configuration.
+  // -----------------------------------------------------------
+
   const sectionsData = sectionsRes?.sections || [];
+
   const SECTION_COMPONENTS = {
-    categories: <CategorySection key="categories" categories={categories} headerText={siteText.category_section} />,
-    featured: <FeaturedSection key="featured" products={featuredProducts} headerText={siteText.featured_section} />,
-    puja: <PujaSection key="puja" services={pujaServices} headerText={siteText.puja_section} />,
-    jyotish: <JyotishSection key="jyotish" sectionText={siteText.jyotish_section} />,
-    rudraksha: <RudrakshaSection key="rudraksha" products={rudrakshaProducts} headerText={siteText.rudraksha_section} />,
-    ratna: <RatnaSection key="ratna" products={ratnaProducts} headerText={siteText.ratna_section} />,
-    yantra: <YantraSection key="yantra" products={yantraProducts} headerText={siteText.yantra_section} />,
-    bracelets: <BraceletsSection key="bracelets" products={braceletsProducts} headerText={siteText.bracelets_section} />,
-    puja_samagri: <PujaSamagriSection key="puja_samagri" products={pujaSamagriProducts} headerText={siteText.puja_samagri_section} />,
-    ads_banner: <AdBannerSection key="ads_banner" position="home_mid" />,
-    video: <VideoSection key="video" sectionText={siteText.video_section} />,
-    why: <WhySection key="why" sectionText={siteText.why_section} />,
-    about: <AboutSection key="about" guruji={guruji} />,
-    testimonials: <TestimonialsSection key="testimonials" testimonials={testimonials} headerText={siteText.testimonials_section} />,
-    blog: <BlogSection key="blog" articles={articles} headerText={siteText.blog_section} />,
+    categories: (
+      <CategorySection
+        key="categories"
+        categories={categories}
+        headerText={siteText.category_section}
+      />
+    ),
+
+    featured: (
+      <FeaturedSection
+        key="featured"
+        products={featuredProducts}
+        headerText={siteText.featured_section}
+      />
+    ),
+
+    puja: (
+      <PujaSection
+        key="puja"
+        services={pujaServices}
+        headerText={siteText.puja_section}
+      />
+    ),
+
+    jyotish: (
+      <JyotishSection
+        key="jyotish"
+        sectionText={siteText.jyotish_section}
+      />
+    ),
+
+    rudraksha: (
+      <RudrakshaSection
+        key="rudraksha"
+        products={rudrakshaProducts}
+        headerText={siteText.rudraksha_section}
+      />
+    ),
+
+    ratna: (
+      <RatnaSection
+        key="ratna"
+        products={ratnaProducts}
+        headerText={siteText.ratna_section}
+      />
+    ),
+
+    yantra: (
+      <YantraSection
+        key="yantra"
+        products={yantraProducts}
+        headerText={siteText.yantra_section}
+      />
+    ),
+
+    bracelets: (
+      <BraceletsSection
+        key="bracelets"
+        products={braceletsProducts}
+        headerText={siteText.bracelets_section}
+      />
+    ),
+
+    puja_samagri: (
+      <PujaSamagriSection
+        key="puja_samagri"
+        products={pujaSamagriProducts}
+        headerText={siteText.puja_samagri_section}
+      />
+    ),
+
+    ads_banner: (
+      <AdBannerSection
+        key="ads_banner"
+        position="home_mid"
+      />
+    ),
+
+    video: (
+      <VideoSection
+        key="video"
+        sectionText={siteText.video_section}
+      />
+    ),
+
+    why: (
+      <WhySection
+        key="why"
+        sectionText={siteText.why_section}
+      />
+    ),
+
+    about: (
+      <AboutSection
+        key="about"
+        guruji={guruji}
+      />
+    ),
+
+    testimonials: (
+      <TestimonialsSection
+        key="testimonials"
+        testimonials={testimonials}
+        headerText={siteText.testimonials_section}
+      />
+    ),
+
+    blog: (
+      <BlogSection
+        key="blog"
+        articles={articles}
+        headerText={siteText.blog_section}
+      />
+    ),
   };
 
   const DEFAULT_SEQUENCE = [
-    'categories', 'featured', 'puja', 'jyotish', 'rudraksha',
-    'ratna', 'yantra', 'bracelets', 'puja_samagri', 'ads_banner',
-    'video', 'why', 'about', 'testimonials', 'blog',
+    'categories',
+    'featured',
+    'puja',
+    'jyotish',
+    'rudraksha',
+    'ratna',
+    'yantra',
+    'bracelets',
+    'puja_samagri',
+    'ads_banner',
+    'video',
+    'why',
+    'about',
+    'testimonials',
+    'blog',
   ];
+
+  // -----------------------------------------------------------
+  // Homepage render.
+  // -----------------------------------------------------------
 
   return (
     <>
-      <TopBar banners={topbarBanners} contactLink={topbarContactLink} contactText={topbarContactText} />
+      <TopBar
+        banners={topbarBanners}
+        contactLink={topbarContactLink}
+        contactText={topbarContactText}
+      />
+
       <Navbar logo={logoUrl} />
+
       <PromoRibbon banner={promoBanner} />
+
       <main>
-        <Hero banner={heroBanner} bgImage={heroBgUrl} bgSlides={dynamicHeroSlides} secBtn={siteText.hero_section} />
-        <div 
+        <Hero
+          banner={heroBanner}
+          bgImage={heroBgUrl}
+          bgSlides={dynamicHeroSlides}
+          secBtn={siteText.hero_section}
+        />
+
+        <div
           className="post-hero"
-          style={siteBgUrl ? {
-            backgroundImage: `radial-gradient(ellipse at center, rgba(16,12,8,0.88), rgba(16,12,8,0.98)), url(${siteBgUrl})`,
-            backgroundAttachment: 'fixed',
-            backgroundSize: 'cover',
-          } : undefined}
+          style={
+            siteBgUrl
+              ? {
+                  backgroundImage:
+                    `radial-gradient(ellipse at center, rgba(16,12,8,0.88), rgba(16,12,8,0.98)), url(${siteBgUrl})`,
+                  backgroundAttachment: 'fixed',
+                  backgroundSize: 'cover',
+                }
+              : undefined
+          }
         >
           {sectionsData.length > 0
             ? sectionsData
-                .filter(s => s.enabled !== false)
-                .map(s => SECTION_COMPONENTS[s.key] || null)
-            : DEFAULT_SEQUENCE.map(key => SECTION_COMPONENTS[key] || null)
-          }
+                .filter((section) => section.enabled !== false)
+                .map(
+                  (section) =>
+                    SECTION_COMPONENTS[section.key] || null
+                )
+            : DEFAULT_SEQUENCE.map(
+                (key) => SECTION_COMPONENTS[key] || null
+              )}
         </div>
       </main>
-      <Footer logo={logoUrl} footerText={siteText.footer_section} />
+
+      <Footer
+        logo={logoUrl}
+        footerText={siteText.footer_section}
+      />
+
       <WhatsAppFloat />
+
       <ScrollToTop />
     </>
   );
