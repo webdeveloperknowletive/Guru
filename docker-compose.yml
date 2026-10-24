@@ -1,29 +1,32 @@
 
 services:
   # 1. Next.js storefront
-  frontend:
-    build:
-      context: ./astroveda
-      dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_API_BASE_URL: /api/v1
-        BACKEND_INTERNAL_URL: http://backend:5000
-    image: astroveda-storefront:latest
-    restart: unless-stopped
 
-    expose:
-      - "3000"
-
-    environment:
-      NODE_ENV: production
-      PORT: "3000"
-      HOSTNAME: "0.0.0.0"
-      BACKEND_INTERNAL_URL: http://backend:5000
+frontend:
+  build:
+    context: ./astroveda
+    dockerfile: Dockerfile
+    args:
       NEXT_PUBLIC_API_BASE_URL: /api/v1
+      BACKEND_INTERNAL_URL: http://backend:5000
 
-    depends_on:
-      backend:
-        condition: service_healthy
+  image: astroveda-storefront:latest
+  restart: unless-stopped
+
+  expose:
+    - "3000"
+
+  environment:
+    NODE_ENV: production
+    PORT: "3000"
+    HOSTNAME: "0.0.0.0"
+    NEXT_PUBLIC_API_BASE_URL: /api/v1
+    BACKEND_INTERNAL_URL: http://backend:5000
+
+  depends_on:
+    backend:
+      condition: service_healthy
+
 
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
