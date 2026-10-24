@@ -160,11 +160,21 @@
     <div style="display:flex; flex-direction:column; gap:1.25rem;">
       <!-- Shop By Category Grid -->
       <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:8px; padding:1rem;">
-        <strong style="color:var(--saffron-600); font-size:0.9rem; display:block; margin-bottom:0.5rem;">Category Navigation Grid</strong>
-        <div style="display:grid; grid-template-columns:1fr 2fr 3fr; gap:0.75rem;">
+        <strong style="color:var(--saffron-600); font-size:0.9rem; display:block; margin-bottom:0.5rem;">Category Navigation Grid (The Right Choice for You)</strong>
+        <div style="display:grid; grid-template-columns:1fr 2fr 3fr; gap:0.75rem; margin-bottom:0.6rem;">
           <input type="text" name="cat_kicker" class="form-control" value="{{ texts.category_section.kicker }}" placeholder="Shop by Category">
           <input type="text" name="cat_title" class="form-control" value="{{ texts.category_section.title }}" placeholder="The Right Choice for You">
           <input type="text" name="cat_subtitle" class="form-control" value="{{ texts.category_section.subtitle }}" placeholder="Subtitle / Description">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:0.25rem;">View All Button Text</label>
+            <input type="text" name="cat_btn_text" class="form-control" value="{{ texts.category_section.btn_text or 'View All' }}" placeholder="View All">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:0.25rem;">Collapse Button Text</label>
+            <input type="text" name="cat_collapse_text" class="form-control" value="{{ texts.category_section.collapse_text or 'Show 4 Even Cards' }}" placeholder="Show 4 Even Cards">
+          </div>
         </div>
       </div>
 

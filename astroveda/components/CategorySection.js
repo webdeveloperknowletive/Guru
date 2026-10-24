@@ -113,7 +113,9 @@ export default function CategorySection({ categories: initialCategories, headerT
                   setSelectedSection(nextState ? 'all' : 'even');
                 }}
               >
-                {showAll ? 'Show 4 Even Cards' : `View All (${categories.length}) →`}
+                {showAll
+                  ? (headerText?.collapse_text || 'Show 4 Even Cards')
+                  : `${headerText?.btn_text || 'View All'} (${categories.length}) →`}
               </button>
             )}
           </div>

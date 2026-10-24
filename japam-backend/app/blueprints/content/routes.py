@@ -957,6 +957,8 @@ def site_text_page():
         cat["kicker"] = f.get("cat_kicker", cat.get("kicker", "Shop by Category")).strip()
         cat["title"] = f.get("cat_title", cat.get("title", "The Right Choice for You")).strip()
         cat["subtitle"] = f.get("cat_subtitle", cat.get("subtitle", "")).strip()
+        cat["btn_text"] = f.get("cat_btn_text", cat.get("btn_text", "View All")).strip()
+        cat["collapse_text"] = f.get("cat_collapse_text", cat.get("collapse_text", "Show 4 Even Cards")).strip()
         current_texts["category_section"] = cat
 
         # 6. Featured Section

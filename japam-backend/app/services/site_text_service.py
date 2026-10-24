@@ -66,6 +66,8 @@ DEFAULT_SITE_TEXTS = {
         "kicker": "Shop by Category",
         "title": "The Right Choice for You",
         "subtitle": "Every category is traditionally curated — with astrological guidance, from certified sources.",
+        "btn_text": "View All",
+        "collapse_text": "Show 4 Even Cards",
     },
     "featured_section": {
         "kicker": "Featured",
