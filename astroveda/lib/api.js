@@ -3,10 +3,25 @@
  * Handles base URL configuration, timeouts, error normalization, and response serialization.
  */
 
-const API_BASE_URL =
-  typeof window !== 'undefined'
-    ? '/api/v1'
-    : (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api/v1');
+
+const API_BASE_URL = (() => {
+  // Browser requests go through Next.js rewrites.
+  if (typeof window !== 'undefined') {
+    return '/api/v1';
+  }
+
+  // Server-side requests must use an absolute URL.
+  const backend = (
+    process.env.BACKEND_INTERNAL_URL ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    'http://backend:5000'
+  )
+    .replace(/\/+$/, '')
+    .replace(/\/api\/v1$/, '');
+
+  return `${backend}/api/v1`;
+})();
+
 
 const DEFAULT_TIMEOUT_MS = 10000;
 
