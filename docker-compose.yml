@@ -74,14 +74,13 @@ services:
       - uploads_data:/app/app/static/uploads
       - uploads_data:/app/uploads
 
+    
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
 
-    healthcheck:
-   
     healthcheck:
       test:
         - CMD
