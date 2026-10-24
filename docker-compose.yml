@@ -1,3 +1,85 @@
+
+services:
+  # 1. Next.js storefront
+  frontend:
+    build:
+      context: ./astroveda
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: /api/v1
+        BACKEND_INTERNAL_URL: http://backend:5000
+
+    image: astroveda-storefront:latest
+    restart: unless-stopped
+
+    expose:
+      - "3000"
+
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+      NEXT_PUBLIC_API_BASE_URL: /api/v1
+      BACKEND_INTERNAL_URL: http://backend:5000
+
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1024M
+
+    networks:
+      - app_net
+
+  # 2. Flask API and admin
+  backend:
+    build:
+      context: ./japam-backend
+      dockerfile: Dockerfile
+
+    image: japam-backend:latest
+    restart: unless-stopped
+
+    expose:
+      - "5000"
+
+    environment:
+      FLASK_ENV: production
+      PORT: "5000"
+      DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER:?Set_POSTGRES_USER_in_Coolify}:${POSTGRES_PASSWORD:?Set_POSTGRES_PASSWORD_in_Coolify}@postgres:5432/${POSTGRES_DB:?Set_POSTGRES_DB_in_Coolify}"
+      REDIS_URL: redis://redis:6379/0
+
+      SECRET_KEY: ${SECRET_KEY:?Set_SECRET_KEY_in_Coolify}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set_JWT_SECRET_KEY_in_Coolify}
+      CSRF_SECRET_KEY: ${CSRF_SECRET_KEY:?Set_CSRF_SECRET_KEY_in_Coolify}
+
+      COOKIE_SECURE: "true"
+      COOKIE_SAMESITE: Lax
+      UPLOAD_FOLDER: /app/app/static/uploads
+      TIMEZONE: Asia/Kolkata
+      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:?Set_FRONTEND_ORIGINS_in_Coolify}
+
+    volumes:
+      - uploads_data:/app/app/static/uploads
+      - uploads_data:/app/uploads
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
     healthcheck:
       test:
         - CMD
@@ -8,20 +90,26 @@
       timeout: 10s
       retries: 5
       start_period: 25s
+
     deploy:
       resources:
         limits:
           cpus: "1.50"
           memory: 1024M
 
+    networks:
+      - app_net
+
   # 3. Background worker
   worker:
     build:
       context: ./japam-backend
       dockerfile: Dockerfile
+
     image: japam-worker:latest
     command: ["python", "worker.py"]
     restart: unless-stopped
+
     environment:
       FLASK_ENV: production
       DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER:?Set_POSTGRES_USER_in_Coolify}:${POSTGRES_PASSWORD:?Set_POSTGRES_PASSWORD_in_Coolify}@postgres:5432/${POSTGRES_DB:?Set_POSTGRES_DB_in_Coolify}"
@@ -31,30 +119,39 @@
       CSRF_SECRET_KEY: ${CSRF_SECRET_KEY:?Set_CSRF_SECRET_KEY_in_Coolify}
       UPLOAD_FOLDER: /app/app/static/uploads
       TIMEZONE: Asia/Kolkata
+
     volumes:
       - uploads_data:/app/app/static/uploads
       - uploads_data:/app/uploads
+
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+
     deploy:
       resources:
         limits:
           cpus: "0.50"
           memory: 512M
 
+    networks:
+      - app_net
+
   # 4. PostgreSQL database
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?Set_POSTGRES_USER_in_Coolify}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set_POSTGRES_PASSWORD_in_Coolify}
       POSTGRES_DB: ${POSTGRES_DB:?Set_POSTGRES_DB_in_Coolify}
+
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
     healthcheck:
       test:
         - CMD-SHELL
@@ -63,16 +160,21 @@
       timeout: 5s
       retries: 5
       start_period: 10s
+
     deploy:
       resources:
         limits:
           cpus: "1.00"
           memory: 1024M
 
+    networks:
+      - app_net
+
   # 5. Redis
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+
     command:
       - redis-server
       - --appendonly
@@ -81,18 +183,24 @@
       - 256mb
       - --maxmemory-policy
       - volatile-lru
+
     volumes:
       - redis_data:/data
+
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
+
     deploy:
       resources:
         limits:
           cpus: "0.50"
           memory: 384M
+
+    networks:
+      - app_net
 
 volumes:
   postgres_data:
@@ -101,3 +209,7 @@ volumes:
     driver: local
   uploads_data:
     driver: local
+
+networks:
+  app_net:
+    driver: bridge
