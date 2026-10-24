@@ -1,32 +1,30 @@
 
 services:
   # 1. Next.js storefront
+  frontend:
+    build:
+      context: ./astroveda
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: /api/v1
+        BACKEND_INTERNAL_URL: http://backend:5000
 
-frontend:
-  build:
-    context: ./astroveda
-    dockerfile: Dockerfile
-    args:
+    image: astroveda-storefront:latest
+    restart: unless-stopped
+
+    expose:
+      - "3000"
+
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
       NEXT_PUBLIC_API_BASE_URL: /api/v1
       BACKEND_INTERNAL_URL: http://backend:5000
 
-  image: astroveda-storefront:latest
-  restart: unless-stopped
-
-  expose:
-    - "3000"
-
-  environment:
-    NODE_ENV: production
-    PORT: "3000"
-    HOSTNAME: "0.0.0.0"
-    NEXT_PUBLIC_API_BASE_URL: /api/v1
-    BACKEND_INTERNAL_URL: http://backend:5000
-
-  depends_on:
-    backend:
-      condition: service_healthy
-
+    depends_on:
+      backend:
+        condition: service_healthy
 
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
@@ -41,11 +39,15 @@ frontend:
           cpus: "1.00"
           memory: 1024M
 
+    networks:
+      - app_net
+
   # 2. Flask API and admin
   backend:
     build:
       context: ./japam-backend
       dockerfile: Dockerfile
+
     image: japam-backend:latest
     restart: unless-stopped
 
@@ -99,11 +101,15 @@ frontend:
           cpus: "1.50"
           memory: 1024M
 
+    networks:
+      - app_net
+
   # 3. Background worker
   worker:
     build:
       context: ./japam-backend
       dockerfile: Dockerfile
+
     image: japam-worker:latest
     command: ["python", "worker.py"]
     restart: unless-stopped
@@ -138,6 +144,9 @@ frontend:
           cpus: "0.50"
           memory: 512M
 
+    networks:
+      - app_net
+
   # 4. PostgreSQL database
   postgres:
     image: postgres:16-alpine
@@ -165,6 +174,9 @@ frontend:
         limits:
           cpus: "1.00"
           memory: 1024M
+
+    networks:
+      - app_net
 
   # 5. Redis
   redis:
@@ -195,6 +207,9 @@ frontend:
           cpus: "0.50"
           memory: 384M
 
+    networks:
+      - app_net
+
 volumes:
   postgres_data:
     driver: local
@@ -202,3 +217,7 @@ volumes:
     driver: local
   uploads_data:
     driver: local
+
+networks:
+  app_net:
+    driver: bridge
