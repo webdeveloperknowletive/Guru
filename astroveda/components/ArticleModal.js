@@ -43,8 +43,7 @@ export default function ArticleModal() {
   const dateStr = article?.created_at ? new Date(article.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
 
   const backendBase = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api/v1').replace(/\/api\/v1\/?$/, '');
-  const rawCover = article?.cover_image || article?.image;
-  const coverImg = rawCover ? (rawCover.startsWith('/static/') ? `${backendBase}${rawCover}` : rawCover) : null;
+  const coverImg = rawCover ? rawCover : null;
 
   return (
     <div

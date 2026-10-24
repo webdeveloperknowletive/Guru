@@ -277,6 +277,21 @@
       </div>
     </div>
 
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; margin-bottom:1rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Video Pill Title</label>
+        <input type="text" name="testi_video_pill" class="form-control" value="{{ texts.testimonials_section.video_pill or 'थेट व्हिडिओ अनुभव (Authentic Video Experiences)' }}">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Video Hint Text</label>
+        <input type="text" name="testi_video_hint" class="form-control" value="{{ texts.testimonials_section.video_hint or 'व्हिडिओ पाहण्यासाठी कार्डवर टॅप करा' }}">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Written Reviews Pill Title</label>
+        <input type="text" name="testi_written_pill" class="form-control" value="{{ texts.testimonials_section.written_pill or 'प्रमाणित भाविकांचे अभिप्राय (Verified Client Reviews)' }}">
+      </div>
+    </div>
+
     <div style="display:grid; grid-template-columns:1fr 2fr 3fr; gap:1rem;">
       <div class="form-group" style="margin-bottom:0;">
         <label class="form-label">Blog Kicker</label>

@@ -1,19 +1,35 @@
 {% extends "base.html" %}
 
-{% block title %}Devotee Testimonials{% endblock %}
+{% block title %}Devotee Testimonials & Video Reviews{% endblock %}
 
 {% block content %}
 <div class="page-header-row">
   <div>
-    <h1 class="page-title">Devotee Testimonials</h1>
-    <p class="page-subtitle">Genuine experiences and blessings shared by devotees worldwide.</p>
+    <h1 class="page-title">Devotee Testimonials & Video Reviews</h1>
+    <p class="page-subtitle">Manage authentic devotee experiences, video reviews, and written blessings for the storefront.</p>
   </div>
-  <div class="page-header-actions">
-    <button type="button" class="btn-primary" onclick="openModal('addTestimonialModal')">
+  <div class="page-header-actions" style="display:flex; gap:10px; align-items:center;">
+    <button type="button" class="btn-primary" onclick="openAddModal(true)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
-      Add Testimonial
+      + Add Video Review
+    </button>
+    <button type="button" class="btn-secondary" onclick="openAddModal(false)">
+      + Add Written Review
     </button>
   </div>
+</div>
+
+<!-- Filter Tabs -->
+<div style="display:flex; gap:10px; margin-bottom:16px;">
+  <button type="button" class="btn-secondary active-filter" id="filter-all" onclick="filterTable('all')">
+    All Testimonials ({{ testimonials|length }})
+  </button>
+  <button type="button" class="btn-secondary" id="filter-video" onclick="filterTable('video')">
+    📹 Video Reviews ({{ testimonials|selectattr('is_video')|list|length }})
+  </button>
+  <button type="button" class="btn-secondary" id="filter-written" onclick="filterTable('written')">
+    ✍ Written Reviews ({{ testimonials|rejectattr('is_video')|list|length }})
+  </button>
 </div>
 
 <div class="dashboard-card">
@@ -21,37 +37,67 @@
     <table class="spiritual-table">
       <thead>
         <tr>
+          <th style="width:70px;">Order</th>
+          <th>Type</th>
           <th>Devotee Name & City</th>
           <th>Rating</th>
-          <th>Puja / Service</th>
-          <th>Blessing & Experience</th>
+          <th>Service / Role</th>
+          <th>Blessing / Quote</th>
           <th>Status</th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody>
         {% for t in testimonials %}
-        <tr>
+        <tr class="testi-row" data-type="{{ 'video' if (t.is_video or t.video_url) else 'written' }}">
+          <td style="font-weight:700; color:var(--text-muted);">#{{ t.sort_order }}</td>
           <td>
-            <div style="font-weight:600;">{{ t.devotee_name }}</div>
-            <div style="font-size:0.75rem; color:var(--text-muted);">{{ t.devotee_city or 'India' }}</div>
+            {% if t.is_video or t.video_url %}
+              <span class="badge" style="background:rgba(217, 119, 6, 0.15); color:#b45309; border:1px solid rgba(217, 119, 6, 0.3); font-weight:700;">
+                📹 Video ({{ t.duration or '0:30' }})
+              </span>
+              {% if t.badge %}
+                <div style="font-size:0.7rem; color:var(--text-muted); margin-top:3px;">{{ t.badge }}</div>
+              {% endif %}
+            {% else %}
+              <span class="badge" style="background:rgba(59, 130, 246, 0.12); color:#2563eb; border:1px solid rgba(59, 130, 246, 0.25); font-weight:600;">
+                ✍ Written
+              </span>
+            {% endif %}
+          </td>
+          <td>
+            <div style="display:flex; align-items:center; gap:8px;">
+              {% if t.poster_url %}
+                <img src="{{ t.poster_url }}" alt="{{ t.devotee_name }}" style="width:34px; height:44px; object-fit:cover; border-radius:6px; border:1px solid rgba(0,0,0,0.1);">
+              {% endif %}
+              <div>
+                <div style="font-weight:700;">{{ t.devotee_name }}</div>
+                <div style="font-size:0.75rem; color:var(--text-muted);">{{ t.devotee_city or 'Maharashtra' }}</div>
+              </div>
+            </div>
           </td>
           <td style="color:#f59e0b; white-space:nowrap;">
             {% for _ in range(t.rating) %}★{% endfor %}
+            <span style="font-size:0.75rem; color:var(--text-muted); margin-left:4px;">{{ t.rating }}.0</span>
           </td>
-          <td style="font-weight:600; color:var(--saffron-700);">{{ t.service_or_product or 'Vedic Puja' }}</td>
-          <td style="line-height:1.4; color:var(--text-secondary); max-width:380px;">
+          <td style="font-weight:600; color:var(--saffron-700);">{{ t.service_or_product or 'Vedic Vidhi' }}</td>
+          <td style="line-height:1.4; color:var(--text-secondary); max-width:320px; font-size:0.85rem;">
             "{{ t.blessing_text }}"
+            {% if t.video_url %}
+              <div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px; font-family:monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                📹 {{ t.video_url }}
+              </div>
+            {% endif %}
           </td>
           <td>
             <span class="badge badge-{{ 'delivered' if t.is_approved else 'pending' }}">
-              {{ 'Approved' if t.is_approved else 'Pending' }}
+              {{ 'Approved' if t.is_approved else 'Hidden' }}
             </span>
           </td>
           <td>
             <div style="display:flex; gap:0.5rem; align-items:center;">
               <button type="button" class="btn-action" title="Edit"
-                onclick='openEditTestimonialModal({{ t.id }}, {{ t.devotee_name|tojson }}, {{ (t.devotee_city or "")|tojson }}, {{ (t.service_or_product or "")|tojson }}, {{ t.rating }}, {{ t.blessing_text|tojson }}, {{ "true" if t.is_approved else "false" }})'>
+                onclick='openEditTestimonialModal({{ t.id }}, {{ t.devotee_name|tojson }}, {{ (t.devotee_city or "")|tojson }}, {{ (t.service_or_product or "")|tojson }}, {{ t.rating }}, {{ t.blessing_text|tojson }}, {{ "true" if t.is_approved else "false" }}, {{ "true" if (t.is_video or t.video_url) else "false" }}, {{ (t.video_url or "")|tojson }}, {{ (t.poster_url or "")|tojson }}, {{ (t.badge or "")|tojson }}, {{ (t.duration or "")|tojson }}, {{ t.sort_order }})'>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
               </button>
               <form action="{{ url_for('content.testimonial_delete', testimonial_id=t.id) }}" method="POST" style="margin:0;" onsubmit="return confirm('Are you sure you want to delete this testimonial?');">
@@ -65,7 +111,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="6" style="text-align:center; padding:30px; color:var(--text-muted);">No testimonials recorded.</td>
+          <td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">No testimonials recorded.</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -75,40 +121,90 @@
 
 <!-- Add Testimonial Modal -->
 <div class="modal-overlay" id="addTestimonialModal">
-  <div class="modal-container">
+  <div class="modal-container" style="max-width:650px;">
     <div class="modal-header">
-      <h3 class="modal-title">Record Devotee Blessing</h3>
+      <h3 class="modal-title" id="addModalTitle">Add Testimonial / Video Review</h3>
       <button type="button" class="modal-close-btn" onclick="closeModal('addTestimonialModal')">&times;</button>
     </div>
     <form action="{{ url_for('content.testimonial_create') }}" method="POST">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <div class="modal-body">
+        
+        <!-- Type Selection Toggle -->
+        <div style="background:rgba(217, 119, 6, 0.08); border:1px solid rgba(217, 119, 6, 0.25); border-radius:10px; padding:12px; margin-bottom:1rem;">
+          <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer; font-weight:700; color:#78350f;">
+            <input type="checkbox" name="is_video" id="add_is_video" value="1" onchange="toggleVideoFields('add', this.checked)">
+            <span>📹 Is Video Review? (व्हिडिओ रिव्ह्यू कार्ड म्हणून दाखवा)</span>
+          </label>
+        </div>
+
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
           <div class="form-group">
-            <label class="form-label">Devotee Name *</label>
-            <input type="text" name="devotee_name" class="form-control" placeholder="e.g. Meera Kulkarni" required>
+            <label class="form-label">Devotee Name (नाव) *</label>
+            <input type="text" name="devotee_name" class="form-control" placeholder="उदा. श्री. विक्रम घोडके" required>
           </div>
           <div class="form-group">
-            <label class="form-label">City / State</label>
-            <input type="text" name="devotee_city" class="form-control" placeholder="Mumbai, MH">
+            <label class="form-label">City / State (शहर / राज्य)</label>
+            <input type="text" name="devotee_city" class="form-control" placeholder="उदा. पुणे / मुंबई">
           </div>
         </div>
+
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
           <div class="form-group">
-            <label class="form-label">Puja / Product</label>
-            <input type="text" name="service_or_product" class="form-control" placeholder="Navagraha Shanti Puja">
+            <label class="form-label">Puja / Role / Designation (हुद्दा किंवा सेवा)</label>
+            <input type="text" name="service_or_product" class="form-control" placeholder="उदा. उद्योगपती, Shirodkar Preci Comp">
           </div>
           <div class="form-group">
-            <label class="form-label">Rating</label>
+            <label class="form-label">Rating (रेटिंग)</label>
             <select name="rating" class="form-control">
-              <option value="5">★★★★★ (5/5)</option>
+              <option value="5" selected>★★★★★ (5/5)</option>
               <option value="4">★★★★☆ (4/5)</option>
+              <option value="3">★★★☆☆ (3/5)</option>
             </select>
           </div>
         </div>
+
+        <!-- Video specific fields -->
+        <div id="add_video_fields" style="display:none; background:#fafaf9; border:1px solid #e7e5e4; border-radius:10px; padding:14px; margin-bottom:1rem;">
+          <div style="font-weight:700; font-size:0.85rem; color:#78350f; margin-bottom:10px;">📹 Video Configuration:</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:10px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">Video URL / File Path *</label>
+              <input type="text" name="video_url" id="add_video_url" class="form-control" placeholder="/videos/testimonials/review-1.mp4">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">Poster Image URL</label>
+              <input type="text" name="poster_url" class="form-control" placeholder="/videos/testimonials/poster-1.jpg">
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">Badge Tag (उदा. उद्योगपती अभिप्राय)</label>
+              <input type="text" name="badge" class="form-control" placeholder="उदा. उद्योगपती अभिप्राय / प्रत्यक्ष अनुभव">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">Duration (कालावधी)</label>
+              <input type="text" name="duration" class="form-control" placeholder="0:33">
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Display Order (क्रमांक)</label>
+            <input type="number" name="sort_order" class="form-control" value="0">
+          </div>
+          <div class="form-group" style="display:flex; align-items:flex-end;">
+            <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; margin-bottom:10px;">
+              <input type="checkbox" name="is_approved" value="1" checked>
+              <span class="form-label" style="margin:0;">Approved / Display on Storefront</span>
+            </label>
+          </div>
+        </div>
+
         <div class="form-group">
-          <label class="form-label">Blessing & Experience *</label>
-          <textarea name="blessing_text" class="form-control" rows="4" placeholder="Words of gratitude, spiritual feeling, or life impact..." required></textarea>
+          <label class="form-label">Blessing & Experience / Quote (अभिप्राय) *</label>
+          <textarea name="blessing_text" class="form-control" rows="3" placeholder="भाविक अनुभव, आभार किंवा पूजेचे सकारात्मक परिणाम..." required></textarea>
         </div>
       </div>
       <div class="modal-footer">
@@ -121,7 +217,7 @@
 
 <!-- Edit Testimonial Modal -->
 <div class="modal-overlay" id="editTestimonialModal">
-  <div class="modal-container">
+  <div class="modal-container" style="max-width:650px;">
     <div class="modal-header">
       <h3 class="modal-title">Edit Devotee Testimonial</h3>
       <button type="button" class="modal-close-btn" onclick="closeModal('editTestimonialModal')">&times;</button>
@@ -129,23 +225,33 @@
     <form id="editTestimonialForm" method="POST">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <div class="modal-body">
+        
+        <!-- Type Selection Toggle -->
+        <div style="background:rgba(217, 119, 6, 0.08); border:1px solid rgba(217, 119, 6, 0.25); border-radius:10px; padding:12px; margin-bottom:1rem;">
+          <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer; font-weight:700; color:#78350f;">
+            <input type="checkbox" name="is_video" id="edit_is_video" value="1" onchange="toggleVideoFields('edit', this.checked)">
+            <span>📹 Is Video Review? (व्हिडिओ रिव्ह्यू कार्ड म्हणून दाखवा)</span>
+          </label>
+        </div>
+
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
           <div class="form-group">
-            <label class="form-label">Devotee Name *</label>
+            <label class="form-label">Devotee Name (नाव) *</label>
             <input type="text" name="devotee_name" id="edit_devotee_name" class="form-control" required>
           </div>
           <div class="form-group">
-            <label class="form-label">City / State</label>
+            <label class="form-label">City / State (शहर / राज्य)</label>
             <input type="text" name="devotee_city" id="edit_devotee_city" class="form-control">
           </div>
         </div>
+
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
           <div class="form-group">
-            <label class="form-label">Puja / Product</label>
+            <label class="form-label">Puja / Role / Designation (हुद्दा किंवा सेवा)</label>
             <input type="text" name="service_or_product" id="edit_service_or_product" class="form-control">
           </div>
           <div class="form-group">
-            <label class="form-label">Rating</label>
+            <label class="form-label">Rating (रेटिंग)</label>
             <select name="rating" id="edit_rating" class="form-control">
               <option value="5">★★★★★ (5/5)</option>
               <option value="4">★★★★☆ (4/5)</option>
@@ -153,15 +259,48 @@
             </select>
           </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Blessing & Experience *</label>
-          <textarea name="blessing_text" id="edit_blessing_text" class="form-control" rows="4" required></textarea>
+
+        <!-- Video specific fields -->
+        <div id="edit_video_fields" style="display:none; background:#fafaf9; border:1px solid #e7e5e4; border-radius:10px; padding:14px; margin-bottom:1rem;">
+          <div style="font-weight:700; font-size:0.85rem; color:#78350f; margin-bottom:10px;">📹 Video Configuration:</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:10px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">Video URL / File Path *</label>
+              <input type="text" name="video_url" id="edit_video_url" class="form-control" placeholder="/videos/testimonials/review-1.mp4">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">Poster Image URL</label>
+              <input type="text" name="poster_url" id="edit_poster_url" class="form-control" placeholder="/videos/testimonials/poster-1.jpg">
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">Badge Tag (उदा. उद्योगपती अभिप्राय)</label>
+              <input type="text" name="badge" id="edit_badge" class="form-control" placeholder="उदा. उद्योगपती अभिप्राय / प्रत्यक्ष अनुभव">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">Duration (कालावधी)</label>
+              <input type="text" name="duration" id="edit_duration" class="form-control" placeholder="0:33">
+            </div>
+          </div>
         </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label class="form-label">Display Order (क्रमांक)</label>
+            <input type="number" name="sort_order" id="edit_sort_order" class="form-control" value="0">
+          </div>
+          <div class="form-group" style="display:flex; align-items:flex-end;">
+            <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; margin-bottom:10px;">
+              <input type="checkbox" name="is_approved" id="edit_is_approved" value="1">
+              <span class="form-label" style="margin:0;">Approved / Display on Storefront</span>
+            </label>
+          </div>
+        </div>
+
         <div class="form-group">
-          <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
-            <input type="checkbox" name="is_approved" id="edit_is_approved" value="1">
-            <span class="form-label" style="margin:0;">Approved / Display on Storefront</span>
-          </label>
+          <label class="form-label">Blessing & Experience / Quote (अभिप्राय) *</label>
+          <textarea name="blessing_text" id="edit_blessing_text" class="form-control" rows="3" required></textarea>
         </div>
       </div>
       <div class="modal-footer">
@@ -173,15 +312,64 @@
 </div>
 
 <script>
-function openEditTestimonialModal(id, name, city, service, rating, text, approved) {
+function toggleVideoFields(prefix, isVideo) {
+  const container = document.getElementById(prefix + '_video_fields');
+  if (container) {
+    container.style.display = isVideo ? 'block' : 'none';
+  }
+}
+
+function openAddModal(isVideo) {
+  document.getElementById('add_is_video').checked = isVideo;
+  toggleVideoFields('add', isVideo);
+  document.getElementById('addModalTitle').innerText = isVideo ? 'Add Video Devotee Review' : 'Add Written Devotee Review';
+  openModal('addTestimonialModal');
+}
+
+function openEditTestimonialModal(id, name, city, service, rating, text, approved, isVideo, videoUrl, posterUrl, badge, duration, sortOrder) {
   document.getElementById('editTestimonialForm').action = '/admin/content/testimonials/' + id + '/edit';
-  document.getElementById('edit_devotee_name').value = name;
-  document.getElementById('edit_devotee_city').value = city;
-  document.getElementById('edit_service_or_product').value = service;
-  document.getElementById('edit_rating').value = rating;
-  document.getElementById('edit_blessing_text').value = text;
+  document.getElementById('edit_devotee_name').value = name || '';
+  document.getElementById('edit_devotee_city').value = city || '';
+  document.getElementById('edit_service_or_product').value = service || '';
+  document.getElementById('edit_rating').value = rating || 5;
+  document.getElementById('edit_blessing_text').value = text || '';
   document.getElementById('edit_is_approved').checked = (approved === true || approved === 'true');
+  
+  const isVid = (isVideo === true || isVideo === 'true');
+  document.getElementById('edit_is_video').checked = isVid;
+  toggleVideoFields('edit', isVid);
+
+  document.getElementById('edit_video_url').value = videoUrl || '';
+  document.getElementById('edit_poster_url').value = posterUrl || '';
+  document.getElementById('edit_badge').value = badge || '';
+  document.getElementById('edit_duration').value = duration || '';
+  document.getElementById('edit_sort_order').value = sortOrder !== undefined ? sortOrder : 0;
+
   openModal('editTestimonialModal');
+}
+
+function filterTable(type) {
+  const rows = document.querySelectorAll('.testi-row');
+  rows.forEach(r => {
+    if (type === 'all') {
+      r.style.display = '';
+    } else {
+      r.style.display = (r.getAttribute('data-type') === type) ? '' : 'none';
+    }
+  });
+
+  ['all', 'video', 'written'].forEach(t => {
+    const btn = document.getElementById('filter-' + t);
+    if (btn) {
+      if (t === type) {
+        btn.style.background = 'var(--saffron-600)';
+        btn.style.color = '#fff';
+      } else {
+        btn.style.background = '';
+        btn.style.color = '';
+      }
+    }
+  });
 }
 </script>
 {% endblock %}

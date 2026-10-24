@@ -389,7 +389,6 @@ export default async function Home() {
     if (url.startsWith('/static/')) {
       return url;
     }
-
     return url;
   };
 

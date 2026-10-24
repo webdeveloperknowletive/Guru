@@ -1267,7 +1267,7 @@ def submit_contact_enquiry():
 @api_v1_bp.route("/content/testimonials", methods=["GET"])
 def get_testimonials():
     """Retrieve approved devotee testimonials for storefront display."""
-    items = Testimonial.query.filter_by(is_approved=True).order_by(Testimonial.created_at.desc()).all()
+    items = Testimonial.query.filter_by(is_approved=True).order_by(Testimonial.sort_order.asc(), Testimonial.created_at.desc()).all()
     results = [
         {
             "id": t.id,
@@ -1277,7 +1277,16 @@ def get_testimonials():
             "service": t.service_or_product,
             "rating": t.rating,
             "text": t.blessing_text,
+            "quote": t.blessing_text,
             "initial": t.devotee_name[0] if t.devotee_name else "A",
+            "is_video": bool(t.is_video or t.video_url),
+            "video_url": t.video_url,
+            "videoSrc": t.video_url,
+            "poster_url": t.poster_url,
+            "poster": t.poster_url,
+            "badge": t.badge or ("व्हिडिओ अनुभव" if t.is_video else None),
+            "duration": t.duration or "0:30",
+            "sort_order": t.sort_order or 0,
             "created_at": t.created_at.isoformat() if t.created_at else None,
         }
         for t in items

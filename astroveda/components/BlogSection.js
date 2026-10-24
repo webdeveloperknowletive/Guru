@@ -29,7 +29,7 @@ const backendBase = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5
 function resolveCoverUrl(url) {
   if (!url) return null;
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  if (url.startsWith('/static/')) return `${backendBase}${url}`;
+  if (url.startsWith('/static/')) return url;
   return url;
 }
 

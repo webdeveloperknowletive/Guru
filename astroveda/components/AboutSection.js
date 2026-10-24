@@ -35,15 +35,13 @@ export default function AboutSection({ guruji }) {
   const buttonText = guruji?.button_text || 'Book Consultation →';
   const buttonUrl = guruji?.button_url || '#jyotish';
 
-  // Photo resolution: handle uploads, external URLs, and local fallback
-  const backendBase = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api/v1').replace(/\/api\/v1\/?$/, '');
   let photo = '/guruji.png';
   const rawPhoto = guruji?.profile_image || guruji?.image_url;
   if (rawPhoto) {
     if (rawPhoto.startsWith('http://') || rawPhoto.startsWith('https://')) {
       photo = rawPhoto;
     } else if (rawPhoto.startsWith('/static/')) {
-      photo = `${backendBase}${rawPhoto}`;
+      photo = rawPhoto;
     } else {
       photo = rawPhoto;
     }

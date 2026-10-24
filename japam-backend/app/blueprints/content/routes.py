@@ -192,7 +192,7 @@ def blog_delete(post_id):
 @permission_required("content", "view")
 def testimonials_list():
     user = get_current_admin()
-    testimonials = Testimonial.query.order_by(Testimonial.created_at.desc()).all()
+    testimonials = Testimonial.query.order_by(Testimonial.sort_order.asc(), Testimonial.created_at.desc()).all()
     return render_template("content/testimonials.html", current_user=user, testimonials=testimonials, active_page="testimonials")
 
 
@@ -206,6 +206,13 @@ def testimonial_create():
     rating = request.form.get("rating", 5, type=int)
     service = request.form.get("service_or_product", "").strip()
     blessing = request.form.get("blessing_text", "").strip()
+    is_video = request.form.get("is_video") == "1" or request.form.get("is_video") == "on"
+    video_url = request.form.get("video_url", "").strip() or None
+    poster_url = request.form.get("poster_url", "").strip() or None
+    badge = request.form.get("badge", "").strip() or None
+    duration = request.form.get("duration", "").strip() or None
+    sort_order = request.form.get("sort_order", 0, type=int)
+    is_approved = request.form.get("is_approved", "1") in ["1", "on", "true", "True"]
 
     if not name or not blessing:
         flash("Devotee name and blessing text are required.", "danger")
@@ -217,7 +224,13 @@ def testimonial_create():
         rating=rating,
         service_or_product=service,
         blessing_text=blessing,
-        is_approved=True,
+        is_video=is_video or bool(video_url),
+        video_url=video_url,
+        poster_url=poster_url,
+        badge=badge,
+        duration=duration,
+        sort_order=sort_order,
+        is_approved=is_approved,
     )
     db.session.add(t)
     db.session.commit()
@@ -236,7 +249,15 @@ def testimonial_update(testimonial_id):
     t.rating = request.form.get("rating", t.rating, type=int)
     t.service_or_product = request.form.get("service_or_product", t.service_or_product).strip()
     t.blessing_text = request.form.get("blessing_text", t.blessing_text).strip()
-    t.is_approved = request.form.get("is_approved") == "1" or request.form.get("is_approved") == "on"
+    is_video = request.form.get("is_video") == "1" or request.form.get("is_video") == "on"
+    video_url = request.form.get("video_url", "").strip() or None
+    t.is_video = is_video or bool(video_url)
+    t.video_url = video_url
+    t.poster_url = request.form.get("poster_url", "").strip() or None
+    t.badge = request.form.get("badge", "").strip() or None
+    t.duration = request.form.get("duration", "").strip() or None
+    t.sort_order = request.form.get("sort_order", t.sort_order, type=int)
+    t.is_approved = request.form.get("is_approved") in ["1", "on", "true", "True"]
     db.session.commit()
 
     AuditService.log(
@@ -246,7 +267,7 @@ def testimonial_update(testimonial_id):
         actor_user_id=user.id,
         entity_type="Testimonial",
         entity_id=str(t.id),
-        details={"name": t.devotee_name, "is_approved": t.is_approved},
+        details={"name": t.devotee_name, "is_approved": t.is_approved, "is_video": t.is_video},
     )
     flash("Testimonial updated.", "success")
     return redirect(url_for("content.testimonials_list"))
@@ -999,6 +1020,9 @@ def site_text_page():
         testi["kicker"] = f.get("testi_kicker", testi.get("kicker", "Testimonials")).strip()
         testi["title"] = f.get("testi_title", testi.get("title", "What Our Clients Say")).strip()
         testi["subtitle"] = f.get("testi_subtitle", testi.get("subtitle", "")).strip()
+        testi["video_pill"] = f.get("testi_video_pill", testi.get("video_pill", "थेट व्हिडिओ अनुभव (Authentic Video Experiences)")).strip()
+        testi["video_hint"] = f.get("testi_video_hint", testi.get("video_hint", "व्हिडिओ पाहण्यासाठी कार्डवर टॅप करा")).strip()
+        testi["written_pill"] = f.get("testi_written_pill", testi.get("written_pill", "प्रमाणित भाविकांचे अभिप्राय (Verified Client Reviews)")).strip()
         current_texts["testimonials_section"] = testi
 
         # 15. Blog Section
