@@ -116,27 +116,56 @@ export function adaptApiProduct(p) {
     ? `${Math.round(((numCompare - numPrice) / numCompare) * 100)}% off`
     : null;
 
-  // Derive SVG or thumbnail visual
+  // Resolve uploaded image URLs for both browser and Next.js rendering.
+  // Same-origin /static paths are intentionally preserved so next.config.mjs
+  // can rewrite them to the Flask backend service.
   let visual = '';
-  const lowerName = (p.name || '').toLowerCase();
-  const catSlug = (typeof p.category === 'object' && p.category?.slug) ? p.category.slug : (p.category || '').toLowerCase();
+  const lowerName = String(p.name || '').toLowerCase();
+  const catSlug = String(
+    (typeof p.category === 'object' && p.category?.slug)
+      ? p.category.slug
+      : (p.category || '')
+  ).toLowerCase();
 
-  const backendBase = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api/v1').replace(/\/api\/v1\/?$/, '');
-  const resolveImg = (url) => {
-    if (!url) return '';
-    let clean = String(url).trim();
-    if (clean.startsWith('http://') || clean.startsWith('https://')) return clean;
-    if (clean.includes('\\') || clean.match(/^[A-Za-z]:/)) {
+  const resolveImg = (value) => {
+    if (!value) return '';
+
+    let clean = typeof value === 'string'
+      ? value.trim()
+      : (value.url || value.image_url || value.path || value.src || '');
+
+    if (typeof clean !== 'string' || !clean.trim()) return '';
+    clean = clean.trim();
+
+    // Convert Windows filesystem paths to the public uploads route.
+    if (clean.includes('\\') || /^[A-Za-z]:/.test(clean)) {
       const filename = clean.split(/[/\\]/).pop();
-      clean = `/static/uploads/products/${filename}`;
+      if (!filename) return '';
+      clean = `/static/uploads/products/${encodeURIComponent(filename)}`;
     }
-    if (clean.startsWith('/static/')) return `${backendBase}${clean}`;
-    return clean;
+
+    // Normalize URLs that accidentally expose internal Docker hostnames.
+    if (/^https?:\/\//i.test(clean)) {
+      try {
+        const parsed = new URL(clean);
+        const internalHosts = new Set(['localhost', '127.0.0.1', 'backend']);
+        if (parsed.pathname.startsWith('/static/') && internalHosts.has(parsed.hostname)) {
+          return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+        }
+      } catch {
+        return '';
+      }
+      return clean;
+    }
+
+    if (clean.startsWith('static/')) clean = `/${clean}`;
+    if (clean.startsWith('/static/')) return clean;
+    return clean.startsWith('/') ? clean : `/${clean}`;
   };
 
-  if (p.thumbnail && p.thumbnail !== '/static/img/product-default.png' && !p.thumbnail.includes('default')) {
-    const src = resolveImg(p.thumbnail);
-    visual = `<img src="${src}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover;border-radius:12px;"/>`;
+  if (p.thumbnail && p.thumbnail !== '/static/img/product-default.png' && !String(p.thumbnail).includes('default')) {
+    // Keep img as a URL/path, not an HTML <img> string. ProductCard renders URLs.
+    visual = resolveImg(p.thumbnail);
   } else if (lowerName.includes('rudraksha') || catSlug.includes('rudraksha')) {
     const m = lowerName.match(/(\d+)\s*mukhi/);
     visual = svgRudraksha(m ? m[1] : 'रु');
@@ -162,37 +191,27 @@ export function adaptApiProduct(p) {
 
   const attrs = p.attributes || {};
 
-  // Build resolved images list for carousel and modal
+  // Build real image URLs for the card carousel and product modal.
+  // Do not invent secondary slides: a single uploaded thumbnail means one slide.
   let rawImagesList = [];
-  if (Array.isArray(p.images) && p.images.length > 0) {
+  if (Array.isArray(p.images)) {
     rawImagesList = [...p.images];
   } else if (typeof p.images === 'string' && p.images.trim()) {
     try {
       const parsed = JSON.parse(p.images);
       if (Array.isArray(parsed)) rawImagesList = parsed;
-    } catch {}
-  }
-
-  if (p.thumbnail && !p.thumbnail.includes('default') && !rawImagesList.includes(p.thumbnail)) {
-    rawImagesList.unshift(p.thumbnail);
-  }
-
-  let resolvedImages = rawImagesList.map(resolveImg).filter(Boolean);
-
-  // If only 1 image, add complementary angle / detail views so user can scroll images in every card
-  if (resolvedImages.length === 1) {
-    if (lowerName.includes('rudraksha') || catSlug.includes('rudraksha')) {
-      resolvedImages.push('/Five-Mukhi Rudraksha in Golden Light-1.png');
-    } else if (lowerName.includes('yantra') || catSlug.includes('yantra')) {
-      resolvedImages.push('/Golden Shri Yantra on an Ivory Altar-2.png');
-    } else if (catSlug.includes('ratna') || catSlug.includes('gemstone') || lowerName.includes('sapphire') || lowerName.includes('emerald') || lowerName.includes('ruby')) {
-      resolvedImages.push("/Gemstones under a jeweler's loupe-3.png");
-    } else {
-      resolvedImages.push('/Shiva lingam ritual water offering-4.png');
+    } catch {
+      // Ignore malformed gallery JSON and rely on the thumbnail.
     }
-  } else if (resolvedImages.length === 0) {
-    resolvedImages = [visual];
   }
+
+  const hasRealThumbnail = Boolean(
+    p.thumbnail && !String(p.thumbnail).toLowerCase().includes('default')
+  );
+  if (hasRealThumbnail) rawImagesList.unshift(p.thumbnail);
+
+  const resolvedImages = [...new Set(rawImagesList.map(resolveImg).filter(Boolean))];
+  if (resolvedImages.length === 0 && visual) resolvedImages.push(visual);
 
   let filterCategory = catSlug;
   if (catSlug.includes('rudraksha') || lowerName.includes('rudraksha')) {
