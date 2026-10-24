@@ -11,6 +11,7 @@ class Category(db.Model):
     slug = db.Column(db.String(120), unique=True, nullable=False, index=True)
     description = db.Column(db.Text, nullable=True)
     icon = db.Column(db.String(100), nullable=True)  # e.g., 'gem', 'sparkles', 'sun', 'box'
+    image_url = db.Column(db.String(500), nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False, index=True)
     sort_order = db.Column(db.Integer, default=0, nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)

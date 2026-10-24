@@ -10,6 +10,10 @@ const defaultCategories = [
 ];
 
 function getCategoryBgImage(cat = {}) {
+  const customImg = cat.image_url || cat.image;
+  if (customImg && typeof customImg === 'string' && customImg.trim()) {
+    return customImg.trim();
+  }
   const s = `${cat.slug || ''} ${cat.name || ''} ${cat.title || ''}`.toLowerCase();
   if (s.includes('rudraksha')) return '/categories/rudraksha.png';
   if (s.includes('ratna') || s.includes('gemstone')) return '/categories/ratna.png';
@@ -30,6 +34,7 @@ export default function CategorySection({ categories: initialCategories, headerT
         title: c.name || c.title,
         desc: c.description || c.desc || 'प्रमाणित स्रोतांकडून आणि शास्त्रोक्त पद्धतीने अभिमंत्रित.',
         slug: c.slug,
+        image_url: c.image_url || c.image || null,
       }))
     : defaultCategories;
 

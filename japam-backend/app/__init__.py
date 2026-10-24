@@ -65,6 +65,19 @@ def create_app(config_name=None) -> Flask:
     migrate.init_app(app, db)
     redis_client.init_app(app)
 
+    with app.app_context():
+        try:
+            from sqlalchemy import inspect, text
+            inspector = inspect(db.engine)
+            if "categories" in inspector.get_table_names():
+                cols = [c["name"] for c in inspector.get_columns("categories")]
+                if "image_url" not in cols:
+                    with db.engine.connect() as conn:
+                        conn.execute(text("ALTER TABLE categories ADD COLUMN image_url VARCHAR(500)"))
+                        conn.commit()
+        except Exception:
+            pass
+
     # Register Blueprints
     from app.blueprints.auth import auth_bp
     from app.blueprints.dashboard import dashboard_bp
@@ -144,6 +157,13 @@ def create_app(config_name=None) -> Flask:
         if os.path.exists(os.path.join(static_img, full_name)):
             return send_from_directory(static_img, full_name)
         return ("Image not found", 404)
+
+    @app.route("/categories/<path:filename>")
+    def serve_category_images(filename):
+        cat_dir = os.path.join(app.root_path, "static", "categories")
+        if os.path.exists(os.path.join(cat_dir, filename)):
+            return send_from_directory(cat_dir, filename)
+        return ("Category image not found", 404)
 
     # Security Headers & CSP
     @app.after_request

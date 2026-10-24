@@ -458,12 +458,18 @@ def category_create():
     name = request.form.get("name", "").strip()
     icon = request.form.get("icon", "box").strip()
     description = request.form.get("description", "").strip()
+    image_url = request.form.get("image_url", "").strip()
+    image_file = request.files.get("image_file") or request.files.get("image") or request.files.get("file")
+    resolved_img = CommerceService.ingest_product_thumbnail(file_obj=image_file, raw_path_or_url=image_url)
+    if resolved_img:
+        image_url = resolved_img
+
     if not name:
         flash("Category name is required.", "danger")
         return redirect(url_for("commerce.categories_list"))
 
     slug = name.lower().replace(" ", "-")
-    cat = Category(name=name, slug=slug, icon=icon, description=description)
+    cat = Category(name=name, slug=slug, icon=icon, description=description, image_url=image_url)
     db.session.add(cat)
     db.session.commit()
 
@@ -490,6 +496,14 @@ def category_update(category_id):
     icon = request.form.get("icon", cat.icon or "box").strip()
     description = request.form.get("description", "").strip()
     is_active = request.form.get("is_active") == "1"
+
+    image_url = request.form.get("image_url", "").strip()
+    image_file = request.files.get("image_file") or request.files.get("image") or request.files.get("file")
+    resolved_img = CommerceService.ingest_product_thumbnail(file_obj=image_file, raw_path_or_url=image_url)
+    if resolved_img:
+        cat.image_url = resolved_img
+    elif "image_url" in request.form:
+        cat.image_url = image_url
 
     if name:
         cat.name = name

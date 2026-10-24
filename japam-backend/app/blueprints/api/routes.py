@@ -235,7 +235,16 @@ def submit_product_review(slug):
 def get_categories():
     categories = Category.query.filter_by(is_active=True).order_by(Category.sort_order.asc()).all()
     results = [
-        {"id": c.id, "name": c.name, "slug": c.slug, "icon": c.icon, "description": c.description}
+        {
+            "id": c.id,
+            "name": c.name,
+            "title": c.name,
+            "slug": c.slug,
+            "icon": c.icon,
+            "description": c.description,
+            "image_url": c.image_url or "",
+            "image": c.image_url or "",
+        }
         for c in categories
     ]
     return jsonify({"categories": results})

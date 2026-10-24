@@ -6,7 +6,7 @@
 <div class="page-header-row">
   <div>
     <h1 class="page-title">Product Categories</h1>
-    <p class="page-subtitle">Organize Ratna, Rudraksha, Yantra, Bracelets, Puja Samagri, and collections.</p>
+    <p class="page-subtitle">Organize Ratna, Rudraksha, Yantra, Bracelets, Puja Samagri, and collections for Shop by Category.</p>
   </div>
   <div class="page-header-actions">
     <button type="button" class="btn-primary" onclick="openModal('addCategoryModal')">
@@ -22,6 +22,7 @@
       <thead>
         <tr>
           <th>Category Name</th>
+          <th>Card Image</th>
           <th>Slug</th>
           <th>Description</th>
           <th>Products Count</th>
@@ -31,10 +32,36 @@
       </thead>
       <tbody>
         {% for cat in categories %}
+        {% set slug_l = (cat.slug or '')|lower %}
+        {% set name_l = (cat.name or '')|lower %}
+        {% set default_img = '' %}
+        {% if 'rudraksha' in slug_l or 'rudraksha' in name_l %}
+          {% set default_img = '/categories/rudraksha.png' %}
+        {% elif 'ratna' in slug_l or 'gemstone' in slug_l or 'ratna' in name_l %}
+          {% set default_img = '/categories/ratna.png' %}
+        {% elif 'yantra' in slug_l or 'yantra' in name_l %}
+          {% set default_img = '/categories/yantra.png' %}
+        {% elif 'bracelet' in slug_l or 'bracelet' in name_l %}
+          {% set default_img = '/categories/bracelets.png' %}
+        {% elif 'puja' in slug_l or 'samagri' in slug_l or 'samagri' in name_l %}
+          {% set default_img = '/categories/puja-samagri.jpg' %}
+        {% elif 'special' in slug_l %}
+          {% set default_img = '/categories/special-collections.jpg' %}
+        {% endif %}
+        {% set display_img = cat.image_url or default_img %}
         <tr>
           <td style="font-weight:600; display:flex; align-items:center; gap:0.5rem;">
             <span style="color:var(--saffron-500);">✦</span>
             {{ cat.name }}
+          </td>
+          <td>
+            <div style="width:48px; height:48px; border-radius:6px; overflow:hidden; background:var(--bg-app); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center;">
+              {% if display_img %}
+                <img src="{{ display_img }}" alt="{{ cat.name }}" style="width:100%; height:100%; object-fit:cover;">
+              {% else %}
+                <span style="font-size:1.2rem;">{{ cat.icon or '📦' }}</span>
+              {% endif %}
+            </div>
           </td>
           <td style="font-family:monospace; color:var(--text-muted); font-size:0.78rem;">{{ cat.slug }}</td>
           <td style="color:var(--text-secondary);">{{ cat.description or '-' }}</td>
@@ -48,7 +75,7 @@
           </td>
           <td>
             <div style="display:flex; gap:0.4rem; align-items:center;">
-              <button type="button" class="btn-action-outline" onclick="openEditCategoryModal({{ cat.id }}, '{{ cat.name|replace('\'', '\\\'') }}', '{{ (cat.icon or 'box')|replace('\'', '\\\'') }}', '{{ (cat.description or '')|replace('\'', '\\\'') }}', {{ 'true' if cat.is_active else 'false' }})">Edit</button>
+              <button type="button" class="btn-action-outline" onclick="openEditCategoryModal({{ cat.id }}, '{{ cat.name|replace('\'', '\\\'') }}', '{{ (cat.icon or 'box')|replace('\'', '\\\'') }}', '{{ (cat.description or '')|replace('\'', '\\\'') }}', {{ 'true' if cat.is_active else 'false' }}, '{{ (cat.image_url or '')|replace('\'', '\\\'') }}', '{{ (default_img or '')|replace('\'', '\\\'') }}')">Edit</button>
               <form action="{{ url_for('commerce.category_delete', category_id=cat.id) }}" method="POST" onsubmit="return confirm('Delete category {{ cat.name|replace('\'', '\\\'') }}?')">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <button type="submit" class="btn-action-outline" style="color:var(--status-red-text); border-color:#fca5a5;">Delete</button>
@@ -58,7 +85,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="6" style="text-align:center; padding:30px; color:var(--text-muted);">No categories available.</td>
+          <td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted);">No categories available.</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -73,12 +100,20 @@
       <h3 class="modal-title">Create Sacred Category</h3>
       <button type="button" class="modal-close" onclick="closeModal('addCategoryModal')">&times;</button>
     </div>
-    <form action="{{ url_for('commerce.category_create') }}" method="POST">
+    <form action="{{ url_for('commerce.category_create') }}" method="POST" enctype="multipart/form-data">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label">Category Name *</label>
           <input type="text" name="name" class="form-control" placeholder="e.g. Energized Yantras" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category Image / Card Background</label>
+          <div style="display:flex; flex-direction:column; gap:0.5rem;">
+            <input type="file" name="image_file" class="form-control" accept="image/*">
+            <input type="text" name="image_url" class="form-control" placeholder="Or enter image URL / static path (e.g. /categories/rudraksha.png)">
+          </div>
+          <small style="color:var(--text-muted); font-size:0.75rem;">This image is displayed on the card in the "Shop by Category" section on the storefront.</small>
         </div>
         <div class="form-group">
           <label class="form-label">Icon (Emoji or Identifier)</label>
@@ -104,12 +139,28 @@
       <h3 class="modal-title">Edit Sacred Category</h3>
       <button type="button" class="modal-close" onclick="closeModal('editCategoryModal')">&times;</button>
     </div>
-    <form id="editCategoryForm" action="" method="POST">
+    <form id="editCategoryForm" action="" method="POST" enctype="multipart/form-data">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label">Category Name *</label>
           <input type="text" name="name" id="editCatName" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category Image / Card Background</label>
+          <div style="display:flex; gap:0.75rem; align-items:flex-start; margin-bottom:0.5rem;">
+            <div id="editCatImgWrapper" style="width:64px; height:64px; border-radius:6px; overflow:hidden; border:1px solid var(--border-color); background:var(--bg-app); flex-shrink:0; display:flex; align-items:center; justify-content:center;">
+              <img id="editCatImgPreview" src="" alt="Preview" style="width:100%; height:100%; object-fit:cover; display:none;">
+              <span id="editCatImgFallback" style="font-size:1.5rem; color:var(--text-muted);">📷</span>
+            </div>
+            <div style="flex:1; display:flex; flex-direction:column; gap:0.4rem;">
+              <label style="font-size:0.75rem; color:var(--text-muted);">Upload Image File:</label>
+              <input type="file" name="image_file" class="form-control" accept="image/*" onchange="previewCatImageUpload(this)">
+              <label style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">Or Image URL / Path:</label>
+              <input type="text" name="image_url" id="editCatImageUrl" class="form-control" placeholder="e.g. /categories/rudraksha.png or https://..." oninput="previewCatImageUrl(this.value)">
+            </div>
+          </div>
+          <small style="color:var(--text-muted); font-size:0.75rem;">Upload an image or enter a URL/path to change this card's image in the "Shop by Category" section.</small>
         </div>
         <div class="form-group">
           <label class="form-label">Icon (Emoji or Identifier)</label>
@@ -135,13 +186,51 @@
 </div>
 
 <script>
-function openEditCategoryModal(id, name, icon, desc, isActive) {
+function openEditCategoryModal(id, name, icon, desc, isActive, imageUrl, defaultImg) {
   document.getElementById('editCategoryForm').action = "/admin/commerce/categories/" + id + "/edit";
   document.getElementById('editCatName').value = name;
   document.getElementById('editCatIcon').value = icon;
   document.getElementById('editCatDesc').value = desc;
   document.getElementById('editCatActive').checked = isActive;
+  document.getElementById('editCatImageUrl').value = imageUrl || '';
+
+  const effectiveImg = imageUrl || defaultImg || '';
+  const preview = document.getElementById('editCatImgPreview');
+  const fallback = document.getElementById('editCatImgFallback');
+  if (effectiveImg) {
+    preview.src = effectiveImg;
+    preview.style.display = 'block';
+    fallback.style.display = 'none';
+  } else {
+    preview.src = '';
+    preview.style.display = 'none';
+    fallback.style.display = 'block';
+  }
   openModal('editCategoryModal');
+}
+
+function previewCatImageUpload(input) {
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const preview = document.getElementById('editCatImgPreview');
+      const fallback = document.getElementById('editCatImgFallback');
+      preview.src = e.target.result;
+      preview.style.display = 'block';
+      fallback.style.display = 'none';
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
+function previewCatImageUrl(val) {
+  const preview = document.getElementById('editCatImgPreview');
+  const fallback = document.getElementById('editCatImgFallback');
+  if (val && val.trim()) {
+    preview.src = val.trim();
+    preview.style.display = 'block';
+    fallback.style.display = 'none';
+  }
 }
 </script>
 {% endblock %}
