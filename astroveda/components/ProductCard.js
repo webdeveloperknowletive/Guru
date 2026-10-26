@@ -20,6 +20,8 @@ export default function ProductCard({ product, showDesc = true }) {
 
   const badgeMap = { hot: 'badge-hot', new: 'badge-new', lab: 'badge-lab' };
   const badgeTxt = { hot: 'Bestseller', new: 'New Drop', lab: 'Lab Certified' };
+  const badgeLabel = product.cert_label || (badge ? badgeTxt[badge] : (product.certification_status === 'certified' ? 'Lab Certified' : null));
+  const isInStock = product.is_in_stock !== undefined ? product.is_in_stock : ((product.stock_quantity ?? 1) > 0);
 
   const handlePrev = (e) => {
     e.stopPropagation();
@@ -50,7 +52,7 @@ export default function ProductCard({ product, showDesc = true }) {
       style={{ cursor: 'pointer' }}
     >
       <div className="prod-img">
-        {badge && <span className={`prod-badge ${badgeMap[badge]}`}>{badgeTxt[badge]}</span>}
+        {badgeLabel && <span className={`prod-badge ${badgeMap[badge] || 'badge-lab'}`}>{badgeLabel}</span>}
         <button
           className={`wish${inWish ? ' on' : ''}`}
           aria-label="Add to wishlist"
@@ -129,12 +131,16 @@ export default function ProductCard({ product, showDesc = true }) {
         <div className="prod-actions">
           <button
             className="btn-add"
+            disabled={!isInStock}
+            style={!isInStock ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
             onClick={(e) => {
               e.stopPropagation();
-              addToCart(product, priceNum);
+              if (isInStock) {
+                addToCart(product, priceNum);
+              }
             }}
           >
-            🛒 Add to Cart
+            {isInStock ? '🛒 Add to Cart' : 'Out of Stock'}
           </button>
           <button
             className="btn-view"

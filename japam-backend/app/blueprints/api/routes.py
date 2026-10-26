@@ -1,6 +1,7 @@
 from decimal import Decimal
 from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify, current_app, session
+from sqlalchemy.orm.attributes import flag_modified
 from app.extensions import db
 from app.models.commerce import Product, Category, Order, OrderItem, Customer, ProductReview
 from app.models.service import PujaService, JyotishConsultation, AvailabilitySlot
@@ -158,16 +159,17 @@ def get_product_detail(slug):
         for r in p.reviews if r.is_approved
     ]
 
-    return jsonify({
+    resp = jsonify({
         "id": p.id,
         "name": p.name,
         "slug": p.slug,
         "sku": p.sku,
-            "display_rank": p.display_rank if getattr(p, "display_rank", None) is not None else 1,
+        "display_rank": p.display_rank if getattr(p, "display_rank", None) is not None else 1,
         "description": p.description,
         "price": float(p.price),
         "compare_price": float(p.compare_price) if p.compare_price else None,
         "stock_quantity": p.stock_quantity,
+        "low_stock_threshold": p.low_stock_threshold,
         "is_in_stock": p.stock_quantity > 0,
         "category": {
             "id": p.category.id,
@@ -184,7 +186,10 @@ def get_product_detail(slug):
             round(sum(r["rating"] for r in approved_reviews) / len(approved_reviews), 1)
             if approved_reviews else 5.0
         ),
-    }), 200
+    })
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    return resp, 200
 
 
 @api_v1_bp.route("/catalog/products/<slug>/reviews", methods=["POST"])
@@ -1734,8 +1739,26 @@ def update_product_api(product_id):
     if "thumbnail" in data and data["thumbnail"]:
         resolved_thumb = CommerceService.ingest_product_thumbnail(raw_path_or_url=data["thumbnail"])
         product.thumbnail = resolved_thumb or data["thumbnail"]
+    if "images" in data and isinstance(data["images"], list):
+        product.images = data["images"]
+        flag_modified(product, "images")
+
+    attrs = dict(product.attributes or {})
     if "attributes" in data and isinstance(data["attributes"], dict):
-        product.attributes = data["attributes"]
+        attrs.update(data["attributes"])
+
+    # Support explicit individual attribute fields
+    attr_keys = [
+        "material", "size", "mukhi", "origin", "carat", "metal", "bead_size",
+        "energized", "installation", "significance_en", "significance_mr",
+        "how_to_wear_mr", "mantra", "care_mr", "shipping_mr", "cert_label"
+    ]
+    for ak in attr_keys:
+        if ak in data:
+            attrs[ak] = str(data[ak]).strip() if data[ak] is not None else ""
+
+    product.attributes = attrs
+    flag_modified(product, "attributes")
 
     product.updated_at = datetime.now(timezone.utc)
     db.session.commit()
@@ -1750,9 +1773,13 @@ def update_product_api(product_id):
             "category": product.category.name if product.category else "",
             "category_id": product.category_id,
             "price": float(product.price),
+            "compare_price": float(product.compare_price) if product.compare_price else None,
+            "stock_quantity": product.stock_quantity,
             "status": "Archived" if product.is_archived else "Active",
             "publishing_status": product.publishing_status,
             "thumbnail": product.thumbnail,
+            "images": product.images or [],
+            "attributes": product.attributes or {},
         }
     })
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"

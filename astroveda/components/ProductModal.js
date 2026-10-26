@@ -18,9 +18,11 @@ export default function ProductModal() {
 
   const product = passedProduct || findProduct(title);
 
-  const modalImages = (product?.images && product.images.length > 0)
-    ? product.images
-    : (product?.img ? [product.img] : []);
+  const modalImages = (liveDetails?.images && liveDetails.images.length > 0)
+    ? liveDetails.images
+    : ((product?.images && product.images.length > 0)
+      ? product.images
+      : (product?.img ? [product.img] : []));
 
   const [modalImgIdx, setModalImgIdx] = useState(0);
 
@@ -63,50 +65,87 @@ export default function ProductModal() {
 
   const priceNum = parseInt(String(product.price).replace(/[^\d]/g, ''), 10) || 0;
 
-  const rowsFor = (tTitle) => {
-    const t = tTitle.toLowerCase();
-    if (t.includes('rudraksha') || t.includes('mukhi')) {
-      const m = tTitle.match(/(\d+)\s*Mukhi/);
-      return [
-        { k: 'Mukhi', v: m ? m[1] : '5' },
-        { k: 'Size', v: '18 mm' },
-        { k: 'Origin', v: 'Nepal' },
-        { k: 'Certification', v: 'Available' },
-      ];
-    }
-    if (t.includes('yantra')) {
-      return [
-        { k: 'Material', v: '99.4% Pure Copper' },
-        { k: 'Size', v: '3 × 3 inch' },
-        { k: 'Energised', v: 'Pran-Pratishtha done' },
-        { k: 'Installation', v: 'Guidance included' },
-      ];
-    }
-    if (t.includes('bracelet')) {
-      return [
-        { k: 'Bead Size', v: '8 mm' },
-        { k: 'Fit', v: 'Elastic' },
-        { k: 'Beads', v: '12 / 108' },
-        { k: 'Wearing', v: 'Left hand' },
-      ];
-    }
-    if (t.includes('mala')) {
-      return [
-        { k: 'Beads', v: '108' },
-        { k: 'Size', v: '8 mm' },
-        { k: 'Type', v: 'Traditional' },
-        { k: 'Energised', v: 'Yes' },
-      ];
-    }
-    return [
-      { k: 'Carat', v: '4.2 ct' },
-      { k: 'Certification', v: 'IGI / GIA' },
-      { k: 'Setting', v: 'Panchdhatu' },
-      { k: 'Origin', v: 'Ceylon / Colombian' },
-    ];
+  // Dynamic attribute lookups (checking liveDetails first, then product, then attributes)
+  const getAttr = (key, altKey) => {
+    return (
+      liveDetails?.attributes?.[key] ||
+      (altKey ? liveDetails?.attributes?.[altKey] : null) ||
+      liveDetails?.[key] ||
+      (altKey ? liveDetails?.[altKey] : null) ||
+      product?.[key] ||
+      product?.attributes?.[key] ||
+      (altKey ? (product?.[altKey] || product?.attributes?.[altKey]) : null) ||
+      ''
+    );
   };
 
-  const rows = rowsFor(product.title);
+  const material = getAttr('material');
+  const size = getAttr('size');
+  const energized = getAttr('energized');
+  const installation = getAttr('installation');
+  const mukhi = getAttr('mukhi');
+  const origin = getAttr('origin');
+  const carat = getAttr('carat');
+  const metal = getAttr('metal');
+  const beadSize = getAttr('bead_size', 'beadSize');
+  const certLabel = getAttr('cert_label') || (
+    product?.certification_status === 'certified' || liveDetails?.certification_status === 'certified'
+      ? 'Lab Certified'
+      : (product?.certification_status === 'premium' || liveDetails?.certification_status === 'premium' ? 'Temple Grade' : 'Verified')
+  );
+
+  const rows = [];
+  if (material) rows.push({ k: 'Material', v: material });
+  if (size) rows.push({ k: 'Size', v: size });
+  if (beadSize) rows.push({ k: 'Bead Size', v: beadSize });
+  if (mukhi) rows.push({ k: 'Mukhi', v: mukhi });
+  if (carat) rows.push({ k: 'Carat', v: carat });
+  if (metal) rows.push({ k: 'Metal / Setting', v: metal });
+  if (energized) rows.push({ k: 'Energised', v: energized });
+  if (installation) rows.push({ k: 'Installation', v: installation });
+  if (origin) rows.push({ k: 'Origin', v: origin });
+  if (certLabel) rows.push({ k: 'Certification', v: certLabel });
+
+  if (rows.length === 0) {
+    const t = (product.title || '').toLowerCase();
+    if (t.includes('rudraksha') || t.includes('mukhi')) {
+      const m = product.title.match(/(\d+)\s*Mukhi/i);
+      rows.push({ k: 'Mukhi', v: m ? m[1] : '5' });
+      rows.push({ k: 'Origin', v: 'Nepal' });
+      rows.push({ k: 'Certification', v: 'Lab Certified' });
+    } else if (t.includes('yantra')) {
+      rows.push({ k: 'Material', v: '99.4% Pure Copper' });
+      rows.push({ k: 'Size', v: '3 × 3 inch' });
+      rows.push({ k: 'Energised', v: 'Pran-Pratishtha done' });
+      rows.push({ k: 'Installation', v: 'Guidance included' });
+    } else if (t.includes('bracelet')) {
+      rows.push({ k: 'Bead Size', v: '8 mm' });
+      rows.push({ k: 'Fit', v: 'Elastic Stretchable' });
+      rows.push({ k: 'Certification', v: 'Lab Certified' });
+    } else {
+      rows.push({ k: 'Certification', v: 'Lab Certified' });
+    }
+  }
+
+  const significance = getAttr('significance_mr') || getAttr('significance_en') || getAttr('significance');
+  const howToWear = getAttr('how_to_wear_mr') || getAttr('how_to_wear');
+  const mantra = getAttr('mantra');
+  const care = getAttr('care_mr') || getAttr('care');
+  const shipping = getAttr('shipping_mr') || getAttr('shipping');
+
+  const curPrice = liveDetails?.price !== undefined ? liveDetails.price : (product.priceNum ?? priceNum);
+  const curCompare = liveDetails?.compare_price !== undefined ? liveDetails.compare_price : (product.comparePriceNum ?? null);
+  const displayPrice = `₹${Number(curPrice).toLocaleString('en-IN')}`;
+  const displayCompare = curCompare && Number(curCompare) > Number(curPrice)
+    ? `₹${Number(curCompare).toLocaleString('en-IN')}`
+    : (product.priceOld || null);
+  const displaySave = curCompare && Number(curCompare) > Number(curPrice)
+    ? `${Math.round(((Number(curCompare) - Number(curPrice)) / Number(curCompare)) * 100)}% off`
+    : (product.save || null);
+
+  const curStock = liveDetails?.stock_quantity !== undefined ? liveDetails.stock_quantity : (product.stock_quantity ?? 0);
+  const lowThreshold = liveDetails?.low_stock_threshold !== undefined ? liveDetails.low_stock_threshold : (product.low_stock_threshold ?? 10);
+  const isInStock = liveDetails?.is_in_stock !== undefined ? liveDetails.is_in_stock : (curStock > 0);
 
   const badgeTxt = { hot: 'Bestseller', new: 'New Drop', lab: 'Lab Certified' };
 
@@ -245,20 +284,30 @@ export default function ProductModal() {
         </div>
 
         <div className="pd-info">
-          <h3>{product.title}</h3>
+          <h3>{liveDetails?.name || product.title}</h3>
           <div className="pd-price-row">
-            <span className="p1">{product.price}</span>
-            {product.priceOld && <span className="p2">{product.priceOld}</span>}
-            {product.save && <span className="p3">{product.save}</span>}
+            <span className="p1">{displayPrice}</span>
+            {displayCompare && <span className="p2">{displayCompare}</span>}
+            {displaySave && <span className="p3">{displaySave}</span>}
           </div>
 
           <div className="pd-stars">
             ★★★★★{' '}
             <span style={{ color: 'var(--muted)', fontSize: '12px', fontFamily: 'var(--sans)', letterSpacing: 0 }}>
               {ratingScore} · {reviewCount} reviews
-              {liveDetails?.is_in_stock !== undefined && (
-                <span style={{ marginLeft: '12px', color: liveDetails.is_in_stock ? '#4ade80' : '#f87171' }}>
-                  {liveDetails.is_in_stock ? `✓ In Stock (${liveDetails.stock_quantity ?? 'Available'})` : 'Out of Stock'}
+              {isInStock ? (
+                curStock <= lowThreshold ? (
+                  <span style={{ marginLeft: '12px', color: '#f59e0b', fontWeight: 600 }}>
+                    ⚠️ Low Stock (Only {curStock} left)
+                  </span>
+                ) : (
+                  <span style={{ marginLeft: '12px', color: '#4ade80', fontWeight: 500 }}>
+                    ✓ In Stock ({curStock} available)
+                  </span>
+                )
+              ) : (
+                <span style={{ marginLeft: '12px', color: '#f87171', fontWeight: 600 }}>
+                  ✕ Out of Stock
                 </span>
               )}
             </span>
@@ -266,29 +315,42 @@ export default function ProductModal() {
 
           <p className="pd-lead">{liveDetails?.description || product.desc}</p>
 
-          <div className="pd-details">
-            {rows.map((r, i) => (
-              <div key={i} className="row">
-                <span className="k">{r.k}</span>
-                <span className="v">{r.v}</span>
-              </div>
-            ))}
-          </div>
+          {rows.length > 0 && (
+            <div className="pd-details">
+              {rows.map((r, i) => (
+                <div key={i} className="row">
+                  <span className="k">{r.k}</span>
+                  <span className="v">{r.v}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
-          <div className="pd-section">
-            <h5>Traditional Significance</h5>
-            <p>{product.desc} पारंपरिक शास्त्रानुसार धारण करण्याची पद्धत आणि महत्त्व सविस्तर मार्गदर्शनासह दिले जाते.</p>
-          </div>
+          {significance ? (
+            <div className="pd-section">
+              <h5>Traditional Significance</h5>
+              <p>{significance}</p>
+            </div>
+          ) : product.desc ? (
+            <div className="pd-section">
+              <h5>Traditional Significance</h5>
+              <p>{product.desc} पारंपरिक शास्त्रानुसार धारण करण्याची पद्धत आणि महत्त्व सविस्तर मार्गदर्शनासह दिले जाते.</p>
+            </div>
+          ) : null}
 
-          <div className="pd-section">
-            <h5>How to Wear · धारण पद्धत</h5>
-            <p>सकाळी स्नान करून, तांब्याच्या पात्रातील गंगाजलाने शुद्ध करून, योग्य मंत्राने 108 वेळा अभिमंत्रित करून धारण करावे. तज्ञ मार्गदर्शनासाठी WhatsApp वर संपर्क करा.</p>
-          </div>
+          {howToWear ? (
+            <div className="pd-section">
+              <h5>How to Wear · धारण पद्धत</h5>
+              <p>{howToWear}</p>
+            </div>
+          ) : null}
 
-          <div className="pd-section">
-            <h5>Mantra · मंत्र</h5>
-            <p className="mantra">ॐ ह्रीं नमः</p>
-          </div>
+          {mantra ? (
+            <div className="pd-section">
+              <h5>Mantra · मंत्र</h5>
+              <p className="mantra">{mantra}</p>
+            </div>
+          ) : null}
 
           {/* Customer Reviews Section */}
           <div className="pd-section">
@@ -383,21 +445,35 @@ export default function ProductModal() {
             )}
           </div>
 
-          <div className="pd-section">
-            <h5>Care Instructions</h5>
-            <p>पाण्यात भिजवू नका, रासायनिक साबण वापरू नका. महिन्यातून एकदा गंगाजलाने शुद्ध करा.</p>
-          </div>
+          {care ? (
+            <div className="pd-section">
+              <h5>Care Instructions</h5>
+              <p>{care}</p>
+            </div>
+          ) : null}
 
-          <div className="pd-section">
-            <h5>Shipping &amp; Returns</h5>
-            <p>48 तासांत डिस्पॅच · 7 दिवसांत easy returns · संपूर्ण भारतात मोफत शिपिंग (₹999 वर).</p>
-          </div>
+          {shipping ? (
+            <div className="pd-section">
+              <h5>Shipping &amp; Returns</h5>
+              <p>{shipping}</p>
+            </div>
+          ) : null}
 
           <div className="pd-actions">
-            <button className="btn btn-gold" onClick={handleAddToCart}>
-              Add to Cart
+            <button
+              className="btn btn-gold"
+              onClick={handleAddToCart}
+              disabled={!isInStock}
+              style={!isInStock ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+            >
+              {isInStock ? 'Add to Cart' : 'Out of Stock'}
             </button>
-            <button className="btn btn-ghost" onClick={handleAddToCart}>
+            <button
+              className="btn btn-ghost"
+              onClick={handleAddToCart}
+              disabled={!isInStock}
+              style={!isInStock ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+            >
               Buy Now
             </button>
           </div>

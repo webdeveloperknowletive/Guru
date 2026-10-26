@@ -132,6 +132,25 @@
           <td>
             <div style="display:flex; gap:0.4rem; align-items:center;">
               <textarea id="prod-desc-{{ prod.id }}" style="display:none;">{{ prod.description or '' }}</textarea>
+              <script type="application/json" id="prod-data-{{ prod.id }}">
+              {{ {
+                "id": prod.id,
+                "name": prod.name,
+                "sku": prod.sku,
+                "category_id": prod.category_id,
+                "price": prod.price|string,
+                "compare_price": prod.compare_price|string if prod.compare_price else "",
+                "stock_quantity": prod.stock_quantity,
+                "low_stock_threshold": prod.low_stock_threshold,
+                "certification_status": prod.certification_status,
+                "publishing_status": prod.publishing_status,
+                "thumbnail": prod.thumbnail or "",
+                "images": prod.images or [],
+                "attributes": prod.attributes or {},
+                "description": prod.description or "",
+                "display_rank": prod.display_rank
+              }|tojson }}
+              </script>
               <button type="button" class="btn-action-outline edit-product-btn"
                 data-id="{{ prod.id }}"
                 data-name="{{ prod.name|e }}"
@@ -303,105 +322,289 @@
 
 <!-- Edit Product Modal -->
 <div class="modal-overlay" id="editProductModal">
-  <div class="modal-container" style="max-width:680px;">
-    <div class="modal-header">
-      <h3 class="modal-title">Edit Spiritual Product</h3>
+  <div class="modal-container" style="max-width:840px; width:95%; max-height:90vh; display:flex; flex-direction:column;">
+    <div class="modal-header" style="flex-shrink:0;">
+      <div style="display:flex; align-items:center; gap:0.6rem;">
+        <span style="display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:6px; background:#fef3c7; color:#b45309; font-size:1rem;">📿</span>
+        <div>
+          <h3 class="modal-title" style="margin:0;">Edit Spiritual Product</h3>
+          <p style="margin:2px 0 0 0; font-size:0.75rem; color:var(--text-muted, #64748b);">Manage core info, dynamic pricing, inventory, gallery, and sacred specifications</p>
+        </div>
+      </div>
       <button type="button" class="modal-close" onclick="closeModal('editProductModal')">&times;</button>
     </div>
+
     <!-- Inline Error Box -->
     <div id="editProductError" style="display:none; margin:0 1.5rem 0.75rem 1.5rem; padding:0.65rem 1rem; border-radius:8px; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; font-size:0.85rem; line-height:1.4;"></div>
-    <form id="editProductForm" action="" method="POST" enctype="multipart/form-data">
+
+    <form id="editProductForm" action="" method="POST" enctype="multipart/form-data" style="display:flex; flex-direction:column; overflow:hidden; flex:1;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <input type="hidden" name="product_id" id="editProdId" value="">
-      <div class="modal-body">
-        <div class="form-row" style="display:grid; grid-template-columns:2fr 1fr; gap:1rem;">
-          <div class="form-group">
-            <label class="form-label">Product Name *</label>
-            <input type="text" name="name" id="editProdName" class="form-control" required>
+      <input type="hidden" name="gallery_images" id="editProdGalleryImages" value="">
+
+      <div class="modal-body" style="overflow-y:auto; padding:1.25rem 1.5rem; display:flex; flex-direction:column; gap:1.25rem;">
+
+        <!-- 1. Basic Information -->
+        <div class="edit-section" style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:1.2rem;">
+          <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:1rem; border-bottom:1px solid #f1f5f9; padding-bottom:0.6rem;">
+            <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:#dbeafe; color:#1e40af; font-size:0.75rem; font-weight:700;">1</span>
+            <h4 style="margin:0; font-size:0.95rem; font-weight:600; color:#1e293b;">Basic Information</h4>
           </div>
-          <div class="form-group">
-            <label class="form-label">Category</label>
-            <select name="category_id" id="editProdCategory" class="form-control">
-              {% for cat in categories %}
-                <option value="{{ cat.id }}">{{ cat.name }}</option>
-              {% endfor %}
-            </select>
+          <div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:1rem; margin-bottom:1rem;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Product Name *</label>
+              <input type="text" name="name" id="editProdName" class="form-control" required placeholder="e.g. Sri Yantra in Pure Copper">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Category *</label>
+              <select name="category_id" id="editProdCategory" class="form-control">
+                {% for cat in categories %}
+                  <option value="{{ cat.id }}">{{ cat.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">SKU</label>
+              <input type="text" name="sku" id="editProdSku" class="form-control" readonly style="background:#f8fafc; font-family:monospace; color:#64748b;">
+            </div>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Description / Summary</label>
+            <textarea name="description" id="editProdDesc" class="form-control" rows="2" placeholder="Brief spiritual description of the sacred product..."></textarea>
           </div>
         </div>
 
-        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem;">
-          <div class="form-group">
-            <label class="form-label">Price (₹) *</label>
-            <input type="number" step="0.01" name="price" id="editProdPrice" class="form-control" required>
+        <!-- 2. Pricing & Discounts -->
+        <div class="edit-section" style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:1.2rem;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; border-bottom:1px solid #f1f5f9; padding-bottom:0.6rem;">
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:#dcfce7; color:#15803d; font-size:0.75rem; font-weight:700;">2</span>
+              <h4 style="margin:0; font-size:0.95rem; font-weight:600; color:#1e293b;">Pricing &amp; Discounts</h4>
+            </div>
+            <div id="editDiscountPreviewBadge" style="display:none; font-size:0.78rem; font-weight:600; padding:3px 10px; border-radius:20px;"></div>
           </div>
-          <div class="form-group">
-            <label class="form-label">Compare At Price (₹)</label>
-            <input type="number" step="0.01" name="compare_price" id="editProdComparePrice" class="form-control">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Stock Quantity</label>
-            <input type="number" name="stock_quantity" id="editProdStock" class="form-control" required>
-          </div>
-        </div>
-
-        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem;">
-          <div class="form-group">
-            <label class="form-label">Low Stock Threshold</label>
-            <input type="number" name="low_stock_threshold" id="editProdThreshold" class="form-control">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Certification Status</label>
-            <select name="certification_status" id="editProdCert" class="form-control">
-              <option value="certified">Certified (Lab Verified)</option>
-              <option value="standard">Standard Quality</option>
-              <option value="premium">Premium Temple Grade</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Publishing Status</label>
-            <select name="publishing_status" id="editProdStatus" class="form-control">
-              <option value="published">Published</option>
-              <option value="draft">Draft</option>
-              <option value="archived">Archived</option>
-            </select>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Selling Price (₹) *</label>
+              <input type="number" step="0.01" min="0" name="price" id="editProdPrice" class="form-control" required placeholder="e.g. 2599.00" oninput="updateEditPriceCalculations()">
+              <small class="form-text text-muted" style="font-size:0.72rem; color:#94a3b8;">Final price paid by customer on website &amp; cart</small>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Compare-at Price (₹)</label>
+              <input type="number" step="0.01" min="0" name="compare_price" id="editProdComparePrice" class="form-control" placeholder="e.g. 2999.00" oninput="updateEditPriceCalculations()">
+              <small class="form-text text-muted" style="font-size:0.72rem; color:#94a3b8;">Original crossed-out price to show discount percentage</small>
+            </div>
           </div>
         </div>
 
-        <!-- 3-column row: Thumbnail Image URL (2 cols) & Display Rank (1 col) -->
-        <div class="form-row" style="display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:1rem; align-items:start; margin-bottom:1rem;">
-          <div class="form-group" style="grid-column: span 2;">
+        <!-- 3. Inventory & Stock -->
+        <div class="edit-section" style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:1.2rem;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; border-bottom:1px solid #f1f5f9; padding-bottom:0.6rem;">
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:#fef3c7; color:#b45309; font-size:0.75rem; font-weight:700;">3</span>
+              <h4 style="margin:0; font-size:0.95rem; font-weight:600; color:#1e293b;">Inventory &amp; Stock</h4>
+            </div>
+            <div id="editStockPreviewBadge" style="font-size:0.78rem; font-weight:600; padding:3px 10px; border-radius:20px;"></div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Stock Quantity *</label>
+              <input type="number" min="0" name="stock_quantity" id="editProdStock" class="form-control" required placeholder="e.g. 24" oninput="updateEditStockPreview()">
+              <small class="form-text text-muted" style="font-size:0.72rem; color:#94a3b8;">Items in stock. Set to 0 to mark as Out of Stock.</small>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Low Stock Threshold</label>
+              <input type="number" min="0" name="low_stock_threshold" id="editProdThreshold" class="form-control" placeholder="e.g. 10" oninput="updateEditStockPreview()">
+              <small class="form-text text-muted" style="font-size:0.72rem; color:#94a3b8;">Triggers low stock badge on website and admin warning</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Certification & Publishing -->
+        <div class="edit-section" style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:1.2rem;">
+          <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:1rem; border-bottom:1px solid #f1f5f9; padding-bottom:0.6rem;">
+            <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:#ede9fe; color:#6d28d9; font-size:0.75rem; font-weight:700;">4</span>
+            <h4 style="margin:0; font-size:0.95rem; font-weight:600; color:#1e293b;">Certification &amp; Publishing</h4>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Certification Status</label>
+              <select name="certification_status" id="editProdCert" class="form-control">
+                <option value="certified">Certified (Lab Verified)</option>
+                <option value="standard">Standard Quality</option>
+                <option value="premium">Premium Temple Grade</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Certification Badge Label</label>
+              <input type="text" name="cert_label" id="editProdCertLabel" class="form-control" placeholder="e.g. Lab Certified / IGI Certified">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Publishing Status *</label>
+              <select name="publishing_status" id="editProdStatus" class="form-control">
+                <option value="published">Published (Visible to Devotees)</option>
+                <option value="draft">Draft (Hidden)</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Product Images & Gallery -->
+        <div class="edit-section" style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:1.2rem;">
+          <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:1rem; border-bottom:1px solid #f1f5f9; padding-bottom:0.6rem;">
+            <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:#fce7f3; color:#be185d; font-size:0.75rem; font-weight:700;">5</span>
+            <h4 style="margin:0; font-size:0.95rem; font-weight:600; color:#1e293b;">Product Images &amp; Gallery</h4>
+          </div>
+
+          <!-- Primary Thumbnail -->
+          <div style="margin-bottom:1.25rem;">
             <label class="form-label" style="display:flex; justify-content:space-between; align-items:center;">
-              <span>Product Image / Thumbnail</span>
+              <span>Primary Product Image / Thumbnail</span>
               <span id="editImgStatus" style="font-size:0.75rem; font-weight:normal; color:#10b981;"></span>
             </label>
             <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.5rem;">
-              <input type="text" name="thumbnail" id="editProdThumb" class="form-control rounded-lg border-gray-300 text-sm" placeholder="Paste URL, local file path, or choose from folder" style="flex:1;" oninput="updateEditPreviewFromInput()">
-              <label class="btn-secondary" style="margin:0; cursor:pointer; white-space:nowrap; padding:0.5rem 0.75rem; font-size:0.825rem; display:inline-flex; align-items:center; gap:0.35rem; border-radius:6px; background:#f1f5f9; border:1px solid #cbd5e1; color:#334155; font-weight:500;">
+              <input type="text" name="thumbnail" id="editProdThumb" class="form-control" placeholder="Paste URL or choose file from device..." style="flex:1;" oninput="updateEditPreviewFromInput()">
+              <label class="btn-secondary" style="margin:0; cursor:pointer; white-space:nowrap; padding:0.5rem 0.85rem; font-size:0.825rem; display:inline-flex; align-items:center; gap:0.35rem; border-radius:6px; background:#f1f5f9; border:1px solid #cbd5e1; color:#334155; font-weight:500;">
                 📁 Choose File
                 <input type="file" name="thumbnail_file" id="editProdFileInput" accept="image/*" style="display:none;" onchange="handleImageSelection(this, 'editProdThumb', 'editProdPreview', 'editImgStatus')">
               </label>
             </div>
-            <div id="editProdPreviewWrap" style="display:flex; align-items:center; gap:0.75rem; margin-top:0.5rem; padding:0.5rem; border:1px solid #e2e8f0; border-radius:0.5rem; background:#f8fafc;">
-              <img id="editProdPreview" src="" alt="Preview" style="width:48px; height:48px; object-fit:cover; border-radius:6px; border:1px solid #cbd5e1;" onerror="this.style.display='none'" onload="this.style.display='block'">
-              <span id="editProdPreviewText" style="font-size:0.75rem; color:#64748b;">Current product image preview</span>
+            <div id="editProdPreviewWrap" style="display:flex; align-items:center; gap:0.75rem; padding:0.5rem 0.75rem; border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc;">
+              <img id="editProdPreview" src="" alt="Primary Preview" style="width:48px; height:48px; object-fit:cover; border-radius:6px; border:1px solid #cbd5e1;" onerror="this.style.display='none'" onload="this.style.display='block'">
+              <span id="editProdPreviewText" style="font-size:0.75rem; color:#64748b;">Primary display thumbnail on storefront</span>
             </div>
-            <small class="form-text text-muted" style="font-size:0.75rem; color:var(--text-muted, #94a3b8); display:block; margin-top:3px; line-height:1.3;">Choose image directly from local folder, or paste image URL or file path address.</small>
           </div>
-          <div class="form-group" style="grid-column: span 1;">
-            <label class="form-label">Display Rank</label>
-            <input type="number" name="display_rank" id="editProdDisplayRank" min="1" step="1" class="form-control rounded-lg border-gray-300 text-sm" value="1" required>
-            <small class="form-text text-muted" style="font-size:0.75rem; color:var(--text-muted, #94a3b8); display:block; margin-top:3px; line-height:1.3;">Determines position on the website (1 = 1st, 2 = 2nd, etc.)</small>
+
+          <!-- Gallery Images Management -->
+          <div>
+            <label class="form-label" style="display:flex; justify-content:space-between; align-items:center;">
+              <span>Product Gallery (Multiple Views)</span>
+              <span style="font-size:0.75rem; color:#64748b;">Supports multiple photos for modal &amp; cards carousel</span>
+            </label>
+            <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.75rem;">
+              <input type="text" id="editGalleryUrlInput" class="form-control" placeholder="Add additional photo URL (e.g. /products/view2.jpg)..." style="flex:1;">
+              <button type="button" class="btn-secondary" onclick="addGalleryImageUrl()" style="padding:0.5rem 0.85rem; font-size:0.825rem; white-space:nowrap;">+ Add URL</button>
+              <label class="btn-secondary" style="margin:0; cursor:pointer; white-space:nowrap; padding:0.5rem 0.85rem; font-size:0.825rem; display:inline-flex; align-items:center; gap:0.35rem; border-radius:6px; background:#f1f5f9; border:1px solid #cbd5e1; color:#334155; font-weight:500;">
+                📁 Upload Photos
+                <input type="file" name="gallery_files" id="editProdGalleryFileInput" multiple accept="image/*" style="display:none;" onchange="handleGalleryFilesSelected(this)">
+              </label>
+            </div>
+            <!-- Gallery Thumbnails Preview Container -->
+            <div id="editGalleryPreviewWrap" style="display:flex; gap:0.75rem; flex-wrap:wrap; padding:0.75rem; border:1px dashed #cbd5e1; border-radius:8px; background:#f8fafc; min-height:60px; align-items:center;">
+              <span id="editGalleryEmptyText" style="font-size:0.75rem; color:#94a3b8;">No additional gallery images added yet. Upload files or paste URLs above.</span>
+            </div>
           </div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label">Description</label>
-          <textarea name="description" id="editProdDesc" class="form-control" rows="3"></textarea>
+        <!-- 6. Product Specifications -->
+        <div class="edit-section" style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:1.2rem;">
+          <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:1rem; border-bottom:1px solid #f1f5f9; padding-bottom:0.6rem;">
+            <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:#ffedd5; color:#c2410c; font-size:0.75rem; font-weight:700;">6</span>
+            <h4 style="margin:0; font-size:0.95rem; font-weight:600; color:#1e293b;">Product Specifications</h4>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Material</label>
+              <input type="text" name="material" id="editProdMaterial" class="form-control" placeholder="e.g. 99.4% Pure Copper / Natural Gemstone">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Size / Dimensions</label>
+              <input type="text" name="size" id="editProdSize" class="form-control" placeholder="e.g. 3 × 3 inch / 18 mm / 8 mm">
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:1rem;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Mukhi</label>
+              <input type="text" name="mukhi" id="editProdMukhi" class="form-control" placeholder="e.g. 5 Mukhi">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Carat / Weight</label>
+              <input type="text" name="carat" id="editProdCarat" class="form-control" placeholder="e.g. 4.2 ct / 5.25 Ratti">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Metal / Setting</label>
+              <input type="text" name="metal" id="editProdMetal" class="form-control" placeholder="e.g. Panchdhatu / Pure Copper">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Origin / Holy Location</label>
+              <input type="text" name="origin" id="editProdOrigin" class="form-control" placeholder="e.g. Nepal / Haridwar / Ceylon">
+            </div>
+          </div>
         </div>
+
+        <!-- 7. Spiritual Information & Instructions -->
+        <div class="edit-section" style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:1.2rem;">
+          <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:1rem; border-bottom:1px solid #f1f5f9; padding-bottom:0.6rem;">
+            <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:#e0e7ff; color:#4338ca; font-size:0.75rem; font-weight:700;">7</span>
+            <h4 style="margin:0; font-size:0.95rem; font-weight:600; color:#1e293b;">Spiritual Information &amp; Instructions</h4>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Energised Status / Details</label>
+              <input type="text" name="energized" id="editProdEnergized" class="form-control" placeholder="e.g. Pran-Pratishtha done in Kashi">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Installation Guidance</label>
+              <input type="text" name="installation" id="editProdInstallation" class="form-control" placeholder="e.g. Guidance included with sacred water">
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:1rem;">
+            <label class="form-label">Mantra · मंत्र (e.g. ॐ ह्रीं नमः)</label>
+            <input type="text" name="mantra" id="editProdMantra" class="form-control" placeholder="e.g. ॐ ह्रीं नमः / ॐ गं गणपतये नमः" style="font-family:'Tiro Devanagari Sanskrit', serif, inherit;">
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Traditional Significance (English)</label>
+              <textarea name="significance_en" id="editProdSignificanceEn" class="form-control" rows="2" placeholder="Spiritual benefits and scriptural significance in English..."></textarea>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">पारंपरिक महत्त्व · Traditional Significance (Marathi)</label>
+              <textarea name="significance_mr" id="editProdSignificanceMr" class="form-control" rows="2" placeholder="पारंपरिक शास्त्रानुसार महत्त्व आणि लाभ (मराठीत)..."></textarea>
+            </div>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">धारण पद्धत · How to Wear / Usage Instructions (Marathi)</label>
+            <textarea name="how_to_wear_mr" id="editProdHowToWearMr" class="form-control" rows="2" placeholder="सकाळी स्नान करून, गंगाजलाने शुद्ध करून, मंत्राने 108 वेळा अभिमंत्रित करून धारण करावे..."></textarea>
+          </div>
+        </div>
+
+        <!-- 8. Shipping & Returns -->
+        <div class="edit-section" style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:1.2rem;">
+          <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:1rem; border-bottom:1px solid #f1f5f9; padding-bottom:0.6rem;">
+            <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:#ccfbf1; color:#0f766e; font-size:0.75rem; font-weight:700;">8</span>
+            <h4 style="margin:0; font-size:0.95rem; font-weight:600; color:#1e293b;">Care Instructions &amp; Shipping</h4>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">काळजी घेण्याच्या सूचना · Care Instructions (Marathi)</label>
+              <textarea name="care_mr" id="editProdCareMr" class="form-control" rows="2" placeholder="पाण्यात भिजवू नका, रासायनिक साबण वापरू नका. महिन्यातून एकदा गंगाजलाने शुद्ध करा."></textarea>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">शिपिंग आणि परतावा · Shipping &amp; Returns (Marathi)</label>
+              <textarea name="shipping_mr" id="editProdShippingMr" class="form-control" rows="2" placeholder="48 तासांत डिस्पॅच · 7 दिवसांत easy returns · संपूर्ण भारतात मोफत शिपिंग (₹999 वर)."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- 9. Display Order -->
+        <div class="edit-section" style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:1.2rem;">
+          <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:1rem; border-bottom:1px solid #f1f5f9; padding-bottom:0.6rem;">
+            <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:#f1f5f9; color:#475569; font-size:0.75rem; font-weight:700;">9</span>
+            <h4 style="margin:0; font-size:0.95rem; font-weight:600; color:#1e293b;">Storefront Display Order</h4>
+          </div>
+          <div style="max-width:320px;">
+            <label class="form-label">Display Rank (Storefront Priority) *</label>
+            <input type="number" name="display_rank" id="editProdDisplayRank" min="1" step="1" class="form-control" value="1" required>
+            <small class="form-text text-muted" style="font-size:0.72rem; color:#94a3b8; display:block; margin-top:3px;">Controls sorting rank on public website (1 = 1st card, 2 = 2nd card, etc.)</small>
+          </div>
+        </div>
+
       </div>
-      <div class="modal-footer">
+
+      <div class="modal-footer" style="flex-shrink:0; background:#f8fafc; border-top:1px solid #e2e8f0; padding:1rem 1.5rem; display:flex; justify-content:flex-end; gap:0.75rem;">
         <button type="button" class="btn-secondary" onclick="closeModal('editProductModal')">Cancel</button>
-        <button type="submit" id="editProductSubmitBtn" class="btn-primary">Update Product</button>
+        <button type="submit" id="editProductSubmitBtn" class="btn-primary" style="padding:0.6rem 1.4rem; font-weight:600;">Update Product</button>
       </div>
     </form>
   </div>
@@ -512,55 +715,263 @@ function openAddProductModal(defaultCatId) {
   openModal('addProductModal');
 }
 
+let editGalleryList = [];
+
+function renderEditGalleryThumbnails() {
+  const container = document.getElementById('editGalleryPreviewWrap');
+  const hiddenInput = document.getElementById('editProdGalleryImages');
+  if (!container) return;
+
+  if (hiddenInput) {
+    hiddenInput.value = JSON.stringify(editGalleryList);
+  }
+
+  if (editGalleryList.length === 0) {
+    container.innerHTML = '<span id="editGalleryEmptyText" style="font-size:0.75rem; color:#94a3b8;">No additional gallery images added yet. Upload files or paste URLs above.</span>';
+    return;
+  }
+
+  container.innerHTML = '';
+  editGalleryList.forEach((url, idx) => {
+    const tile = document.createElement('div');
+    tile.style.cssText = 'position:relative; width:56px; height:56px; border-radius:6px; overflow:hidden; border:1px solid #cbd5e1; background:#fff; flex-shrink:0;';
+
+    const img = document.createElement('img');
+    img.src = url;
+    img.style.cssText = 'width:100%; height:100%; object-fit:cover;';
+    img.onerror = function() { this.style.display = 'none'; };
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.innerHTML = '&times;';
+    delBtn.style.cssText = 'position:absolute; top:2px; right:2px; width:18px; height:18px; border-radius:50%; background:rgba(0,0,0,0.65); color:#fff; border:none; display:flex; align-items:center; justify-content:center; font-size:12px; cursor:pointer; padding:0; line-height:1;';
+    delBtn.title = 'Remove photo';
+    delBtn.onclick = (e) => {
+      e.stopPropagation();
+      removeGalleryImage(idx);
+    };
+
+    tile.appendChild(img);
+    tile.appendChild(delBtn);
+    container.appendChild(tile);
+  });
+}
+
+function removeGalleryImage(idx) {
+  if (idx >= 0 && idx < editGalleryList.length) {
+    editGalleryList.splice(idx, 1);
+    renderEditGalleryThumbnails();
+  }
+}
+
+function addGalleryImageUrl() {
+  const input = document.getElementById('editGalleryUrlInput');
+  if (!input) return;
+  const val = (input.value || '').trim();
+  if (val && !editGalleryList.includes(val)) {
+    editGalleryList.push(val);
+    renderEditGalleryThumbnails();
+    input.value = '';
+  }
+}
+
+function handleGalleryFilesSelected(fileInput) {
+  if (!fileInput.files || fileInput.files.length === 0) return;
+  Array.from(fileInput.files).forEach(file => {
+    const tempUrl = URL.createObjectURL(file);
+    const formData = new FormData();
+    formData.append('image', file);
+    const csrfEl = document.querySelector('input[name="csrf_token"]');
+    if (csrfEl) formData.append('csrf_token', csrfEl.value);
+
+    fetch('/admin/commerce/upload-image', {
+      method: 'POST',
+      body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success && data.url) {
+        if (!editGalleryList.includes(data.url)) {
+          editGalleryList.push(data.url);
+          renderEditGalleryThumbnails();
+        }
+      }
+    })
+    .catch(() => {
+      if (!editGalleryList.includes(tempUrl)) {
+        editGalleryList.push(tempUrl);
+        renderEditGalleryThumbnails();
+      }
+    });
+  });
+}
+
+function updateEditPriceCalculations() {
+  const priceVal = parseFloat(document.getElementById('editProdPrice')?.value) || 0;
+  const compVal = parseFloat(document.getElementById('editProdComparePrice')?.value) || 0;
+  const badge = document.getElementById('editDiscountPreviewBadge');
+  if (!badge) return;
+
+  if (compVal > priceVal && priceVal > 0) {
+    const diff = compVal - priceVal;
+    const pct = Math.round((diff / compVal) * 100);
+    badge.style.display = 'inline-flex';
+    badge.className = 'badge badge-delivered';
+    badge.style.background = '#dcfce7';
+    badge.style.color = '#15803d';
+    badge.style.border = '1px solid #bbf7d0';
+    badge.innerHTML = `✓ ${pct}% OFF · Save ₹${diff.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+  } else if (compVal > 0 && compVal <= priceVal) {
+    badge.style.display = 'inline-flex';
+    badge.className = 'badge badge-warning';
+    badge.style.background = '#fef3c7';
+    badge.style.color = '#b45309';
+    badge.style.border = '1px solid #fde68a';
+    badge.innerHTML = '⚠️ Compare price should be greater than selling price';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function updateEditStockPreview() {
+  const stockVal = parseInt(document.getElementById('editProdStock')?.value, 10) || 0;
+  const threshVal = parseInt(document.getElementById('editProdThreshold')?.value, 10) || 10;
+  const badge = document.getElementById('editStockPreviewBadge');
+  if (!badge) return;
+
+  if (stockVal <= 0) {
+    badge.className = 'badge badge-cancelled';
+    badge.style.background = '#fee2e2';
+    badge.style.color = '#b91c1c';
+    badge.style.border = '1px solid #fecaca';
+    badge.textContent = '✕ Out of Stock';
+  } else if (stockVal <= threshVal) {
+    badge.className = 'badge badge-warning';
+    badge.style.background = '#fef3c7';
+    badge.style.color = '#b45309';
+    badge.style.border = '1px solid #fde68a';
+    badge.textContent = `⚠️ Low Stock (${stockVal} units)`;
+  } else {
+    badge.className = 'badge badge-delivered';
+    badge.style.background = '#dcfce7';
+    badge.style.color = '#15803d';
+    badge.style.border = '1px solid #bbf7d0';
+    badge.textContent = `✓ In Stock (${stockVal} units)`;
+  }
+}
+
+function applyProductValuesToForm(p) {
+  if (!p) return;
+  const setVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val !== undefined && val !== null ? val : '';
+  };
+
+  setVal('editProdName', p.name);
+  if (p.category_id) setVal('editProdCategory', p.category_id);
+  setVal('editProdSku', p.sku);
+  setVal('editProdDesc', p.description);
+
+  setVal('editProdPrice', p.price);
+  setVal('editProdComparePrice', p.compare_price);
+  setVal('editProdStock', p.stock_quantity);
+  setVal('editProdThreshold', p.low_stock_threshold);
+  setVal('editProdCert', p.certification_status || 'certified');
+  setVal('editProdStatus', p.publishing_status || 'published');
+  setVal('editProdThumb', p.thumbnail || '');
+  setVal('editProdDisplayRank', p.display_rank || 1);
+
+  const attrs = p.attributes || {};
+  setVal('editProdCertLabel', attrs.cert_label || '');
+  setVal('editProdMaterial', attrs.material || '');
+  setVal('editProdSize', attrs.size || '');
+  setVal('editProdMukhi', attrs.mukhi || '');
+  setVal('editProdCarat', attrs.carat || '');
+  setVal('editProdMetal', attrs.metal || '');
+  setVal('editProdOrigin', attrs.origin || '');
+  setVal('editProdEnergized', attrs.energized || '');
+  setVal('editProdInstallation', attrs.installation || '');
+  setVal('editProdMantra', attrs.mantra || '');
+  setVal('editProdSignificanceEn', attrs.significance_en || '');
+  setVal('editProdSignificanceMr', attrs.significance_mr || '');
+  setVal('editProdHowToWearMr', attrs.how_to_wear_mr || '');
+  setVal('editProdCareMr', attrs.care_mr || '');
+  setVal('editProdShippingMr', attrs.shipping_mr || '');
+
+  // Thumbnail preview
+  const preview = document.getElementById('editProdPreview');
+  const wrap = document.getElementById('editProdPreviewWrap');
+  if (p.thumbnail && p.thumbnail.trim()) {
+    if (wrap) wrap.style.display = 'flex';
+    if (preview) {
+      preview.style.display = 'block';
+      preview.src = p.thumbnail;
+    }
+  } else {
+    if (wrap) wrap.style.display = 'none';
+  }
+
+  // Gallery
+  if (Array.isArray(p.images)) {
+    editGalleryList = [...p.images];
+  } else if (typeof p.images === 'string' && p.images.trim()) {
+    try {
+      editGalleryList = JSON.parse(p.images);
+    } catch {
+      editGalleryList = p.images.split(',').map(s => s.trim()).filter(Boolean);
+    }
+  } else {
+    editGalleryList = [];
+  }
+  renderEditGalleryThumbnails();
+
+  updateEditPriceCalculations();
+  updateEditStockPreview();
+}
+
 async function openEditProductFromBtn(btn) {
   clearEditError();
   const id = btn.getAttribute('data-id');
-  const name = btn.getAttribute('data-name') || '';
-  const catId = btn.getAttribute('data-category-id') || '';
-  const price = btn.getAttribute('data-price') || '';
-  const comparePrice = btn.getAttribute('data-compare-price') || '';
-  const stock = btn.getAttribute('data-stock') || '0';
-  const threshold = btn.getAttribute('data-threshold') || '10';
-  const cert = btn.getAttribute('data-cert') || 'certified';
-  const status = btn.getAttribute('data-status') || 'published';
-  const thumb = btn.getAttribute('data-thumb') || '';
-  const rank = btn.getAttribute('data-rank') || '1';
 
-  const descEl = document.getElementById('prod-desc-' + id);
-  const desc = descEl ? descEl.value : '';
-
-  // Populate form with current cached/button values immediately
   document.getElementById('editProdId').value = id;
   document.getElementById('editProductForm').action = "/admin/commerce/products/" + id + "/edit";
-  document.getElementById('editProdName').value = name;
-  if (catId) document.getElementById('editProdCategory').value = catId;
-  document.getElementById('editProdPrice').value = price;
-  document.getElementById('editProdComparePrice').value = comparePrice;
-  document.getElementById('editProdStock').value = stock;
-  document.getElementById('editProdThreshold').value = threshold;
-  document.getElementById('editProdCert').value = cert;
-  document.getElementById('editProdStatus').value = status;
-  document.getElementById('editProdThumb').value = thumb;
-  document.getElementById('editProdDesc').value = desc;
-  document.getElementById('editProdDisplayRank').value = rank;
+
+  // 1. Try reading instant pre-rendered JSON script
+  const scriptEl = document.getElementById('prod-data-' + id);
+  if (scriptEl && scriptEl.textContent) {
+    try {
+      const parsedData = JSON.parse(scriptEl.textContent);
+      applyProductValuesToForm(parsedData);
+    } catch (e) {
+      console.debug('Parsing embedded prod-data script:', e);
+    }
+  }
+
+  // Fallback to button attributes if needed
+  if (!document.getElementById('editProdName').value) {
+    document.getElementById('editProdName').value = btn.getAttribute('data-name') || '';
+    const catId = btn.getAttribute('data-category-id') || '';
+    if (catId) document.getElementById('editProdCategory').value = catId;
+    document.getElementById('editProdPrice').value = btn.getAttribute('data-price') || '';
+    document.getElementById('editProdComparePrice').value = btn.getAttribute('data-compare-price') || '';
+    document.getElementById('editProdStock').value = btn.getAttribute('data-stock') || '0';
+    document.getElementById('editProdThreshold').value = btn.getAttribute('data-threshold') || '10';
+    document.getElementById('editProdCert').value = btn.getAttribute('data-cert') || 'certified';
+    document.getElementById('editProdStatus').value = btn.getAttribute('data-status') || 'published';
+    document.getElementById('editProdThumb').value = btn.getAttribute('data-thumb') || '';
+    document.getElementById('editProdDisplayRank').value = btn.getAttribute('data-rank') || '1';
+    const descEl = document.getElementById('prod-desc-' + id);
+    if (descEl) document.getElementById('editProdDesc').value = descEl.value || '';
+    updateEditPreviewFromInput();
+  }
 
   // Reset status and file input
   const statusEl = document.getElementById('editImgStatus');
   if (statusEl) statusEl.innerText = '';
   const fileInp = document.getElementById('editProdFileInput');
   if (fileInp) fileInp.value = '';
-
-  const preview = document.getElementById('editProdPreview');
-  const wrap = document.getElementById('editProdPreviewWrap');
-  if (thumb && thumb.trim()) {
-    if (wrap) wrap.style.display = 'flex';
-    if (preview) {
-      preview.style.display = 'block';
-      preview.src = thumb;
-    }
-  } else {
-    if (wrap) wrap.style.display = 'none';
-  }
+  const gFileInp = document.getElementById('editProdGalleryFileInput');
+  if (gFileInp) gFileInp.value = '';
 
   // Ensure submit button is enabled and has standard label
   const submitBtn = document.getElementById('editProductSubmitBtn');
@@ -577,27 +988,8 @@ async function openEditProductFromBtn(btn) {
     if (res.ok) {
       const data = await res.json();
       if (data && data.success && data.product) {
-        const p = data.product;
-        // Only update if modal is still active and corresponds to this product
         if (document.getElementById('editProdId').value === String(id)) {
-          document.getElementById('editProdName').value = p.name;
-          if (p.category_id) document.getElementById('editProdCategory').value = p.category_id;
-          document.getElementById('editProdPrice').value = p.price;
-          document.getElementById('editProdComparePrice').value = p.compare_price;
-          document.getElementById('editProdStock').value = p.stock_quantity;
-          document.getElementById('editProdThreshold').value = p.low_stock_threshold;
-          document.getElementById('editProdCert').value = p.certification_status;
-          document.getElementById('editProdStatus').value = p.publishing_status;
-          document.getElementById('editProdThumb').value = p.thumbnail || '';
-          document.getElementById('editProdDesc').value = p.description || '';
-          document.getElementById('editProdDisplayRank').value = p.display_rank || 1;
-          if (p.thumbnail && p.thumbnail.trim()) {
-            if (wrap) wrap.style.display = 'flex';
-            if (preview) {
-              preview.style.display = 'block';
-              preview.src = p.thumbnail;
-            }
-          }
+          applyProductValuesToForm(data.product);
         }
       }
     }
@@ -606,26 +998,17 @@ async function openEditProductFromBtn(btn) {
   }
 }
 
-function openEditProductModal(id, name, catId, price, comparePrice, stock, threshold, cert, status, thumb, desc, displayRank) {
+function openEditProductModal(id) {
   const btn = document.querySelector(`.edit-product-btn[data-id="${id}"]`);
   if (btn) {
     openEditProductFromBtn(btn);
   } else {
-    clearEditError();
     document.getElementById('editProdId').value = id;
     document.getElementById('editProductForm').action = "/admin/commerce/products/" + id + "/edit";
-    document.getElementById('editProdName').value = name || '';
-    if (catId) document.getElementById('editProdCategory').value = catId;
-    document.getElementById('editProdPrice').value = price || '';
-    document.getElementById('editProdComparePrice').value = comparePrice || '';
-    document.getElementById('editProdStock').value = stock || '0';
-    document.getElementById('editProdThreshold').value = threshold || '10';
-    document.getElementById('editProdCert').value = cert || 'certified';
-    document.getElementById('editProdStatus').value = status || 'published';
-    document.getElementById('editProdThumb').value = thumb || '';
-    document.getElementById('editProdDesc').value = desc || '';
-    document.getElementById('editProdDisplayRank').value = displayRank || 1;
     openModal('editProductModal');
+    fetch('/admin/commerce/products/' + id + '/data')
+      .then(r => r.json())
+      .then(d => { if (d.success && d.product) applyProductValuesToForm(d.product); });
   }
 }
 
@@ -715,6 +1098,10 @@ function updateProductRowInTable(p) {
   const descEl = document.getElementById('prod-desc-' + p.id);
   if (descEl) {
     descEl.value = p.description || '';
+  }
+  const scriptEl = document.getElementById('prod-data-' + p.id);
+  if (scriptEl) {
+    scriptEl.textContent = JSON.stringify(p);
   }
 }
 

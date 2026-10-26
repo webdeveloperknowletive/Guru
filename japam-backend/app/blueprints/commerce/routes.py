@@ -1,6 +1,8 @@
+import json
 from decimal import Decimal
 from datetime import datetime, timezone
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, jsonify
+from sqlalchemy.orm.attributes import flag_modified
 from app.extensions import db
 from app.models.commerce import Product, Category, InventoryAdjustment, Order, OrderItem, Customer, ProductReview
 from app.services.commerce_service import CommerceService
@@ -295,6 +297,8 @@ def product_data(product_id):
             "certification_status": product.certification_status,
             "publishing_status": product.publishing_status,
             "thumbnail": product.thumbnail or "",
+            "images": product.images or [],
+            "attributes": product.attributes or {},
             "description": product.description or "",
             "display_rank": product.display_rank,
             "is_low_stock": product.is_low_stock,
@@ -348,32 +352,45 @@ def product_update(product_id):
             product.price = parsed_price
         except Exception:
             if is_ajax:
-                return jsonify({"success": False, "error": "Please enter a valid non-negative price."}), 400
+                return jsonify({"success": False, "error": "Please enter a valid non-negative selling price."}), 400
             flash("Please enter a valid price.", "danger")
             return redirect(request.referrer or url_for("commerce.products_list"))
 
     compare_price_val = req_data.get("compare_price")
+    if compare_price_val is None:
+        compare_price_val = req_data.get("compare_at_price")
     if compare_price_val is not None:
         str_comp = str(compare_price_val).strip()
         if str_comp:
             try:
-                product.compare_price = Decimal(str_comp)
+                comp_num = Decimal(str_comp)
+                if comp_num < 0:
+                    raise ValueError("Compare-at price cannot be negative")
+                product.compare_price = comp_num
             except Exception:
-                pass
+                if is_ajax:
+                    return jsonify({"success": False, "error": "Compare-at price must be a valid non-negative number."}), 400
         else:
             product.compare_price = None
 
     stock_val = req_data.get("stock_quantity")
     if stock_val is not None and str(stock_val).strip() != "":
         try:
-            product.stock_quantity = int(stock_val)
+            stock_int = int(stock_val)
+            if stock_int < 0:
+                raise ValueError("Stock quantity cannot be negative")
+            product.stock_quantity = stock_int
         except (ValueError, TypeError):
-            pass
+            if is_ajax:
+                return jsonify({"success": False, "error": "Stock quantity must be a non-negative integer."}), 400
 
     threshold_val = req_data.get("low_stock_threshold")
     if threshold_val is not None and str(threshold_val).strip() != "":
         try:
-            product.low_stock_threshold = int(threshold_val)
+            thresh_int = int(threshold_val)
+            if thresh_int < 0:
+                thresh_int = 0
+            product.low_stock_threshold = thresh_int
         except (ValueError, TypeError):
             pass
 
@@ -401,6 +418,59 @@ def product_update(product_id):
         product.thumbnail = resolved_thumb
     elif thumbnail:
         product.thumbnail = thumbnail
+
+    # Gallery images
+    current_images = list(product.images or [])
+    if hasattr(req_data, "getlist") and req_data.getlist("gallery_images"):
+        raw_list = req_data.getlist("gallery_images")
+        if len(raw_list) == 1 and str(raw_list[0]).strip().startswith("["):
+            try:
+                current_images = [str(x).strip() for x in json.loads(raw_list[0]) if str(x).strip()]
+            except Exception:
+                current_images = [str(x).strip() for x in raw_list if str(x).strip()]
+        else:
+            current_images = [str(x).strip() for x in raw_list if str(x).strip()]
+    elif "gallery_images" in req_data:
+        raw_gallery = req_data.get("gallery_images")
+        if isinstance(raw_gallery, list):
+            current_images = [str(x).strip() for x in raw_gallery if str(x).strip()]
+        elif isinstance(raw_gallery, str):
+            rg_str = raw_gallery.strip()
+            if rg_str.startswith("["):
+                try:
+                    current_images = [str(x).strip() for x in json.loads(rg_str) if str(x).strip()]
+                except Exception:
+                    current_images = [x.strip() for x in rg_str.split(",") if x.strip()]
+            elif rg_str:
+                current_images = [x.strip() for x in rg_str.split(",") if x.strip()]
+            else:
+                current_images = []
+
+    # Uploaded gallery files
+    gallery_files = request.files.getlist("gallery_files")
+    for g_file in gallery_files:
+        if g_file and getattr(g_file, "filename", ""):
+            uploaded_url = CommerceService.ingest_product_thumbnail(file_obj=g_file)
+            if uploaded_url and uploaded_url not in current_images:
+                current_images.append(uploaded_url)
+
+    product.images = current_images
+    flag_modified(product, "images")
+
+    # Attributes dictionary
+    attrs = dict(product.attributes or {})
+    attr_fields = [
+        "material", "size", "mukhi", "origin", "carat", "metal", "bead_size",
+        "energized", "installation", "significance_en", "significance_mr",
+        "how_to_wear_mr", "mantra", "care_mr", "shipping_mr", "cert_label"
+    ]
+    for k in attr_fields:
+        if k in req_data:
+            val = req_data.get(k)
+            attrs[k] = str(val).strip() if val is not None else ""
+
+    product.attributes = attrs
+    flag_modified(product, "attributes")
 
     raw_rank = req_data.get("display_rank") or req_data.get("displayRank") or req_data.get("rank")
     if raw_rank is not None and str(raw_rank).strip():
@@ -447,6 +517,8 @@ def product_update(product_id):
                 "certification_status": product.certification_status,
                 "publishing_status": product.publishing_status,
                 "thumbnail": product.thumbnail or "/static/img/product-default.png",
+                "images": product.images or [],
+                "attributes": product.attributes or {},
                 "description": product.description or "",
                 "display_rank": product.display_rank,
                 "is_low_stock": product.is_low_stock,
