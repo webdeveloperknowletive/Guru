@@ -22,6 +22,11 @@ from app.models.operations import (
     CustomerEnquiry,
     SystemSetting,
 )
+from app.models.analytics import (
+    AnalyticsVisitor,
+    AnalyticsSession,
+    AnalyticsEvent,
+)
 
 __all__ = [
     "Role",
@@ -45,10 +50,12 @@ __all__ = [
     "MediaFile",
     "Banner",
     "AdBanner",
-
     "PaymentTransaction",
     "Coupon",
     "ReturnRequest",
     "CustomerEnquiry",
     "SystemSetting",
+    "AnalyticsVisitor",
+    "AnalyticsSession",
+    "AnalyticsEvent",
 ]

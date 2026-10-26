@@ -1814,3 +1814,50 @@ def get_welcome_popup():
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     return resp
 
+
+# ==========================================
+# STOREFRONT ANALYTICS & LIVE TELEMETRY
+# ==========================================
+from app.services.analytics_service import AnalyticsService
+
+
+@api_v1_bp.route("/analytics/track", methods=["POST", "OPTIONS"])
+def analytics_track():
+    """Ingest visitor events, pageviews, and section engagements."""
+    if request.method == "OPTIONS":
+        return "", 200
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+    except Exception:
+        data = {}
+    if not data:
+        return jsonify({"status": "ignored", "reason": "empty_payload"}), 400
+
+    ip_addr = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+    if "," in ip_addr:
+        ip_addr = ip_addr.split(",")[0].strip()
+    ua = request.headers.get("User-Agent", "")
+
+    success = AnalyticsService.ingest_tracking_data(data, ip_address=ip_addr, user_agent_str=ua)
+    if success:
+        return jsonify({"status": "ok"}), 200
+    return jsonify({"status": "error"}), 400
+
+
+@api_v1_bp.route("/analytics/heartbeat", methods=["POST", "OPTIONS"])
+def analytics_heartbeat():
+    """Ingest foreground session heartbeats to power Active Now (5 min) metric."""
+    if request.method == "OPTIONS":
+        return "", 200
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+    except Exception:
+        data = {}
+    if not data:
+        return jsonify({"status": "ignored", "reason": "empty_payload"}), 400
+
+    success = AnalyticsService.ingest_heartbeat(data)
+    if success:
+        return jsonify({"status": "ok"}), 200
+    return jsonify({"status": "error"}), 400
+

@@ -178,6 +178,52 @@ document.addEventListener("DOMContentLoaded", () => {
     `).join("");
     searchResults.style.display = "block";
   }
+
+  // 4. Collapsible Sidebar Accordion Navigation
+  const accordion = document.getElementById("sidebarAccordion");
+  if (accordion) {
+    const groupToggles = accordion.querySelectorAll(".nav-group-toggle");
+
+    groupToggles.forEach((toggle) => {
+      toggle.addEventListener("click", () => {
+        const isExpanded = toggle.getAttribute("aria-expanded") === "true";
+        const targetMenuId = toggle.getAttribute("aria-controls");
+        const targetMenu = document.getElementById(targetMenuId);
+
+        // Accordion behavior: close all other open groups
+        groupToggles.forEach((otherToggle) => {
+          if (otherToggle !== toggle) {
+            otherToggle.setAttribute("aria-expanded", "false");
+            otherToggle.classList.remove("is-expanded");
+            const otherMenuId = otherToggle.getAttribute("aria-controls");
+            const otherMenu = document.getElementById(otherMenuId);
+            if (otherMenu) otherMenu.classList.remove("expanded");
+          }
+        });
+
+        // Toggle clicked group
+        if (isExpanded) {
+          toggle.setAttribute("aria-expanded", "false");
+          toggle.classList.remove("is-expanded");
+          if (targetMenu) targetMenu.classList.remove("expanded");
+        } else {
+          toggle.setAttribute("aria-expanded", "true");
+          toggle.classList.add("is-expanded");
+          if (targetMenu) targetMenu.classList.add("expanded");
+        }
+      });
+    });
+
+    // Auto-close sidebar on mobile when any navigation submodule link is clicked
+    const allNavLinks = accordion.querySelectorAll(".nav-link");
+    allNavLinks.forEach((link) => {
+      link.addEventListener("click", () => {
+        if (window.innerWidth <= 992) {
+          closeSidebar();
+        }
+      });
+    });
+  }
 });
 
 // Modal Helpers

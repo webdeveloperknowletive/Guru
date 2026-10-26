@@ -14,6 +14,7 @@ import Toast from '@/components/Toast';
 import UrgencyNotification from '@/components/UrgencyNotification';
 import CookieConsentModal from '@/components/CookieConsentModal';
 import ScrollReveal from '@/components/ScrollReveal';
+import AnalyticsTracker from '@/components/AnalyticsTracker';
 
 export const viewport = {
   width: 'device-width',
@@ -39,6 +40,7 @@ export default function RootLayout({ children }) {
       </head>
       <body>
         <StoreProvider>
+          <AnalyticsTracker />
           <div className="bg-fx" />
           <div className="bg-grain" />
           <ScrollReveal />

@@ -34,136 +34,289 @@
         </button>
       </div>
 
-      <nav class="sidebar-nav">
-        <!-- Overview -->
-        <a href="{{ url_for('dashboard.overview') }}" class="nav-link {% if active_page == 'overview' %}active{% endif %}">
+      <nav class="sidebar-nav" id="sidebarAccordion">
+        <!-- Overview Direct Link -->
+        <a href="{{ url_for('dashboard.overview') }}" class="nav-link {% if active_page == 'overview' %}active{% endif %}" {% if active_page == 'overview' %}aria-current="page"{% endif %}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
           <span>Overview</span>
         </a>
 
-        <!-- Commerce -->
-        <div class="nav-section-title">Commerce</div>
-        <a href="{{ url_for('commerce.products_list') }}" class="nav-link {% if active_page == 'products' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
-          <span>Products</span>
-        </a>
-        <a href="{{ url_for('commerce.categories_list') }}" class="nav-link {% if active_page == 'categories' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3h7v7H3z"/><path d="M14 3h7v7h-7z"/><path d="M14 14h7v7h-7z"/><path d="M3 14h7v7H3z"/></svg>
-          <span>Categories</span>
-        </a>
-        <a href="{{ url_for('commerce.inventory_list') }}" class="nav-link {% if active_page == 'inventory' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
-          <span>Inventory</span>
-        </a>
-        <a href="{{ url_for('commerce.orders_list') }}" class="nav-link {% if active_page == 'orders' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
-          <span>Orders</span>
-        </a>
-        <a href="{{ url_for('commerce.customers_list') }}" class="nav-link {% if active_page == 'customers' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          <span>Customers</span>
-        </a>
-        <a href="{{ url_for('commerce.reviews_list') }}" class="nav-link {% if active_page == 'reviews' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <span>Reviews</span>
+        <!-- Analytics & Activity Direct Link -->
+        <a href="{{ url_for('dashboard.analytics_page') }}" class="nav-link {% if active_page == 'analytics' %}active{% endif %}" {% if active_page == 'analytics' %}aria-current="page"{% endif %}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+          <span>Analytics & Activity</span>
         </a>
 
-        <!-- Services -->
-        <div class="nav-section-title">Services</div>
-        <a href="{{ url_for('services.puja_services_list') }}" class="nav-link {% if active_page == 'puja_services' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a5 5 0 0 0-5 5c0 2 1 3.5 2 4.5V17a3 3 0 0 0 6 0v-5.5c1-1 2-2.5 2-4.5a5 5 0 0 0-5-5Z"/></svg>
-          <span>Puja Services</span>
-        </a>
-        <a href="{{ url_for('services.puja_bookings_list') }}" class="nav-link {% if active_page == 'puja_bookings' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
-          <span>Puja Bookings</span>
-        </a>
-        <a href="{{ url_for('services.consultations_list') }}" class="nav-link {% if active_page == 'consultations' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="m12 6 2 4 4 1-3 3 1 4-4-2-4 2 1-4-3-3 4-1 2-4Z"/></svg>
-          <span>Jyotish Consultations</span>
-        </a>
-        <a href="{{ url_for('services.availability_list') }}" class="nav-link {% if active_page == 'availability' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          <span>Availability</span>
-        </a>
+        {# Role permission evaluation helper #}
+        {% set is_super = not current_user or (current_user.role and current_user.role.code == 'super_admin') %}
+        {% set can_commerce = is_super or current_user.has_permission('commerce', 'view') or current_user.has_permission('inventory', 'view') or current_user.has_permission('orders', 'view') or current_user.has_permission('reviews', 'view') %}
+        {% set can_services = is_super or current_user.has_permission('services', 'view') or current_user.has_permission('consultations', 'view') or current_user.has_permission('availability', 'view') %}
+        {% set can_content = is_super or current_user.has_permission('content', 'view') or current_user.has_permission('media', 'view') %}
+        {% set can_operations = is_super or current_user.has_permission('operations', 'view') or current_user.has_permission('enquiries', 'view') %}
+        {% set can_system = is_super or current_user.has_permission('system', 'view') or current_user.has_permission('reports', 'view') %}
 
-        <!-- Content -->
-        <div class="nav-section-title">Content</div>
-        <a href="{{ url_for('content.blog_list') }}" class="nav-link {% if active_page == 'blog' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
-          <span>Blog</span>
-        </a>
-        <a href="{{ url_for('content.testimonials_list') }}" class="nav-link {% if active_page == 'testimonials' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          <span>Testimonials</span>
-        </a>
-        <a href="{{ url_for('content.banners_list') }}" class="nav-link {% if active_page == 'banners' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/></svg>
-          <span>Banners</span>
-        </a>
-        <a href="{{ url_for('content.ads_list') }}" class="nav-link {% if active_page == 'ads' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="20" height="14" x="2" y="5" rx="2"/><path d="M7 15h2l1.5-4 1.5 4h2"/><path d="M7.7 13h5.6"/><path d="M18 9v6"/></svg>
-          <span>Ads & AdSense</span>
-        </a>
-        <a href="{{ url_for('content.welcome_popup_page') }}" class="nav-link {% if active_page == 'welcome_popup' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
-          <span>Welcome Popup</span>
-        </a>
+        <!-- Commerce Group -->
+        {% if can_commerce %}
+          {% set is_commerce_active = active_page in ['products', 'categories', 'inventory', 'orders', 'customers', 'reviews'] %}
+          <div class="nav-group {% if is_commerce_active %}has-active-child{% endif %}" data-group="commerce">
+            <button type="button" 
+                    class="nav-group-toggle {% if is_commerce_active %}is-expanded{% endif %}" 
+                    id="btn-group-commerce" 
+                    aria-expanded="{% if is_commerce_active %}true{% else %}false{% endif %}" 
+                    aria-controls="menu-group-commerce">
+              <span class="group-toggle-label">
+                <svg class="group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+                <span>Commerce</span>
+              </span>
+              <svg class="group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="nav-group-menu {% if is_commerce_active %}expanded{% endif %}" 
+                 id="menu-group-commerce" 
+                 role="region" 
+                 aria-labelledby="btn-group-commerce">
+              <div class="nav-group-inner">
+                {% if is_super or current_user.has_permission('commerce', 'view') %}
+                  <a href="{{ url_for('commerce.products_list') }}" class="nav-link sub-link {% if active_page == 'products' %}active{% endif %}" {% if active_page == 'products' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                    <span>Products</span>
+                  </a>
+                  <a href="{{ url_for('commerce.categories_list') }}" class="nav-link sub-link {% if active_page == 'categories' %}active{% endif %}" {% if active_page == 'categories' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3h7v7H3z"/><path d="M14 3h7v7h-7z"/><path d="M14 14h7v7h-7z"/><path d="M3 14h7v7H3z"/></svg>
+                    <span>Categories</span>
+                  </a>
+                {% endif %}
+                {% if is_super or current_user.has_permission('inventory', 'view') %}
+                  <a href="{{ url_for('commerce.inventory_list') }}" class="nav-link sub-link {% if active_page == 'inventory' %}active{% endif %}" {% if active_page == 'inventory' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                    <span>Inventory</span>
+                  </a>
+                {% endif %}
+                {% if is_super or current_user.has_permission('orders', 'view') %}
+                  <a href="{{ url_for('commerce.orders_list') }}" class="nav-link sub-link {% if active_page == 'orders' %}active{% endif %}" {% if active_page == 'orders' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+                    <span>Orders</span>
+                  </a>
+                  <a href="{{ url_for('commerce.customers_list') }}" class="nav-link sub-link {% if active_page == 'customers' %}active{% endif %}" {% if active_page == 'customers' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>Customers</span>
+                  </a>
+                {% endif %}
+                {% if is_super or current_user.has_permission('reviews', 'view') %}
+                  <a href="{{ url_for('commerce.reviews_list') }}" class="nav-link sub-link {% if active_page == 'reviews' %}active{% endif %}" {% if active_page == 'reviews' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    <span>Reviews</span>
+                  </a>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endif %}
 
-        <a href="{{ url_for('content.guruji_profile') }}" class="nav-link {% if active_page == 'guruji' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
-          <span>Guruji Profile</span>
-        </a>
-        <a href="{{ url_for('content.site_text_page') }}" class="nav-link {% if active_page == 'site_text' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>
-          <span>Website Text & Headings</span>
-        </a>
-        <a href="{{ url_for('content.sections_manager') }}" class="nav-link {% if active_page == 'sections' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/><path d="M7 10h10M7 14h10"/></svg>
-          <span>Page Layout & Sections</span>
-        </a>
-        <a href="{{ url_for('content.media_list') }}" class="nav-link {% if active_page == 'media' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
-          <span>Media</span>
-        </a>
+        <!-- Services Group -->
+        {% if can_services %}
+          {% set is_services_active = active_page in ['puja_services', 'puja_bookings', 'consultations', 'availability'] %}
+          <div class="nav-group {% if is_services_active %}has-active-child{% endif %}" data-group="services">
+            <button type="button" 
+                    class="nav-group-toggle {% if is_services_active %}is-expanded{% endif %}" 
+                    id="btn-group-services" 
+                    aria-expanded="{% if is_services_active %}true{% else %}false{% endif %}" 
+                    aria-controls="menu-group-services">
+              <span class="group-toggle-label">
+                <svg class="group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2C8 6 6 10 6 14a6 6 0 0 0 12 0c0-4-2-8-6-12Z"/><path d="M6 14C3 13 2 10 2 8c2 0 4 2 5 4"/><path d="M18 14c3-1 4-4 4-6-2 0-4 2-5 4"/></svg>
+                <span>Services</span>
+              </span>
+              <svg class="group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="nav-group-menu {% if is_services_active %}expanded{% endif %}" 
+                 id="menu-group-services" 
+                 role="region" 
+                 aria-labelledby="btn-group-services">
+              <div class="nav-group-inner">
+                {% if is_super or current_user.has_permission('services', 'view') %}
+                  <a href="{{ url_for('services.puja_services_list') }}" class="nav-link sub-link {% if active_page == 'puja_services' %}active{% endif %}" {% if active_page == 'puja_services' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a5 5 0 0 0-5 5c0 2 1 3.5 2 4.5V17a3 3 0 0 0 6 0v-5.5c1-1 2-2.5 2-4.5a5 5 0 0 0-5-5Z"/></svg>
+                    <span>Puja Services</span>
+                  </a>
+                  <a href="{{ url_for('services.puja_bookings_list') }}" class="nav-link sub-link {% if active_page == 'puja_bookings' %}active{% endif %}" {% if active_page == 'puja_bookings' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                    <span>Puja Bookings</span>
+                  </a>
+                {% endif %}
+                {% if is_super or current_user.has_permission('consultations', 'view') %}
+                  <a href="{{ url_for('services.consultations_list') }}" class="nav-link sub-link {% if active_page == 'consultations' %}active{% endif %}" {% if active_page == 'consultations' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="m12 6 2 4 4 1-3 3 1 4-4-2-4 2 1-4-3-3 4-1 2-4Z"/></svg>
+                    <span>Jyotish Consultations</span>
+                  </a>
+                {% endif %}
+                {% if is_super or current_user.has_permission('availability', 'view') %}
+                  <a href="{{ url_for('services.availability_list') }}" class="nav-link sub-link {% if active_page == 'availability' %}active{% endif %}" {% if active_page == 'availability' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span>Availability</span>
+                  </a>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endif %}
 
-        <!-- Operations -->
-        <div class="nav-section-title">Operations</div>
-        <a href="{{ url_for('operations.payments_list') }}" class="nav-link {% if active_page == 'payments' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
-          <span>Payments</span>
-        </a>
-        <a href="{{ url_for('operations.coupons_list') }}" class="nav-link {% if active_page == 'coupons' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 14 4 9l5-5 5 5-5 5Z"/><path d="m14 9 5 5-5 5-5-5 5-5Z"/></svg>
-          <span>Coupons</span>
-        </a>
-        <a href="{{ url_for('operations.shipping_list') }}" class="nav-link {% if active_page == 'shipping' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>
-          <span>Shipping & Returns</span>
-        </a>
-        <a href="{{ url_for('operations.enquiries_list') }}" class="nav-link {% if active_page == 'enquiries' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-          <span>Enquiries</span>
-        </a>
+        <!-- Content Group -->
+        {% if can_content %}
+          {% set is_content_active = active_page in ['blog', 'testimonials', 'banners', 'ads', 'welcome_popup', 'guruji', 'site_text', 'sections', 'media'] %}
+          <div class="nav-group {% if is_content_active %}has-active-child{% endif %}" data-group="content">
+            <button type="button" 
+                    class="nav-group-toggle {% if is_content_active %}is-expanded{% endif %}" 
+                    id="btn-group-content" 
+                    aria-expanded="{% if is_content_active %}true{% else %}false{% endif %}" 
+                    aria-controls="menu-group-content">
+              <span class="group-toggle-label">
+                <svg class="group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
+                <span>Content</span>
+              </span>
+              <svg class="group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="nav-group-menu {% if is_content_active %}expanded{% endif %}" 
+                 id="menu-group-content" 
+                 role="region" 
+                 aria-labelledby="btn-group-content">
+              <div class="nav-group-inner">
+                {% if is_super or current_user.has_permission('content', 'view') %}
+                  <a href="{{ url_for('content.blog_list') }}" class="nav-link sub-link {% if active_page == 'blog' %}active{% endif %}" {% if active_page == 'blog' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
+                    <span>Blog</span>
+                  </a>
+                  <a href="{{ url_for('content.testimonials_list') }}" class="nav-link sub-link {% if active_page == 'testimonials' %}active{% endif %}" {% if active_page == 'testimonials' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    <span>Testimonials</span>
+                  </a>
+                  <a href="{{ url_for('content.banners_list') }}" class="nav-link sub-link {% if active_page == 'banners' %}active{% endif %}" {% if active_page == 'banners' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/></svg>
+                    <span>Banners</span>
+                  </a>
+                  <a href="{{ url_for('content.ads_list') }}" class="nav-link sub-link {% if active_page == 'ads' %}active{% endif %}" {% if active_page == 'ads' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="20" height="14" x="2" y="5" rx="2"/><path d="M7 15h2l1.5-4 1.5 4h2"/><path d="M7.7 13h5.6"/><path d="M18 9v6"/></svg>
+                    <span>Ads & AdSense</span>
+                  </a>
+                  <a href="{{ url_for('content.welcome_popup_page') }}" class="nav-link sub-link {% if active_page == 'welcome_popup' %}active{% endif %}" {% if active_page == 'welcome_popup' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+                    <span>Welcome Popup</span>
+                  </a>
+                  <a href="{{ url_for('content.guruji_profile') }}" class="nav-link sub-link {% if active_page == 'guruji' %}active{% endif %}" {% if active_page == 'guruji' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+                    <span>Guruji Profile</span>
+                  </a>
+                  <a href="{{ url_for('content.site_text_page') }}" class="nav-link sub-link {% if active_page == 'site_text' %}active{% endif %}" {% if active_page == 'site_text' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>
+                    <span>Website Text & Headings</span>
+                  </a>
+                  <a href="{{ url_for('content.sections_manager') }}" class="nav-link sub-link {% if active_page == 'sections' %}active{% endif %}" {% if active_page == 'sections' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/><path d="M7 10h10M7 14h10"/></svg>
+                    <span>Page Layout & Sections</span>
+                  </a>
+                {% endif %}
+                {% if is_super or current_user.has_permission('media', 'view') %}
+                  <a href="{{ url_for('content.media_list') }}" class="nav-link sub-link {% if active_page == 'media' %}active{% endif %}" {% if active_page == 'media' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                    <span>Media</span>
+                  </a>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endif %}
 
-        <!-- System -->
-        <div class="nav-section-title">System</div>
-        <a href="{{ url_for('system.users_list') }}" class="nav-link {% if active_page == 'users' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          <span>Admin Users & Roles</span>
-        </a>
-        <a href="{{ url_for('system.reports_page') }}" class="nav-link {% if active_page == 'reports' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
-          <span>Reports</span>
-        </a>
-        <a href="{{ url_for('system.audit_logs_list') }}" class="nav-link {% if active_page == 'audit_logs' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-          <span>Audit Logs</span>
-        </a>
-        <a href="{{ url_for('system.settings_page') }}" class="nav-link {% if active_page == 'settings' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          <span>Settings</span>
-        </a>
+        <!-- Operations Group -->
+        {% if can_operations %}
+          {% set is_operations_active = active_page in ['payments', 'coupons', 'shipping', 'enquiries'] %}
+          <div class="nav-group {% if is_operations_active %}has-active-child{% endif %}" data-group="operations">
+            <button type="button" 
+                    class="nav-group-toggle {% if is_operations_active %}is-expanded{% endif %}" 
+                    id="btn-group-operations" 
+                    aria-expanded="{% if is_operations_active %}true{% else %}false{% endif %}" 
+                    aria-controls="menu-group-operations">
+              <span class="group-toggle-label">
+                <svg class="group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                <span>Operations</span>
+              </span>
+              <svg class="group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="nav-group-menu {% if is_operations_active %}expanded{% endif %}" 
+                 id="menu-group-operations" 
+                 role="region" 
+                 aria-labelledby="btn-group-operations">
+              <div class="nav-group-inner">
+                {% if is_super or current_user.has_permission('operations', 'view') %}
+                  <a href="{{ url_for('operations.payments_list') }}" class="nav-link sub-link {% if active_page == 'payments' %}active{% endif %}" {% if active_page == 'payments' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                    <span>Payments</span>
+                  </a>
+                  <a href="{{ url_for('operations.coupons_list') }}" class="nav-link sub-link {% if active_page == 'coupons' %}active{% endif %}" {% if active_page == 'coupons' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 14 4 9l5-5 5 5-5 5Z"/><path d="m14 9 5 5-5 5-5-5 5-5Z"/></svg>
+                    <span>Coupons</span>
+                  </a>
+                  <a href="{{ url_for('operations.shipping_list') }}" class="nav-link sub-link {% if active_page == 'shipping' %}active{% endif %}" {% if active_page == 'shipping' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>
+                    <span>Shipping & Returns</span>
+                  </a>
+                {% endif %}
+                {% if is_super or current_user.has_permission('enquiries', 'view') %}
+                  <a href="{{ url_for('operations.enquiries_list') }}" class="nav-link sub-link {% if active_page == 'enquiries' %}active{% endif %}" {% if active_page == 'enquiries' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                    <span>Enquiries</span>
+                  </a>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
+        <!-- System Group -->
+        {% if can_system %}
+          {% set is_system_active = active_page in ['users', 'reports', 'audit_logs', 'settings'] %}
+          <div class="nav-group {% if is_system_active %}has-active-child{% endif %}" data-group="system">
+            <button type="button" 
+                    class="nav-group-toggle {% if is_system_active %}is-expanded{% endif %}" 
+                    id="btn-group-system" 
+                    aria-expanded="{% if is_system_active %}true{% else %}false{% endif %}" 
+                    aria-controls="menu-group-system">
+              <span class="group-toggle-label">
+                <svg class="group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <span>System</span>
+              </span>
+              <svg class="group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="nav-group-menu {% if is_system_active %}expanded{% endif %}" 
+                 id="menu-group-system" 
+                 role="region" 
+                 aria-labelledby="btn-group-system">
+              <div class="nav-group-inner">
+                {% if is_super or current_user.has_permission('system', 'view') %}
+                  <a href="{{ url_for('system.users_list') }}" class="nav-link sub-link {% if active_page == 'users' %}active{% endif %}" {% if active_page == 'users' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>Admin Users & Roles</span>
+                  </a>
+                {% endif %}
+                {% if is_super or current_user.has_permission('reports', 'view') %}
+                  <a href="{{ url_for('system.reports_page') }}" class="nav-link sub-link {% if active_page == 'reports' %}active{% endif %}" {% if active_page == 'reports' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                    <span>Reports</span>
+                  </a>
+                {% endif %}
+                {% if is_super %}
+                  <a href="{{ url_for('system.audit_logs_list') }}" class="nav-link sub-link {% if active_page == 'audit_logs' %}active{% endif %}" {% if active_page == 'audit_logs' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    <span>Audit Logs</span>
+                  </a>
+                  <a href="{{ url_for('system.settings_page') }}" class="nav-link sub-link {% if active_page == 'settings' %}active{% endif %}" {% if active_page == 'settings' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    <span>Settings</span>
+                  </a>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endif %}
       </nav>
     </aside>
 

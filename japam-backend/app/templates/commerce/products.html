@@ -86,9 +86,9 @@
       </thead>
       <tbody>
         {% for prod in products %}
-        <tr>
+        <tr id="product-row-{{ prod.id }}">
           <td style="text-align:center;">
-            <span style="display:inline-flex; align-items:center; justify-content:center; min-width:32px; height:26px; padding:0 6px; border-radius:99px; background:rgba(224,176,74,0.18); color:var(--saffron-600, #d97706); font-weight:800; font-size:0.8rem; border:1px solid rgba(224,176,74,0.38);">
+            <span class="product-rank-badge" style="display:inline-flex; align-items:center; justify-content:center; min-width:32px; height:26px; padding:0 6px; border-radius:99px; background:rgba(224,176,74,0.18); color:var(--saffron-600, #d97706); font-weight:800; font-size:0.8rem; border:1px solid rgba(224,176,74,0.38);">
               #{{ prod.display_rank if prod.display_rank is not none else 1 }}
             </span>
           </td>
@@ -96,7 +96,7 @@
             <div class="product-cell">
               <img src="{{ prod.thumbnail or '/static/img/product-default.png' }}" alt="{{ prod.name }}" class="product-thumb" onerror="this.src='/static/img/product-default.png'">
               <div>
-                <div style="font-weight:600;">{{ prod.name }}</div>
+                <div class="product-title" style="font-weight:600;">{{ prod.name }}</div>
                 {% if prod.attributes %}
                   <div style="font-size:0.72rem; color:var(--text-muted);">
                     {% for k, v in prod.attributes.items() %}
@@ -108,30 +108,43 @@
             </div>
           </td>
           <td style="font-size:0.78rem; font-family:monospace; color:var(--text-muted);">{{ prod.sku }}</td>
-          <td>{{ prod.category.name if prod.category else '-' }}</td>
-          <td style="font-weight:600;">{{ format_currency(prod.price) }}</td>
+          <td class="product-category-cell">{{ prod.category.name if prod.category else '-' }}</td>
+          <td class="product-price-cell" style="font-weight:600;">{{ format_currency(prod.price) }}</td>
           <td>
-            <span class="{% if prod.is_low_stock %}stock-alert-text{% endif %}">
+            <span class="product-stock-cell {% if prod.is_low_stock %}stock-alert-text{% endif %}">
               {{ prod.stock_quantity }}
             </span>
           </td>
           <td>
-            <span class="badge badge-{{ 'delivered' if prod.certification_status == 'certified' else 'pending' }}">
+            <span class="badge product-cert-badge badge-{{ 'delivered' if prod.certification_status == 'certified' else 'pending' }}">
               {{ prod.certification_status }}
             </span>
           </td>
           <td>
             {% if prod.is_archived or prod.publishing_status == 'archived' %}
-              <span class="badge badge-cancelled">Archived</span>
+              <span class="badge product-status-badge badge-cancelled">Archived</span>
             {% elif prod.publishing_status == 'published' %}
-              <span class="badge badge-published">Published</span>
+              <span class="badge product-status-badge badge-published">Published</span>
             {% else %}
-              <span class="badge badge-processing">Draft</span>
+              <span class="badge product-status-badge badge-processing">Draft</span>
             {% endif %}
           </td>
           <td>
             <div style="display:flex; gap:0.4rem; align-items:center;">
-              <button type="button" class="btn-action-outline" onclick="openEditProductModal({{ prod.id }}, '{{ prod.name|replace('\'', '\\\'') }}', {{ prod.category_id or 'null' }}, '{{ prod.price }}', '{{ prod.compare_price or '' }}', {{ prod.stock_quantity }}, {{ prod.low_stock_threshold }}, '{{ prod.certification_status }}', '{{ prod.publishing_status }}', '{{ (prod.thumbnail or '')|replace('\'', '\\\'') }}', '{{ (prod.description or '')|replace('\'', '\\\'')|replace('\n', ' ') }}', {{ prod.display_rank if prod.display_rank is not none else 1 }})">Edit</button>
+              <textarea id="prod-desc-{{ prod.id }}" style="display:none;">{{ prod.description or '' }}</textarea>
+              <button type="button" class="btn-action-outline edit-product-btn"
+                data-id="{{ prod.id }}"
+                data-name="{{ prod.name|e }}"
+                data-category-id="{{ prod.category_id or '' }}"
+                data-price="{{ prod.price }}"
+                data-compare-price="{{ prod.compare_price or '' }}"
+                data-stock="{{ prod.stock_quantity }}"
+                data-threshold="{{ prod.low_stock_threshold }}"
+                data-cert="{{ prod.certification_status }}"
+                data-status="{{ prod.publishing_status }}"
+                data-thumb="{{ prod.thumbnail or '' }}"
+                data-rank="{{ prod.display_rank if prod.display_rank is not none else 1 }}"
+                onclick="openEditProductFromBtn(this)">Edit</button>
               {% if prod.is_archived or prod.publishing_status == 'archived' %}
                 <form action="{{ url_for('commerce.product_unarchive', product_id=prod.id) }}?archive_status={{ archive_status or 'all' }}" method="POST" onsubmit="return confirm('Are you sure you want to unarchive and restore product '{{ prod.name|replace("'", "\\'") }}'?');" style="display:inline;">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -295,8 +308,11 @@
       <h3 class="modal-title">Edit Spiritual Product</h3>
       <button type="button" class="modal-close" onclick="closeModal('editProductModal')">&times;</button>
     </div>
+    <!-- Inline Error Box -->
+    <div id="editProductError" style="display:none; margin:0 1.5rem 0.75rem 1.5rem; padding:0.65rem 1rem; border-radius:8px; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; font-size:0.85rem; line-height:1.4;"></div>
     <form id="editProductForm" action="" method="POST" enctype="multipart/form-data">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="product_id" id="editProdId" value="">
       <div class="modal-body">
         <div class="form-row" style="display:grid; grid-template-columns:2fr 1fr; gap:1rem;">
           <div class="form-group">
@@ -385,13 +401,55 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn-secondary" onclick="closeModal('editProductModal')">Cancel</button>
-        <button type="submit" class="btn-primary">Update Product</button>
+        <button type="submit" id="editProductSubmitBtn" class="btn-primary">Update Product</button>
       </div>
     </form>
   </div>
 </div>
 
+<!-- Floating Toast Container -->
+<div class="cat-toast-container" id="productToastContainer"></div>
+
 <script>
+function showAdminToast(message, type = 'success') {
+  const container = document.getElementById('productToastContainer');
+  if (!container) return;
+
+  const toast = document.createElement('div');
+  toast.className = `cat-toast ${type}`;
+  toast.innerHTML = `<span>${message}</span>`;
+  container.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.classList.add('show');
+  });
+
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 300);
+  }, 3200);
+}
+
+function showEditError(msg) {
+  const errBox = document.getElementById('editProductError');
+  if (errBox) {
+    errBox.textContent = msg;
+    errBox.style.display = 'block';
+  }
+}
+
+function clearEditError() {
+  const errBox = document.getElementById('editProductError');
+  if (errBox) {
+    errBox.textContent = '';
+    errBox.style.display = 'none';
+  }
+}
+
 function handleImageSelection(fileInput, textInputId, previewImgId, statusId) {
   if (fileInput.files && fileInput.files[0]) {
     const file = fileInput.files[0];
@@ -454,7 +512,25 @@ function openAddProductModal(defaultCatId) {
   openModal('addProductModal');
 }
 
-function openEditProductModal(id, name, catId, price, comparePrice, stock, threshold, cert, status, thumb, desc, displayRank) {
+async function openEditProductFromBtn(btn) {
+  clearEditError();
+  const id = btn.getAttribute('data-id');
+  const name = btn.getAttribute('data-name') || '';
+  const catId = btn.getAttribute('data-category-id') || '';
+  const price = btn.getAttribute('data-price') || '';
+  const comparePrice = btn.getAttribute('data-compare-price') || '';
+  const stock = btn.getAttribute('data-stock') || '0';
+  const threshold = btn.getAttribute('data-threshold') || '10';
+  const cert = btn.getAttribute('data-cert') || 'certified';
+  const status = btn.getAttribute('data-status') || 'published';
+  const thumb = btn.getAttribute('data-thumb') || '';
+  const rank = btn.getAttribute('data-rank') || '1';
+
+  const descEl = document.getElementById('prod-desc-' + id);
+  const desc = descEl ? descEl.value : '';
+
+  // Populate form with current cached/button values immediately
+  document.getElementById('editProdId').value = id;
   document.getElementById('editProductForm').action = "/admin/commerce/products/" + id + "/edit";
   document.getElementById('editProdName').value = name;
   if (catId) document.getElementById('editProdCategory').value = catId;
@@ -464,19 +540,18 @@ function openEditProductModal(id, name, catId, price, comparePrice, stock, thres
   document.getElementById('editProdThreshold').value = threshold;
   document.getElementById('editProdCert').value = cert;
   document.getElementById('editProdStatus').value = status;
-  document.getElementById('editProdThumb').value = thumb || '';
+  document.getElementById('editProdThumb').value = thumb;
   document.getElementById('editProdDesc').value = desc;
-  var parsedRank = (displayRank !== undefined && displayRank !== null && displayRank !== '' && !isNaN(Number(displayRank))) ? Number(displayRank) : 1;
-  document.getElementById('editProdDisplayRank').value = parsedRank;
+  document.getElementById('editProdDisplayRank').value = rank;
 
-  // Setup preview for existing or new image
-  const preview = document.getElementById('editProdPreview');
-  const wrap = document.getElementById('editProdPreviewWrap');
+  // Reset status and file input
   const statusEl = document.getElementById('editImgStatus');
   if (statusEl) statusEl.innerText = '';
   const fileInp = document.getElementById('editProdFileInput');
   if (fileInp) fileInp.value = '';
 
+  const preview = document.getElementById('editProdPreview');
+  const wrap = document.getElementById('editProdPreviewWrap');
   if (thumb && thumb.trim()) {
     if (wrap) wrap.style.display = 'flex';
     if (preview) {
@@ -487,8 +562,235 @@ function openEditProductModal(id, name, catId, price, comparePrice, stock, thres
     if (wrap) wrap.style.display = 'none';
   }
 
+  // Ensure submit button is enabled and has standard label
+  const submitBtn = document.getElementById('editProductSubmitBtn');
+  if (submitBtn) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Update Product';
+  }
+
   openModal('editProductModal');
+
+  // Asynchronously verify latest values from server data endpoint to ensure absolute freshness
+  try {
+    const res = await fetch('/admin/commerce/products/' + id + '/data');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.success && data.product) {
+        const p = data.product;
+        // Only update if modal is still active and corresponds to this product
+        if (document.getElementById('editProdId').value === String(id)) {
+          document.getElementById('editProdName').value = p.name;
+          if (p.category_id) document.getElementById('editProdCategory').value = p.category_id;
+          document.getElementById('editProdPrice').value = p.price;
+          document.getElementById('editProdComparePrice').value = p.compare_price;
+          document.getElementById('editProdStock').value = p.stock_quantity;
+          document.getElementById('editProdThreshold').value = p.low_stock_threshold;
+          document.getElementById('editProdCert').value = p.certification_status;
+          document.getElementById('editProdStatus').value = p.publishing_status;
+          document.getElementById('editProdThumb').value = p.thumbnail || '';
+          document.getElementById('editProdDesc').value = p.description || '';
+          document.getElementById('editProdDisplayRank').value = p.display_rank || 1;
+          if (p.thumbnail && p.thumbnail.trim()) {
+            if (wrap) wrap.style.display = 'flex';
+            if (preview) {
+              preview.style.display = 'block';
+              preview.src = p.thumbnail;
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.debug('Fresh data check:', err);
+  }
 }
+
+function openEditProductModal(id, name, catId, price, comparePrice, stock, threshold, cert, status, thumb, desc, displayRank) {
+  const btn = document.querySelector(`.edit-product-btn[data-id="${id}"]`);
+  if (btn) {
+    openEditProductFromBtn(btn);
+  } else {
+    clearEditError();
+    document.getElementById('editProdId').value = id;
+    document.getElementById('editProductForm').action = "/admin/commerce/products/" + id + "/edit";
+    document.getElementById('editProdName').value = name || '';
+    if (catId) document.getElementById('editProdCategory').value = catId;
+    document.getElementById('editProdPrice').value = price || '';
+    document.getElementById('editProdComparePrice').value = comparePrice || '';
+    document.getElementById('editProdStock').value = stock || '0';
+    document.getElementById('editProdThreshold').value = threshold || '10';
+    document.getElementById('editProdCert').value = cert || 'certified';
+    document.getElementById('editProdStatus').value = status || 'published';
+    document.getElementById('editProdThumb').value = thumb || '';
+    document.getElementById('editProdDesc').value = desc || '';
+    document.getElementById('editProdDisplayRank').value = displayRank || 1;
+    openModal('editProductModal');
+  }
+}
+
+function updateProductRowInTable(p) {
+  const row = document.getElementById('product-row-' + p.id);
+  if (!row) return;
+
+  // 1. Display rank badge
+  const rankEl = row.querySelector('.product-rank-badge');
+  if (rankEl) {
+    rankEl.textContent = '#' + (p.display_rank !== undefined && p.display_rank !== null ? p.display_rank : 1);
+  }
+
+  // 2. Thumbnail
+  const thumbEl = row.querySelector('.product-thumb');
+  if (thumbEl && p.thumbnail) {
+    thumbEl.src = p.thumbnail;
+    thumbEl.alt = p.name;
+  }
+
+  // 3. Product title
+  const titleEl = row.querySelector('.product-title');
+  if (titleEl) {
+    titleEl.textContent = p.name;
+  }
+
+  // 4. Category
+  const catEl = row.querySelector('.product-category-cell');
+  if (catEl) {
+    catEl.textContent = p.category_name || '-';
+  }
+
+  // 5. Price
+  const priceEl = row.querySelector('.product-price-cell');
+  if (priceEl) {
+    const num = Number(p.price);
+    priceEl.textContent = !isNaN(num) ? '₹' + num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ('₹' + p.price);
+  }
+
+  // 6. Stock & Low stock alert
+  const stockEl = row.querySelector('.product-stock-cell');
+  if (stockEl) {
+    stockEl.textContent = p.stock_quantity;
+    if (p.is_low_stock) {
+      stockEl.classList.add('stock-alert-text');
+    } else {
+      stockEl.classList.remove('stock-alert-text');
+    }
+  }
+
+  // 7. Certification badge
+  const certEl = row.querySelector('.product-cert-badge');
+  if (certEl) {
+    certEl.textContent = p.certification_status;
+    certEl.className = 'badge product-cert-badge badge-' + (p.certification_status === 'certified' ? 'delivered' : 'pending');
+  }
+
+  // 8. Publishing status badge
+  const statusEl = row.querySelector('.product-status-badge');
+  if (statusEl) {
+    if (p.is_archived || p.publishing_status === 'archived') {
+      statusEl.className = 'badge product-status-badge badge-cancelled';
+      statusEl.textContent = 'Archived';
+    } else if (p.publishing_status === 'published') {
+      statusEl.className = 'badge product-status-badge badge-published';
+      statusEl.textContent = 'Published';
+    } else {
+      statusEl.className = 'badge product-status-badge badge-processing';
+      statusEl.textContent = 'Draft';
+    }
+  }
+
+  // 9. Update the Edit button data attributes and description textarea
+  const btn = row.querySelector('.edit-product-btn');
+  if (btn) {
+    btn.setAttribute('data-name', p.name);
+    btn.setAttribute('data-category-id', p.category_id || '');
+    btn.setAttribute('data-price', p.price);
+    btn.setAttribute('data-compare-price', p.compare_price || '');
+    btn.setAttribute('data-stock', p.stock_quantity);
+    btn.setAttribute('data-threshold', p.low_stock_threshold);
+    btn.setAttribute('data-cert', p.certification_status);
+    btn.setAttribute('data-status', p.publishing_status);
+    btn.setAttribute('data-thumb', p.thumbnail || '');
+    btn.setAttribute('data-rank', p.display_rank || 1);
+  }
+  const descEl = document.getElementById('prod-desc-' + p.id);
+  if (descEl) {
+    descEl.value = p.description || '';
+  }
+}
+
+let isSavingProduct = false;
+
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('editProductForm');
+  if (!form) return;
+
+  form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    if (isSavingProduct) return;
+
+    clearEditError();
+    const submitBtn = document.getElementById('editProductSubmitBtn');
+    const nameInput = document.getElementById('editProdName');
+    const priceInput = document.getElementById('editProdPrice');
+
+    const nameVal = (nameInput.value || '').trim();
+    if (!nameVal) {
+      showEditError('Product title is required.');
+      nameInput.focus();
+      return;
+    }
+
+    const priceVal = parseFloat(priceInput.value);
+    if (isNaN(priceVal) || priceVal < 0) {
+      showEditError('Please enter a valid non-negative price.');
+      priceInput.focus();
+      return;
+    }
+
+    isSavingProduct = true;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Updating...';
+    }
+
+    try {
+      const formData = new FormData(form);
+      const res = await fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'application/json'
+        }
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success && data.product) {
+        // Update DOM row in-place
+        updateProductRowInTable(data.product);
+
+        // Show toast notification
+        showAdminToast(data.message || `✓ Product "${data.product.name}" updated successfully.`, 'success');
+
+        // Close modal
+        closeModal('editProductModal');
+      } else {
+        // Error from server: keep modal open and preserve form input
+        const errorMsg = (data && (data.error || data.message)) || `Server responded with status ${res.status}`;
+        showEditError(errorMsg);
+      }
+    } catch (err) {
+      console.error('Save product error:', err);
+      showEditError('Network error while saving. Your changes are preserved. Please check your connection and try again.');
+    } finally {
+      isSavingProduct = false;
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Update Product';
+      }
+    }
+  });
+});
 </script>
 {% endblock %}
 

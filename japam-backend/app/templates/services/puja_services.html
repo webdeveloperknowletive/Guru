@@ -60,7 +60,18 @@
           </td>
           <td>
             <div style="display:flex; gap:0.4rem; align-items:center;">
-              <button type="button" class="btn-action-outline" onclick="openEditPujaModal({{ svc.id }}, '{{ svc.name|replace('\'', '\\\'') }}', '{{ (svc.deity or '')|replace('\'', '\\\'') }}', '{{ (svc.icon or '🪔')|replace('\'', '\\\'') }}', '{{ svc.price }}', {{ svc.duration_minutes }}, '{{ (svc.description or '')|replace('\'', '\\\'')|replace('\n', ' ') }}', {{ 'true' if svc.is_online_available else 'false' }}, {{ 'true' if svc.is_offline_available else 'false' }}, {{ 'true' if svc.is_active else 'false' }})">Edit</button>
+              <textarea id="puja-desc-{{ svc.id }}" style="display:none;">{{ svc.description or '' }}</textarea>
+              <button type="button" class="btn-action-outline edit-puja-btn"
+                data-id="{{ svc.id }}"
+                data-name="{{ svc.name|e }}"
+                data-deity="{{ (svc.deity or '')|e }}"
+                data-icon="{{ (svc.icon or '🪔')|e }}"
+                data-price="{{ svc.price }}"
+                data-duration="{{ svc.duration_minutes }}"
+                data-online="{{ 'true' if svc.is_online_available else 'false' }}"
+                data-offline="{{ 'true' if svc.is_offline_available else 'false' }}"
+                data-active="{{ 'true' if svc.is_active else 'false' }}"
+                onclick="openEditPujaFromBtn(this)">Edit</button>
               <form action="{{ url_for('services.puja_service_delete', service_id=svc.id) }}" method="POST" onsubmit="return confirm('Delete puja service {{ svc.name|replace('\'', '\\\'') }}?')">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <button type="submit" class="btn-action-outline" style="color:var(--status-red-text); border-color:#fca5a5;">Delete</button>
@@ -197,7 +208,20 @@
 </div>
 
 <script>
-function openEditPujaModal(id, name, deity, icon, price, duration, desc, online, offline, active) {
+function openEditPujaFromBtn(btn) {
+  const id = btn.getAttribute('data-id');
+  const name = btn.getAttribute('data-name') || '';
+  const deity = btn.getAttribute('data-deity') || '';
+  const icon = btn.getAttribute('data-icon') || '🪔';
+  const price = btn.getAttribute('data-price') || '';
+  const duration = btn.getAttribute('data-duration') || '60';
+  const online = btn.getAttribute('data-online') === 'true';
+  const offline = btn.getAttribute('data-offline') === 'true';
+  const active = btn.getAttribute('data-active') === 'true';
+
+  const descEl = document.getElementById('puja-desc-' + id);
+  const desc = descEl ? descEl.value : '';
+
   document.getElementById('editPujaForm').action = "/admin/services/puja/" + id + "/edit";
   document.getElementById('editPujaName').value = name;
   document.getElementById('editPujaDeity').value = deity;
@@ -209,6 +233,26 @@ function openEditPujaModal(id, name, deity, icon, price, duration, desc, online,
   document.getElementById('editPujaOffline').checked = offline;
   document.getElementById('editPujaActive').checked = active;
   openModal('editPujaModal');
+}
+
+function openEditPujaModal(id, name, deity, icon, price, duration, desc, online, offline, active) {
+  const btn = document.querySelector(`.edit-puja-btn[data-id="${id}"]`);
+  if (btn) {
+    openEditPujaFromBtn(btn);
+  } else {
+    document.getElementById('editPujaForm').action = "/admin/services/puja/" + id + "/edit";
+    document.getElementById('editPujaName').value = name || '';
+    document.getElementById('editPujaDeity').value = deity || '';
+    document.getElementById('editPujaIcon').value = icon || '';
+    document.getElementById('editPujaPrice').value = price || '';
+    document.getElementById('editPujaDuration').value = duration || '';
+    const descEl = document.getElementById('puja-desc-' + id);
+    document.getElementById('editPujaDesc').value = descEl ? descEl.value : (desc || '');
+    document.getElementById('editPujaOnline').checked = Boolean(online);
+    document.getElementById('editPujaOffline').checked = Boolean(offline);
+    document.getElementById('editPujaActive').checked = Boolean(active);
+    openModal('editPujaModal');
+  }
 }
 </script>
 {% endblock %}

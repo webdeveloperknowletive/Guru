@@ -36,6 +36,7 @@ export default function Hero({ banner, bgImage, bgSlides = [], secBtn }) {
 
   return (
     <section 
+      id="hero"
       className="hero"
       style={{
         position: 'relative',

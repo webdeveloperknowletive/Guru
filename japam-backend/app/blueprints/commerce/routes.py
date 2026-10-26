@@ -274,15 +274,57 @@ def product_unarchive(product_id):
     return redirect(url_for("commerce.products_list", archive_status=ret_archive))
 
 
+@commerce_bp.route("/products/<int:product_id>/data", methods=["GET"])
+@login_required
+@permission_required("commerce", "view")
+def product_data(product_id):
+    product = Product.query.get_or_404(product_id)
+    return jsonify({
+        "success": True,
+        "product": {
+            "id": product.id,
+            "name": product.name,
+            "sku": product.sku,
+            "slug": product.slug,
+            "category_id": product.category_id,
+            "category_name": product.category.name if product.category else "",
+            "price": str(product.price),
+            "compare_price": str(product.compare_price) if product.compare_price is not None else "",
+            "stock_quantity": product.stock_quantity,
+            "low_stock_threshold": product.low_stock_threshold,
+            "certification_status": product.certification_status,
+            "publishing_status": product.publishing_status,
+            "thumbnail": product.thumbnail or "",
+            "description": product.description or "",
+            "display_rank": product.display_rank,
+            "is_low_stock": product.is_low_stock,
+            "is_archived": bool(product.is_archived or product.publishing_status == "archived"),
+        }
+    })
+
+
 @commerce_bp.route("/products/<int:product_id>/edit", methods=["POST"])
 @login_required
 @permission_required("commerce", "edit")
 def product_update(product_id):
     user = get_current_admin()
     product = Product.query.get_or_404(product_id)
+    is_ajax = (
+        request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        or request.is_json
+        or "application/json" in request.headers.get("Accept", "")
+    )
 
-    name = request.form.get("name", "").strip()
-    raw_cat = request.form.get("category_id") or request.form.get("category")
+    req_data = request.get_json() if request.is_json else request.form
+
+    name = req_data.get("name", "").strip()
+    if not name:
+        if is_ajax:
+            return jsonify({"success": False, "error": "Product name is required."}), 400
+        flash("Product name is required.", "danger")
+        return redirect(request.referrer or url_for("commerce.products_list"))
+
+    raw_cat = req_data.get("category_id") or req_data.get("category")
     category_id = None
     if raw_cat is not None and str(raw_cat).strip():
         raw_cat_str = str(raw_cat).strip()
@@ -296,43 +338,71 @@ def product_update(product_id):
             ).first()
             if cat_obj:
                 category_id = cat_obj.id
-    price_val = request.form.get("price")
-    compare_price_val = request.form.get("compare_price")
-    stock_qty = request.form.get("stock_quantity", type=int)
-    threshold = request.form.get("low_stock_threshold", type=int)
-    certification = request.form.get("certification_status")
-    pub_status = request.form.get("publishing_status")
-    description = request.form.get("description", "").strip()
-    thumbnail = request.form.get("thumbnail", "").strip()
-    display_rank = request.form.get("display_rank", 999, type=int)
-    if not display_rank or display_rank < 1:
-        display_rank = 999
 
-    if name:
-        product.name = name
-    if category_id:
-        product.category_id = category_id
-    if price_val:
-        product.price = Decimal(price_val)
+    price_val = req_data.get("price")
+    if price_val is not None:
+        try:
+            parsed_price = Decimal(str(price_val).strip())
+            if parsed_price < 0:
+                raise ValueError("Price cannot be negative")
+            product.price = parsed_price
+        except Exception:
+            if is_ajax:
+                return jsonify({"success": False, "error": "Please enter a valid non-negative price."}), 400
+            flash("Please enter a valid price.", "danger")
+            return redirect(request.referrer or url_for("commerce.products_list"))
+
+    compare_price_val = req_data.get("compare_price")
     if compare_price_val is not None:
-        product.compare_price = Decimal(compare_price_val) if compare_price_val.strip() else None
-    if stock_qty is not None:
-        product.stock_quantity = stock_qty
-    if threshold is not None:
-        product.low_stock_threshold = threshold
+        str_comp = str(compare_price_val).strip()
+        if str_comp:
+            try:
+                product.compare_price = Decimal(str_comp)
+            except Exception:
+                pass
+        else:
+            product.compare_price = None
+
+    stock_val = req_data.get("stock_quantity")
+    if stock_val is not None and str(stock_val).strip() != "":
+        try:
+            product.stock_quantity = int(stock_val)
+        except (ValueError, TypeError):
+            pass
+
+    threshold_val = req_data.get("low_stock_threshold")
+    if threshold_val is not None and str(threshold_val).strip() != "":
+        try:
+            product.low_stock_threshold = int(threshold_val)
+        except (ValueError, TypeError):
+            pass
+
+    certification = req_data.get("certification_status")
     if certification:
-        product.certification_status = certification
+        product.certification_status = certification.strip()
+
+    pub_status = req_data.get("publishing_status")
     if pub_status:
-        product.publishing_status = pub_status
-    if description:
-        product.description = description
+        product.publishing_status = pub_status.strip()
+        if product.publishing_status == "archived":
+            product.is_archived = True
+            product.archived_at = datetime.now(timezone.utc)
+        elif product.is_archived:
+            product.is_archived = False
+            product.archived_at = None
+
+    if "description" in req_data:
+        product.description = req_data.get("description", "").strip()
+
+    thumbnail = req_data.get("thumbnail", "").strip()
     thumb_file = request.files.get("thumbnail_file") or request.files.get("image") or request.files.get("file")
     resolved_thumb = CommerceService.ingest_product_thumbnail(file_obj=thumb_file, raw_path_or_url=thumbnail)
     if resolved_thumb:
         product.thumbnail = resolved_thumb
     elif thumbnail:
         product.thumbnail = thumbnail
-    raw_rank = request.form.get("display_rank") or request.form.get("displayRank") or request.form.get("rank")
+
+    raw_rank = req_data.get("display_rank") or req_data.get("displayRank") or req_data.get("rank")
     if raw_rank is not None and str(raw_rank).strip():
         try:
             rank_val = int(raw_rank)
@@ -340,9 +410,10 @@ def product_update(product_id):
                 product.display_rank = rank_val
         except (ValueError, TypeError):
             pass
-    display_rank = request.form.get("display_rank", type=int)
-    if display_rank is not None and display_rank >= 1:
-        product.display_rank = display_rank
+
+    product.name = name
+    if category_id:
+        product.category_id = category_id
 
     product.updated_at = datetime.now(timezone.utc)
     db.session.commit()
@@ -356,6 +427,33 @@ def product_update(product_id):
         entity_id=str(product.id),
         details={"sku": product.sku, "name": product.name, "price": str(product.price), "stock": product.stock_quantity},
     )
+
+    if is_ajax:
+        return jsonify({
+            "success": True,
+            "message": f"Product '{product.name}' updated successfully.",
+            "product": {
+                "id": product.id,
+                "name": product.name,
+                "sku": product.sku,
+                "slug": product.slug,
+                "category_id": product.category_id,
+                "category_name": product.category.name if product.category else "-",
+                "price": str(product.price),
+                "price_num": float(product.price),
+                "compare_price": str(product.compare_price) if product.compare_price is not None else "",
+                "stock_quantity": product.stock_quantity,
+                "low_stock_threshold": product.low_stock_threshold,
+                "certification_status": product.certification_status,
+                "publishing_status": product.publishing_status,
+                "thumbnail": product.thumbnail or "/static/img/product-default.png",
+                "description": product.description or "",
+                "display_rank": product.display_rank,
+                "is_low_stock": product.is_low_stock,
+                "is_archived": bool(product.is_archived or product.publishing_status == "archived"),
+            }
+        })
+
     flash(f"Product '{product.name}' updated successfully.", "success")
     return redirect(url_for("commerce.products_list", category_id=category_id, archive_status="active"))
 
@@ -522,6 +620,45 @@ def category_update(category_id):
         details={"name": cat.name, "is_active": cat.is_active},
     )
     flash(f"Category '{cat.name}' updated successfully.", "success")
+    return redirect(url_for("commerce.categories_list"))
+
+
+@commerce_bp.route("/categories/<int:category_id>/toggle-status", methods=["POST"])
+@login_required
+@permission_required("commerce", "edit")
+def category_toggle_status(category_id):
+    user = get_current_admin()
+    cat = Category.query.get_or_404(category_id)
+    cat.is_active = not cat.is_active
+    db.session.commit()
+
+    AuditService.log(
+        action="CATEGORY_UPDATE",
+        module="commerce",
+        actor_email=user.email,
+        actor_user_id=user.id,
+        entity_type="Category",
+        entity_id=str(cat.id),
+        details={"name": cat.name, "is_active": cat.is_active, "field": "toggle_status"},
+    )
+
+    is_ajax = (
+        request.is_json
+        or request.headers.get("Accept") == "application/json"
+        or request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    )
+
+    if is_ajax:
+        return jsonify({
+            "success": True,
+            "category_id": cat.id,
+            "name": cat.name,
+            "is_active": cat.is_active,
+            "status_text": "Active" if cat.is_active else "Inactive",
+            "message": f"Category '{cat.name}' is now {'Active' if cat.is_active else 'Inactive'}."
+        })
+
+    flash(f"Category '{cat.name}' is now {'Active' if cat.is_active else 'Inactive'}.", "success")
     return redirect(url_for("commerce.categories_list"))
 
 

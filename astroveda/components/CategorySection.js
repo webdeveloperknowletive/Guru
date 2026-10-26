@@ -25,8 +25,8 @@ function getCategoryBgImage(cat = {}) {
 }
 
 export default function CategorySection({ categories: initialCategories, headerText }) {
-  const [showAll, setShowAll] = useState(false);
-  const [selectedSection, setSelectedSection] = useState('even');
+  const [showAll, setShowAll] = useState(true);
+  const [selectedSection, setSelectedSection] = useState('all');
 
   const categories = (initialCategories && initialCategories.length > 0)
     ? initialCategories.map(c => ({

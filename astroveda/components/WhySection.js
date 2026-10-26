@@ -40,7 +40,7 @@ export default function WhySection({ sectionText }) {
     : reasons;
 
   return (
-    <section className="why-section">
+    <section id="why" className="why-section">
       <div className="wrap">
         <div className="sec-head center reveal">
           <span className="kicker">{kicker}</span>

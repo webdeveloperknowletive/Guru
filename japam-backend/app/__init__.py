@@ -67,6 +67,7 @@ def create_app(config_name=None) -> Flask:
 
     with app.app_context():
         try:
+            db.create_all()
             from sqlalchemy import inspect, text
             inspector = inspect(db.engine)
             if "categories" in inspector.get_table_names():

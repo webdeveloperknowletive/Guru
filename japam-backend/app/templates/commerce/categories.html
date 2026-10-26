@@ -3,11 +3,484 @@
 {% block title %}Spiritual Categories{% endblock %}
 
 {% block content %}
-<div class="page-header-row">
-  <div>
+<style>
+/* ==========================================================================
+   PRODUCT CATEGORIES RESPONSIVE UI & INTERACTIVE STATUS TOGGLE
+   ========================================================================== */
+
+/* Page Header Stats & Layout */
+.cat-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.cat-header-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.cat-header-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.cat-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 0.22rem 0.65rem;
+  border-radius: 9999px;
+  background: var(--bg-card-subtle, #fef3eb);
+  color: var(--text-secondary, #6b7280);
+  border: 1px solid var(--border-light, #fcd34d33);
+}
+
+.cat-stat-pill.active-sync {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.cat-stat-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.cat-stat-dot.pulse {
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: catPulse 2s infinite;
+}
+
+@keyframes catPulse {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* Card & Table Styles */
+.categories-card {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: var(--radius-lg, 14px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  position: relative;
+}
+
+.categories-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.categories-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  text-align: left;
+  font-size: 0.84rem;
+  min-width: 820px;
+}
+
+.categories-table th {
+  background: var(--bg-card-subtle, #fbf7f4);
+  color: var(--text-muted, #78716c);
+  font-weight: 600;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  white-space: nowrap;
+}
+
+.categories-table td {
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--border-light, #f1f3f5);
+  color: var(--text-primary, #1f2937);
+  vertical-align: middle;
+  background: var(--bg-card, #ffffff);
+  transition: background-color 0.15s ease;
+}
+
+.categories-table tr:hover td {
+  background: rgba(254, 243, 235, 0.4);
+}
+
+.categories-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Cell Elements */
+.cat-name-box {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 600;
+  color: var(--text-primary, #1c1917);
+}
+
+.cat-star-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(245, 158, 11, 0.14);
+  color: #d97706;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.cat-thumb-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-app, #fbf7f4);
+  border: 1px solid var(--border-color, #e7e5e4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cat-thumb-box:hover {
+  transform: scale(1.08);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+.cat-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cat-slug-pill {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.76rem;
+  color: var(--text-secondary, #57534e);
+  background: var(--bg-app, #f5f5f4);
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #e7e5e4);
+  white-space: nowrap;
+}
+
+.cat-desc-cell {
+  color: var(--text-secondary, #44403c);
+  font-size: 0.81rem;
+  line-height: 1.45;
+  max-width: 280px;
+}
+
+.cat-count-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary, #57534e);
+  white-space: nowrap;
+}
+
+.cat-count-badge b {
+  color: var(--text-primary, #1c1917);
+  font-size: 0.88rem;
+}
+
+/* ==========================================================================
+   INTERACTIVE STATUS TOGGLE BUTTON (CLICKABLE)
+   ========================================================================== */
+.cat-status-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.38rem 0.85rem;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  background: transparent;
+  text-decoration: none;
+  position: relative;
+  outline: none;
+}
+
+.cat-status-toggle:focus-visible {
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.4);
+}
+
+/* Active State */
+.cat-status-toggle.is-active {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+  border-color: rgba(16, 185, 129, 0.32);
+}
+
+.cat-status-toggle.is-active:hover {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #10b981;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.2);
+}
+
+/* Inactive State */
+.cat-status-toggle.is-inactive {
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.cat-status-toggle.is-inactive:hover {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: #ef4444;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.2);
+}
+
+.cat-toggle-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: currentColor;
+  transition: transform 0.2s ease;
+}
+
+.cat-status-toggle:hover .cat-toggle-dot {
+  transform: scale(1.25);
+}
+
+.cat-toggle-switch-icon {
+  font-size: 0.72rem;
+  opacity: 0.6;
+  margin-left: 0.15rem;
+  transition: transform 0.25s ease;
+}
+
+.cat-status-toggle:hover .cat-toggle-switch-icon {
+  opacity: 1;
+  transform: rotate(180deg);
+}
+
+/* Loading state during status toggle */
+.cat-status-toggle.is-loading {
+  opacity: 0.65;
+  pointer-events: none;
+  cursor: wait;
+}
+
+.cat-status-toggle.is-loading .cat-toggle-dot {
+  animation: spinDot 0.7s linear infinite;
+}
+
+@keyframes spinDot {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.6); opacity: 0.4; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Actions styling */
+.cat-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+/* ==========================================================================
+   MOBILE RESPONSIVE CARDS VIEW (VISIBLE ON <= 768px)
+   ========================================================================== */
+.categories-mobile-cards {
+  display: none;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 0.85rem;
+}
+
+.cat-mobile-card {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cat-mobile-card:hover {
+  border-color: rgba(245, 158, 11, 0.4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.cat-mobile-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.cat-mobile-info-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.cat-mobile-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.cat-mobile-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-primary, #1c1917);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  word-break: break-word;
+}
+
+.cat-mobile-desc {
+  font-size: 0.82rem;
+  color: var(--text-secondary, #57534e);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.cat-mobile-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px dashed var(--border-light, #e7e5e4);
+  flex-wrap: wrap;
+}
+
+/* Floating Toast Notification */
+.cat-toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.cat-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1.15rem;
+  border-radius: 10px;
+  background: #1c1917;
+  color: #ffffff;
+  font-size: 0.84rem;
+  font-weight: 500;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transform: translateY(20px);
+  opacity: 0;
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cat-toast.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.cat-toast.success {
+  border-left: 4px solid #10b981;
+}
+
+.cat-toast.error {
+  border-left: 4px solid #ef4444;
+}
+
+/* ==========================================================================
+   BREAKPOINTS: FULLY RESPONSIVE FOR ALL DEVICES
+   ========================================================================== */
+@media (max-width: 768px) {
+  .categories-table-wrapper {
+    display: none;
+  }
+  .categories-mobile-cards {
+    display: flex;
+  }
+  .cat-page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.85rem;
+  }
+  .cat-page-header .page-header-actions {
+    width: 100%;
+  }
+  .cat-page-header .page-header-actions .btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (min-width: 769px) {
+  .categories-table-wrapper {
+    display: block;
+  }
+  .categories-mobile-cards {
+    display: none;
+  }
+}
+</style>
+
+<!-- Header Section with Live Sync Indicator -->
+<div class="cat-page-header">
+  <div class="cat-header-title-group">
     <h1 class="page-title">Product Categories</h1>
     <p class="page-subtitle">Organize Ratna, Rudraksha, Yantra, Bracelets, Puja Samagri, and collections for Shop by Category.</p>
+    
+    <div class="cat-header-badges">
+      <span class="cat-stat-pill">
+        <span class="cat-stat-dot"></span>
+        <span id="totalCategoriesCount">{{ categories|length }}</span> Categories Total
+      </span>
+      {% set active_count = categories|selectattr('is_active')|list|length %}
+      <span class="cat-stat-pill active-sync">
+        <span class="cat-stat-dot pulse"></span>
+        <span id="activeCategoriesCount">{{ active_count }}</span> Active on Storefront
+      </span>
+      <span style="font-size:0.75rem; color:var(--text-muted); display:inline-flex; align-items:center; gap:0.25rem;">
+        <span>⚡ Click any status badge below to toggle immediately</span>
+      </span>
+    </div>
   </div>
+  
   <div class="page-header-actions">
     <button type="button" class="btn-primary" onclick="openModal('addCategoryModal')">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
@@ -16,18 +489,20 @@
   </div>
 </div>
 
-<div class="dashboard-card">
-  <div class="table-responsive">
-    <table class="spiritual-table">
+<!-- Main Categories Card -->
+<div class="categories-card">
+  <!-- 1. Desktop & Tablet Table View (min-width: 769px) -->
+  <div class="categories-table-wrapper">
+    <table class="categories-table">
       <thead>
         <tr>
-          <th>Category Name</th>
-          <th>Card Image</th>
-          <th>Slug</th>
-          <th>Description</th>
-          <th>Products Count</th>
-          <th>Status</th>
-          <th>Actions</th>
+          <th style="min-width:180px;">Category Name</th>
+          <th style="width:70px; text-align:center;">Card Image</th>
+          <th style="min-width:130px;">Slug</th>
+          <th style="min-width:240px;">Description</th>
+          <th style="min-width:110px; text-align:center;">Products Count</th>
+          <th style="min-width:130px; text-align:center;">Status (Click to toggle)</th>
+          <th style="min-width:130px; text-align:right;">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -49,53 +524,160 @@
           {% set default_img = '/categories/special-collections.jpg' %}
         {% endif %}
         {% set display_img = cat.image_url or default_img %}
-        <tr>
-          <td style="font-weight:600; display:flex; align-items:center; gap:0.5rem;">
-            <span style="color:var(--saffron-500);">✦</span>
-            {{ cat.name }}
-          </td>
+        <tr id="category-row-{{ cat.id }}">
           <td>
-            <div style="width:48px; height:48px; border-radius:6px; overflow:hidden; background:var(--bg-app); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center;">
+            <div class="cat-name-box">
+              <span class="cat-star-icon">✦</span>
+              <span>{{ cat.name }}</span>
+            </div>
+          </td>
+          <td style="text-align:center;">
+            <div class="cat-thumb-box" style="margin:0 auto;" title="{{ cat.name }} card image">
               {% if display_img %}
-                <img src="{{ display_img }}" alt="{{ cat.name }}" style="width:100%; height:100%; object-fit:cover;">
+                <img src="{{ display_img }}" alt="{{ cat.name }}" class="cat-thumb-img">
               {% else %}
-                <span style="font-size:1.2rem;">{{ cat.icon or '📦' }}</span>
+                <span style="font-size:1.25rem;">{{ cat.icon or '📦' }}</span>
               {% endif %}
             </div>
           </td>
-          <td style="font-family:monospace; color:var(--text-muted); font-size:0.78rem;">{{ cat.slug }}</td>
-          <td style="color:var(--text-secondary);">{{ cat.description or '-' }}</td>
           <td>
-            <span style="font-weight:600;">{{ cat.products|length }}</span> items
+            <span class="cat-slug-pill">{{ cat.slug }}</span>
           </td>
           <td>
-            <span class="badge badge-{{ 'delivered' if cat.is_active else 'cancelled' }}">
-              {{ 'Active' if cat.is_active else 'Inactive' }}
+            <div class="cat-desc-cell">{{ cat.description or '-' }}</div>
+          </td>
+          <td style="text-align:center;">
+            <span class="cat-count-badge">
+              <b>{{ cat.products|length }}</b> items
             </span>
           </td>
-          <td>
-            <div style="display:flex; gap:0.4rem; align-items:center;">
-              <button type="button" class="btn-action-outline" onclick="openEditCategoryModal({{ cat.id }}, '{{ cat.name|replace('\'', '\\\'') }}', '{{ (cat.icon or 'box')|replace('\'', '\\\'') }}', '{{ (cat.description or '')|replace('\'', '\\\'') }}', {{ 'true' if cat.is_active else 'false' }}, '{{ (cat.image_url or '')|replace('\'', '\\\'') }}', '{{ (default_img or '')|replace('\'', '\\\'') }}')">Edit</button>
+          <td style="text-align:center;">
+            <!-- Clickable Interactive Status Button -->
+            <button type="button"
+                    class="cat-status-toggle {{ 'is-active' if cat.is_active else 'is-inactive' }}"
+                    data-category-id="{{ cat.id }}"
+                    data-category-name="{{ cat.name|replace('\'', '\\\'') }}"
+                    data-is-active="{{ 'true' if cat.is_active else 'false' }}"
+                    onclick="toggleCategoryStatus(event, {{ cat.id }}, this)"
+                    title="Click to toggle status: currently {{ 'Active' if cat.is_active else 'Inactive' }} (reflects on website)"
+                    aria-label="Toggle status for {{ cat.name }}">
+              <span class="cat-toggle-dot"></span>
+              <span class="cat-status-label">{{ 'Active' if cat.is_active else 'Inactive' }}</span>
+              <span class="cat-toggle-switch-icon">⇄</span>
+            </button>
+          </td>
+          <td style="text-align:right;">
+            <div class="cat-actions-group" style="justify-content:flex-end;">
+              <button type="button" 
+                      class="btn-action-outline" 
+                      onclick="openEditCategoryModal({{ cat.id }}, '{{ cat.name|replace('\'', '\\\'') }}', '{{ (cat.icon or 'box')|replace('\'', '\\\'') }}', '{{ (cat.description or '')|replace('\'', '\\\'') }}', {{ 'true' if cat.is_active else 'false' }}, '{{ (cat.image_url or '')|replace('\'', '\\\'') }}', '{{ (default_img or '')|replace('\'', '\\\'') }}')">
+                Edit
+              </button>
               <form action="{{ url_for('commerce.category_delete', category_id=cat.id) }}" method="POST" onsubmit="return confirm('Delete category {{ cat.name|replace('\'', '\\\'') }}?')">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <button type="submit" class="btn-action-outline" style="color:var(--status-red-text); border-color:#fca5a5;">Delete</button>
+                <button type="submit" class="btn-action-outline" style="color:var(--status-red-text, #ef4444); border-color:#fca5a5;">Delete</button>
               </form>
             </div>
           </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted);">No categories available.</td>
+          <td colspan="7" style="text-align:center; padding:36px; color:var(--text-muted);">No categories available. Click "Add Category" to create one.</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+
+  <!-- 2. Mobile Cards View (max-width: 768px) -->
+  <div class="categories-mobile-cards">
+    {% for cat in categories %}
+    {% set slug_l = (cat.slug or '')|lower %}
+    {% set name_l = (cat.name or '')|lower %}
+    {% set default_img = '' %}
+    {% if 'rudraksha' in slug_l or 'rudraksha' in name_l %}
+      {% set default_img = '/categories/rudraksha.png' %}
+    {% elif 'ratna' in slug_l or 'gemstone' in slug_l or 'ratna' in name_l %}
+      {% set default_img = '/categories/ratna.png' %}
+    {% elif 'yantra' in slug_l or 'yantra' in name_l %}
+      {% set default_img = '/categories/yantra.png' %}
+    {% elif 'bracelet' in slug_l or 'bracelet' in name_l %}
+      {% set default_img = '/categories/bracelets.png' %}
+    {% elif 'puja' in slug_l or 'samagri' in slug_l or 'samagri' in name_l %}
+      {% set default_img = '/categories/puja-samagri.jpg' %}
+    {% elif 'special' in slug_l %}
+      {% set default_img = '/categories/special-collections.jpg' %}
+    {% endif %}
+    {% set display_img = cat.image_url or default_img %}
+    <div class="cat-mobile-card" id="category-card-{{ cat.id }}">
+      <div class="cat-mobile-header">
+        <div class="cat-mobile-info-group">
+          <div class="cat-thumb-box">
+            {% if display_img %}
+              <img src="{{ display_img }}" alt="{{ cat.name }}" class="cat-thumb-img">
+            {% else %}
+              <span style="font-size:1.2rem;">{{ cat.icon or '📦' }}</span>
+            {% endif %}
+          </div>
+          <div class="cat-mobile-title-block">
+            <span class="cat-mobile-name">
+              <span class="cat-star-icon">✦</span>
+              {{ cat.name }}
+            </span>
+            <span class="cat-slug-pill">{{ cat.slug }}</span>
+          </div>
+        </div>
+        
+        <!-- Clickable Status Toggle on Mobile Card Header -->
+        <button type="button"
+                class="cat-status-toggle {{ 'is-active' if cat.is_active else 'is-inactive' }}"
+                data-category-id="{{ cat.id }}"
+                data-category-name="{{ cat.name|replace('\'', '\\\'') }}"
+                data-is-active="{{ 'true' if cat.is_active else 'false' }}"
+                onclick="toggleCategoryStatus(event, {{ cat.id }}, this)"
+                title="Click to toggle status: currently {{ 'Active' if cat.is_active else 'Inactive' }}"
+                aria-label="Toggle status for {{ cat.name }}">
+          <span class="cat-toggle-dot"></span>
+          <span class="cat-status-label">{{ 'Active' if cat.is_active else 'Inactive' }}</span>
+          <span class="cat-toggle-switch-icon">⇄</span>
+        </button>
+      </div>
+
+      {% if cat.description %}
+      <p class="cat-mobile-desc">{{ cat.description }}</p>
+      {% endif %}
+
+      <div class="cat-mobile-footer">
+        <span class="cat-count-badge">
+          <b>{{ cat.products|length }}</b> items in category
+        </span>
+        <div class="cat-actions-group">
+          <button type="button" 
+                  class="btn-action-outline" 
+                  onclick="openEditCategoryModal({{ cat.id }}, '{{ cat.name|replace('\'', '\\\'') }}', '{{ (cat.icon or 'box')|replace('\'', '\\\'') }}', '{{ (cat.description or '')|replace('\'', '\\\'') }}', {{ 'true' if cat.is_active else 'false' }}, '{{ (cat.image_url or '')|replace('\'', '\\\'') }}', '{{ (default_img or '')|replace('\'', '\\\'') }}')">
+            Edit
+          </button>
+          <form action="{{ url_for('commerce.category_delete', category_id=cat.id) }}" method="POST" onsubmit="return confirm('Delete category {{ cat.name|replace('\'', '\\\'') }}?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="btn-action-outline" style="color:var(--status-red-text, #ef4444); border-color:#fca5a5;">Delete</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div style="text-align:center; padding:30px; color:var(--text-muted);">
+      No categories available. Click "Add Category" to create one.
+    </div>
+    {% endfor %}
+  </div>
 </div>
+
+<!-- Floating Toast Container -->
+<div class="cat-toast-container" id="catToastContainer"></div>
 
 <!-- Add Category Modal -->
 <div class="modal-overlay" id="addCategoryModal">
-  <div class="modal-container">
+  <div class="modal-container" style="max-width:540px;">
     <div class="modal-header">
       <h3 class="modal-title">Create Sacred Category</h3>
       <button type="button" class="modal-close" onclick="closeModal('addCategoryModal')">&times;</button>
@@ -134,7 +716,7 @@
 
 <!-- Edit Category Modal -->
 <div class="modal-overlay" id="editCategoryModal">
-  <div class="modal-container">
+  <div class="modal-container" style="max-width:540px;">
     <div class="modal-header">
       <h3 class="modal-title">Edit Sacred Category</h3>
       <button type="button" class="modal-close" onclick="closeModal('editCategoryModal')">&times;</button>
@@ -148,12 +730,12 @@
         </div>
         <div class="form-group">
           <label class="form-label">Category Image / Card Background</label>
-          <div style="display:flex; gap:0.75rem; align-items:flex-start; margin-bottom:0.5rem;">
-            <div id="editCatImgWrapper" style="width:64px; height:64px; border-radius:6px; overflow:hidden; border:1px solid var(--border-color); background:var(--bg-app); flex-shrink:0; display:flex; align-items:center; justify-content:center;">
+          <div style="display:flex; gap:0.75rem; align-items:flex-start; margin-bottom:0.5rem; flex-wrap:wrap;">
+            <div id="editCatImgWrapper" style="width:64px; height:64px; border-radius:8px; overflow:hidden; border:1px solid var(--border-color); background:var(--bg-app); flex-shrink:0; display:flex; align-items:center; justify-content:center;">
               <img id="editCatImgPreview" src="" alt="Preview" style="width:100%; height:100%; object-fit:cover; display:none;">
               <span id="editCatImgFallback" style="font-size:1.5rem; color:var(--text-muted);">📷</span>
             </div>
-            <div style="flex:1; display:flex; flex-direction:column; gap:0.4rem;">
+            <div style="flex:1; min-width:200px; display:flex; flex-direction:column; gap:0.4rem;">
               <label style="font-size:0.75rem; color:var(--text-muted);">Upload Image File:</label>
               <input type="file" name="image_file" class="form-control" accept="image/*" onchange="previewCatImageUpload(this)">
               <label style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">Or Image URL / Path:</label>
@@ -173,7 +755,7 @@
         <div class="form-group">
           <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
             <input type="checkbox" name="is_active" id="editCatActive" value="1">
-            <span>Category is Active</span>
+            <span style="font-weight:600;">Category is Active (Visible in Shop by Category on website)</span>
           </label>
         </div>
       </div>
@@ -186,6 +768,115 @@
 </div>
 
 <script>
+const CSRF_TOKEN = "{{ csrf_token }}";
+
+/**
+ * Interactive Status Toggle Handler
+ * Seamlessly toggles category is_active status via AJAX, updating UI & website sync instantly
+ */
+async function toggleCategoryStatus(event, categoryId, clickedBtn) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  // Find all toggle buttons matching this category ID (both desktop table and mobile card)
+  const buttons = document.querySelectorAll(`[data-category-id="${categoryId}"]`);
+  
+  // Set loading state
+  buttons.forEach(btn => btn.classList.add('is-loading'));
+
+  try {
+    const response = await fetch(`/admin/commerce/categories/${categoryId}/toggle-status`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': CSRF_TOKEN,
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ csrf_token: CSRF_TOKEN })
+    });
+
+    const data = await response.json();
+
+    if (response.ok && data.success) {
+      const isNowActive = data.is_active;
+      const statusText = isNowActive ? 'Active' : 'Inactive';
+
+      // Update all corresponding toggle buttons on page
+      buttons.forEach(btn => {
+        btn.classList.remove('is-active', 'is-inactive');
+        btn.classList.add(isNowActive ? 'is-active' : 'is-inactive');
+        btn.setAttribute('data-is-active', isNowActive ? 'true' : 'false');
+        btn.setAttribute('title', `Click to toggle status: currently ${statusText} (reflects on website)`);
+
+        const labelEl = btn.querySelector('.cat-status-label');
+        if (labelEl) {
+          labelEl.textContent = statusText;
+        }
+      });
+
+      // Update the active count badge in the header stats
+      updateActiveCategoriesCount();
+
+      // Show sleek confirmation toast
+      showToast(`✓ Category "${data.name}" is now ${statusText}. Synced with website.`, 'success');
+    } else {
+      showToast(data.error || 'Failed to update category status.', 'error');
+    }
+  } catch (err) {
+    console.error('Error toggling category status:', err);
+    showToast('Network error while updating status. Please try again.', 'error');
+  } finally {
+    buttons.forEach(btn => btn.classList.remove('is-loading'));
+  }
+}
+
+/**
+ * Dynamically recount and update active categories in header
+ */
+function updateActiveCategoriesCount() {
+  const activeToggles = document.querySelectorAll('.categories-table tbody .cat-status-toggle.is-active');
+  const activeCountEl = document.getElementById('activeCategoriesCount');
+  if (activeCountEl) {
+    activeCountEl.textContent = activeToggles.length;
+  }
+}
+
+/**
+ * Lightweight Toast Notification
+ */
+function showToast(message, type = 'success') {
+  const container = document.getElementById('catToastContainer');
+  if (!container) return;
+
+  const toast = document.createElement('div');
+  toast.className = `cat-toast ${type}`;
+  toast.innerHTML = `
+    <span>${message}</span>
+  `;
+
+  container.appendChild(toast);
+
+  // Trigger animation
+  requestAnimationFrame(() => {
+    toast.classList.add('show');
+  });
+
+  // Auto remove after 3.2s
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 300);
+  }, 3200);
+}
+
+/**
+ * Edit Modal Handlers
+ */
 function openEditCategoryModal(id, name, icon, desc, isActive, imageUrl, defaultImg) {
   document.getElementById('editCategoryForm').action = "/admin/commerce/categories/" + id + "/edit";
   document.getElementById('editCatName').value = name;

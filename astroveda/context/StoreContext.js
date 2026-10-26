@@ -3,6 +3,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { findProduct, getAllProducts } from '@/lib/products';
 import { calculateCart, checkoutOrder } from '@/lib/api';
 import { getTranslation } from '@/lib/translations';
+import { recordEvent } from '@/lib/analytics';
 
 const StoreContext = createContext(null);
 
@@ -259,6 +260,14 @@ export function StoreProvider({ children }) {
     setWishOpen(false);
     setSearchOpen(false);
     showToast(`${title} — cart मध्ये जोडले`);
+
+    recordEvent({
+      type: 'action',
+      path: typeof window !== 'undefined' ? window.location.pathname : '/',
+      section: 'cart-panel',
+      title: `Added ${title} to Cart`,
+      metadata: { action_name: 'add_to_cart', item_title: title, item_sku: sku }
+    });
   }, [showToast]);
 
   const removeFromCart = useCallback((idOrIndex) => {
@@ -362,6 +371,13 @@ export function StoreProvider({ children }) {
       }
     }
     setProductModal({ show: true, product: prod, title: titleStr, activeImageIdx: selectedIdx });
+    recordEvent({
+      type: 'modal_open',
+      path: typeof window !== 'undefined' ? window.location.pathname : '/',
+      section: 'product-modal',
+      title: `Viewed Product: ${titleStr}`,
+      metadata: { modal_name: 'product_modal', product_title: titleStr }
+    });
   }, []);
 
   const closeProductModal = useCallback(() => {
