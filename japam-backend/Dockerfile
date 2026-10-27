@@ -15,7 +15,13 @@ WORKDIR /app
 
 # Install dependencies separately to preserve Docker build cache.
 COPY requirements.txt /app/
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install \
+    --no-cache-dir \
+    --disable-pip-version-check \
+    --retries 3 \
+    --timeout 30 \
+    --index-url https://pypi.org/simple \
+    -r requirements.txt
 
 # Copy application source code.
 COPY --chown=japam:japam . /app
