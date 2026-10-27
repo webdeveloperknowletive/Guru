@@ -6,10 +6,8 @@
 FROM python:3.13-slim AS base
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    gcc \
-    libpq-dev \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root application user
