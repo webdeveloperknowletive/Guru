@@ -57,6 +57,7 @@ services:
     environment:
       FLASK_ENV: production
       PORT: "5000"
+
       DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER:?Set_POSTGRES_USER_in_Coolify}:${POSTGRES_PASSWORD:?Set_POSTGRES_PASSWORD_in_Coolify}@postgres:5432/${POSTGRES_DB:?Set_POSTGRES_DB_in_Coolify}"
       REDIS_URL: redis://redis:6379/0
 
@@ -74,24 +75,23 @@ services:
       - uploads_data:/app/app/static/uploads
       - uploads_data:/app/uploads
 
-    
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
 
+    # Use Python's built-in HTTP client instead of curl.
     healthcheck:
       test:
         - CMD
-        - curl
-        - -f
-        - http://127.0.0.1:5000/health/live
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health/live', timeout=4)"
       interval: 30s
-      timeout: 10s
+      timeout: 5s
       retries: 5
       start_period: 60s
-
 
     deploy:
       resources:
@@ -114,11 +114,14 @@ services:
 
     environment:
       FLASK_ENV: production
+
       DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER:?Set_POSTGRES_USER_in_Coolify}:${POSTGRES_PASSWORD:?Set_POSTGRES_PASSWORD_in_Coolify}@postgres:5432/${POSTGRES_DB:?Set_POSTGRES_DB_in_Coolify}"
       REDIS_URL: redis://redis:6379/0
+
       SECRET_KEY: ${SECRET_KEY:?Set_SECRET_KEY_in_Coolify}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set_JWT_SECRET_KEY_in_Coolify}
       CSRF_SECRET_KEY: ${CSRF_SECRET_KEY:?Set_CSRF_SECRET_KEY_in_Coolify}
+
       UPLOAD_FOLDER: /app/app/static/uploads
       TIMEZONE: Asia/Kolkata
 
