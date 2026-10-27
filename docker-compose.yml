@@ -55,21 +55,21 @@ services:
       - "5000"
 
     environment:
-      FLASK_ENV: production
-      PORT: "5000"
+  FLASK_ENV: production
+  PORT: "5000"
 
-      DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER:?Set_POSTGRES_USER_in_Coolify}:${POSTGRES_PASSWORD:?Set_POSTGRES_PASSWORD_in_Coolify}@postgres:5432/${POSTGRES_DB:?Set_POSTGRES_DB_in_Coolify}"
-      REDIS_URL: redis://redis:6379/0
+  DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER:-}:${POSTGRES_PASSWORD:-}@postgres:5432/${POSTGRES_DB:-}"
+  REDIS_URL: redis://redis:6379/0
 
-      SECRET_KEY: ${SECRET_KEY:?Set_SECRET_KEY_in_Coolify}
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set_JWT_SECRET_KEY_in_Coolify}
-      CSRF_SECRET_KEY: ${CSRF_SECRET_KEY:?Set_CSRF_SECRET_KEY_in_Coolify}
+  SECRET_KEY: ${SECRET_KEY:-}
+  JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
+  CSRF_SECRET_KEY: ${CSRF_SECRET_KEY:-}
 
-      COOKIE_SECURE: "true"
-      COOKIE_SAMESITE: Lax
-      UPLOAD_FOLDER: /app/app/static/uploads
-      TIMEZONE: Asia/Kolkata
-      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:?Set_FRONTEND_ORIGINS_in_Coolify}
+  COOKIE_SECURE: "true"
+  COOKIE_SAMESITE: Lax
+  UPLOAD_FOLDER: /app/app/static/uploads
+  TIMEZONE: Asia/Kolkata
+  FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-}
 
     volumes:
       - uploads_data:/app/app/static/uploads
@@ -149,10 +149,10 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
 
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:?Set_POSTGRES_USER_in_Coolify}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set_POSTGRES_PASSWORD_in_Coolify}
-      POSTGRES_DB: ${POSTGRES_DB:?Set_POSTGRES_DB_in_Coolify}
+     environment:
+  POSTGRES_USER: ${POSTGRES_USER:-}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+  POSTGRES_DB: ${POSTGRES_DB:-}
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
