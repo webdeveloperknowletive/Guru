@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useStore } from '@/context/StoreContext';
+import OfflinePaymentBox from '@/components/OfflinePaymentBox';
 
 export default function CheckoutModal() {
   const {
@@ -16,6 +17,9 @@ export default function CheckoutModal() {
     closeCheckout,
     submitCheckout,
     openTracking,
+    paymentMode,
+    offlineInstructions,
+    offlineQrCode,
   } = useStore();
 
   const [form, setForm] = useState({
@@ -27,9 +31,17 @@ export default function CheckoutModal() {
     city: '',
   });
 
-  const [paymentMethod, setPaymentMethod] = useState('Razorpay');
+  const [paymentMethod, setPaymentMethod] = useState(paymentMode === 'offline' ? 'Offline / Direct UPI / Bank Transfer' : 'Razorpay');
   const [couponInput, setCouponInput] = useState(couponCode || '');
   const [localValidationErr, setLocalValidationErr] = useState('');
+
+  useEffect(() => {
+    if (paymentMode === 'offline') {
+      setPaymentMethod('Offline / Direct UPI / Bank Transfer');
+    } else {
+      setPaymentMethod('Razorpay');
+    }
+  }, [paymentMode]);
 
   useEffect(() => {
     if (couponCode) {
@@ -90,6 +102,46 @@ export default function CheckoutModal() {
     );
   };
 
+  const renderCheckoutThumb = (item) => {
+    const raw = item?.img || (Array.isArray(item?.images) && item.images[0]) || item?.thumbnail || '';
+    const src = typeof raw === 'string' ? raw.trim() : '';
+
+    if (src.startsWith('<')) {
+      return (
+        <div
+          className="checkout-item-thumb svg-thumb"
+          dangerouslySetInnerHTML={{ __html: src }}
+        />
+      );
+    }
+
+    const initialSrc = src || '/categories/rudraksha.png';
+
+    return (
+      <div className="checkout-item-thumb">
+        <img
+          src={initialSrc}
+          alt={item?.title || 'Product'}
+          loading="lazy"
+          onError={(e) => {
+            const target = e.currentTarget;
+            const current = target.src || '';
+            if (current.includes('/static/uploads/products/')) {
+              const filename = current.split('/').pop();
+              if (filename && !target.getAttribute('data-retried')) {
+                target.setAttribute('data-retried', 'true');
+                target.src = `/products/${filename}`;
+                return;
+              }
+            }
+            target.onerror = null;
+            target.src = '/categories/rudraksha.png';
+          }}
+        />
+      </div>
+    );
+  };
+
   return (
     <div
       className="pd-modal-overlay show"
@@ -100,11 +152,6 @@ export default function CheckoutModal() {
     >
       <div
         className={`pd-modal checkout-modal ${checkoutStep === 'confirmed' ? 'confirmed' : ''}`}
-        style={{
-          maxWidth: '840px',
-          padding: '0',
-          overflow: 'hidden',
-        }}
       >
         <button
           className="pd-close"
@@ -117,7 +164,7 @@ export default function CheckoutModal() {
 
         {checkoutStep === 'confirmed' && lastOrder ? (
           /* ================= ORDER CONFIRMATION VIEW ================= */
-          <div style={{ padding: '40px 32px', textAlign: 'center' }}>
+          <div style={{ padding: '40px 32px', textAlign: 'center', gridColumn: '1 / -1' }}>
             <div
               style={{
                 width: '72px',
@@ -149,7 +196,7 @@ export default function CheckoutModal() {
                 borderRadius: '12px',
                 padding: '20px 24px',
                 maxWidth: '520px',
-                margin: '0 auto 28px',
+                margin: '0 auto 20px',
                 textAlign: 'left',
               }}
             >
@@ -166,6 +213,24 @@ export default function CheckoutModal() {
                 </strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid rgba(224,176,74,0.1)' }}>
+                <span style={{ color: 'var(--muted)', fontSize: '13px' }}>Payment Status</span>
+                <span style={{
+                  color: lastOrder.payment_status === 'paid' ? '#10b981' : (lastOrder.payment_status === 'offline_pending' ? '#f59e0b' : 'var(--gold-lt)'),
+                  fontWeight: '700',
+                  fontSize: '13px'
+                }}>
+                  {lastOrder.payment_status === 'paid' ? '✓ Paid via Razorpay' : (lastOrder.payment_status === 'offline_pending' ? 'Offline Payment Pending' : (lastOrder.payment_status || 'Pending'))}
+                </span>
+              </div>
+              {lastOrder.transaction_number && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid rgba(224,176,74,0.1)' }}>
+                  <span style={{ color: 'var(--muted)', fontSize: '13px' }}>Transaction ID</span>
+                  <span style={{ color: '#86efac', fontFamily: 'monospace', fontSize: '12px', fontWeight: '600' }}>
+                    {lastOrder.transaction_number}
+                  </span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid rgba(224,176,74,0.1)' }}>
                 <span style={{ color: 'var(--muted)', fontSize: '13px' }}>Payment Method</span>
                 <span style={{ color: 'var(--cream)', fontSize: '13.5px' }}>
                   {lastOrder.payment_method}
@@ -176,6 +241,19 @@ export default function CheckoutModal() {
                 <span style={{ color: 'var(--gold-lt)', fontSize: '13.5px' }}>Within 24 to 48 Hours</span>
               </div>
             </div>
+
+            {(lastOrder.payment_mode === 'offline' || lastOrder.payment_status === 'offline_pending') && (
+              <OfflinePaymentBox
+                instructions={lastOrder.offline_payment_instructions || offlineInstructions}
+                qrCodeUrl={lastOrder.offline_qr_code || offlineQrCode || '/phonepe-qr.jpg'}
+                referenceNumber={lastOrder.order_number}
+                amount={lastOrder.total_amount}
+                customerName={lastOrder.customer_name}
+                whatsappUrl={`https://wa.me/919623117545?text=${encodeURIComponent(`Namaste! I have placed an order (${lastOrder.order_number}) for ₹${lastOrder.total_amount}. Here is my payment confirmation screenshot:`)}`}
+                whatsappButtonText="💬 Share Payment Screenshot on WhatsApp"
+                title="Offline Payment Instructions / पेमेंट पद्धत"
+              />
+            )}
 
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
               <button
@@ -210,7 +288,7 @@ export default function CheckoutModal() {
           /* ================= ACTIVE CHECKOUT WORKFLOW ================= */
           <>
             {/* Left: Devotee & Shipping Form */}
-            <div className="checkout-form-col" style={{ padding: 'clamp(20px, 3.5vw, 28px) clamp(16px, 3vw, 26px)', overflowY: 'auto', maxHeight: '82vh' }}>
+            <div className="checkout-form-col">
               <div style={{ marginBottom: '20px' }}>
                 <span className="kicker">Secure Checkout</span>
                 <h3 style={{ fontFamily: 'var(--serif)', fontSize: '22px', color: 'var(--cream)', margin: '4px 0 6px' }}>
@@ -317,56 +395,121 @@ export default function CheckoutModal() {
                   </div>
 
                   <div className="field full" style={{ marginTop: '8px' }}>
-                    <label style={{ display: 'block', marginBottom: '8px' }}>Payment Method · पेमेंट पर्याय</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                      <label
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '12px 14px',
-                          borderRadius: '8px',
-                          border: paymentMethod === 'Razorpay' ? '1px solid var(--gold)' : '1px solid rgba(224,176,74,0.15)',
-                          background: paymentMethod === 'Razorpay' ? 'rgba(224,176,74,0.08)' : 'rgba(255,255,255,0.02)',
-                          cursor: 'pointer',
-                          fontSize: '13px',
-                          color: 'var(--cream)',
-                        }}
-                      >
-                        <input
-                          type="radio"
-                          name="paymentMethod"
-                          value="Razorpay"
-                          checked={paymentMethod === 'Razorpay'}
-                          onChange={() => setPaymentMethod('Razorpay')}
-                        />
-                        <span>💳 Razorpay / UPI</span>
-                      </label>
-
-                      <label
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '12px 14px',
-                          borderRadius: '8px',
-                          border: paymentMethod === 'Cash on Delivery' ? '1px solid var(--gold)' : '1px solid rgba(224,176,74,0.15)',
-                          background: paymentMethod === 'Cash on Delivery' ? 'rgba(224,176,74,0.08)' : 'rgba(255,255,255,0.02)',
-                          cursor: 'pointer',
-                          fontSize: '13px',
-                          color: 'var(--cream)',
-                        }}
-                      >
-                        <input
-                          type="radio"
-                          name="paymentMethod"
-                          value="Cash on Delivery"
-                          checked={paymentMethod === 'Cash on Delivery'}
-                          onChange={() => setPaymentMethod('Cash on Delivery')}
-                        />
-                        <span>💵 Pay on Delivery</span>
-                      </label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <label style={{ margin: 0 }}>Payment Method · पेमेंट पर्याय</label>
+                      {paymentMode === 'offline' && (
+                        <span style={{ fontSize: '11px', color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', padding: '2px 8px', borderRadius: '4px', fontWeight: '600' }}>
+                          Offline Mode Active
+                        </span>
+                      )}
                     </div>
+
+                    {paymentMode === 'offline' ? (
+                      <div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '8px' }}>
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              padding: '12px 14px',
+                              borderRadius: '8px',
+                              border: paymentMethod === 'Offline / Direct UPI / Bank Transfer' ? '1px solid var(--gold)' : '1px solid rgba(224,176,74,0.15)',
+                              background: paymentMethod === 'Offline / Direct UPI / Bank Transfer' ? 'rgba(224,176,74,0.08)' : 'rgba(255,255,255,0.02)',
+                              cursor: 'pointer',
+                              fontSize: '12.5px',
+                              color: 'var(--cream)',
+                            }}
+                          >
+                            <input
+                              type="radio"
+                              name="paymentMethod"
+                              value="Offline / Direct UPI / Bank Transfer"
+                              checked={paymentMethod === 'Offline / Direct UPI / Bank Transfer'}
+                              onChange={() => setPaymentMethod('Offline / Direct UPI / Bank Transfer')}
+                            />
+                            <span>🏦 UPI / Bank Transfer</span>
+                          </label>
+
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              padding: '12px 14px',
+                              borderRadius: '8px',
+                              border: paymentMethod === 'Cash on Delivery' ? '1px solid var(--gold)' : '1px solid rgba(224,176,74,0.15)',
+                              background: paymentMethod === 'Cash on Delivery' ? 'rgba(224,176,74,0.08)' : 'rgba(255,255,255,0.02)',
+                              cursor: 'pointer',
+                              fontSize: '12.5px',
+                              color: 'var(--cream)',
+                            }}
+                          >
+                            <input
+                              type="radio"
+                              name="paymentMethod"
+                              value="Cash on Delivery"
+                              checked={paymentMethod === 'Cash on Delivery'}
+                              onChange={() => setPaymentMethod('Cash on Delivery')}
+                            />
+                            <span>💵 Pay on Delivery</span>
+                          </label>
+                        </div>
+                        <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: 'var(--muted)' }}>
+                          ℹ️ No online card gateway required. Order is saved with pending status; follow offline transfer instructions upon confirmation.
+                        </p>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                        <label
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '12px 14px',
+                            borderRadius: '8px',
+                            border: paymentMethod === 'Razorpay' ? '1px solid var(--gold)' : '1px solid rgba(224,176,74,0.15)',
+                            background: paymentMethod === 'Razorpay' ? 'rgba(224,176,74,0.08)' : 'rgba(255,255,255,0.02)',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            color: 'var(--cream)',
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="paymentMethod"
+                            value="Razorpay"
+                            checked={paymentMethod === 'Razorpay'}
+                            onChange={() => setPaymentMethod('Razorpay')}
+                          />
+                          <span>💳 Razorpay / UPI</span>
+                        </label>
+
+                        <label
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '12px 14px',
+                            borderRadius: '8px',
+                            border: paymentMethod === 'Cash on Delivery' ? '1px solid var(--gold)' : '1px solid rgba(224,176,74,0.15)',
+                            background: paymentMethod === 'Cash on Delivery' ? 'rgba(224,176,74,0.08)' : 'rgba(255,255,255,0.02)',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            color: 'var(--cream)',
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="paymentMethod"
+                            value="Cash on Delivery"
+                            checked={paymentMethod === 'Cash on Delivery'}
+                            onChange={() => setPaymentMethod('Cash on Delivery')}
+                          />
+                          <span>💵 Pay on Delivery</span>
+                        </label>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -390,8 +533,12 @@ export default function CheckoutModal() {
                 >
                   {checkoutLoading ? (
                     <span>Processing Sacred Order...</span>
+                  ) : paymentMode === 'offline' ? (
+                    <span>Confirm &amp; Place Order (Offline Payment) → ₹{serverCart.total_amount ? Number(serverCart.total_amount).toLocaleString('en-IN') : '0'}</span>
+                  ) : paymentMethod === 'Cash on Delivery' ? (
+                    <span>Confirm Order (Pay on Delivery) → ₹{serverCart.total_amount ? Number(serverCart.total_amount).toLocaleString('en-IN') : '0'}</span>
                   ) : (
-                    <span>Confirm &amp; Place Order → ₹{serverCart.total_amount ? Number(serverCart.total_amount).toLocaleString('en-IN') : '0'}</span>
+                    <span>Pay with Razorpay / ऑनलाइन पे करा → ₹{serverCart.total_amount ? Number(serverCart.total_amount).toLocaleString('en-IN') : '0'}</span>
                   )}
                 </button>
                 <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--muted)', marginTop: '8px' }}>
@@ -401,49 +548,26 @@ export default function CheckoutModal() {
             </div>
 
             {/* Right: Order Summary & Authoritative Server Calculation */}
-            <div
-              className="checkout-summary-col"
-              style={{
-                background: 'rgba(0, 0, 0, 0.25)',
-                padding: 'clamp(20px, 3.5vw, 28px) clamp(16px, 3vw, 24px)',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                maxHeight: '82vh',
-                overflowY: 'auto',
-              }}
-            >
+            <div className="checkout-summary-col">
               <div>
-                <h4 style={{ fontFamily: 'var(--serif)', fontSize: '17px', color: 'var(--cream)', marginBottom: '16px' }}>
-                  Order Summary ({cart.reduce((s, it) => s + it.qty, 0)})
-                </h4>
+                <div className="checkout-summary-head">
+                  <h4>Order Summary ({cart.reduce((s, it) => s + it.qty, 0)})</h4>
+                </div>
 
                 {/* Items List */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+                <div className="checkout-items-list">
                   {cart.map((item, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '48px 1fr auto',
-                        gap: '12px',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <div
-                        className="thumb"
-                        style={{ width: '48px', height: '48px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', display: 'grid', placeItems: 'center' }}
-                        dangerouslySetInnerHTML={{ __html: item.img || '' }}
-                      />
-                      <div style={{ minWidth: 0 }}>
-                        <h5 style={{ fontSize: '13px', color: 'var(--cream)', margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div key={item.id ? `${item.id}-${idx}` : idx} className="checkout-item-row">
+                      {renderCheckoutThumb(item)}
+                      <div className="checkout-item-info">
+                        <h5 className="checkout-item-title" title={item.title}>
                           {item.title}
                         </h5>
-                        <span style={{ fontSize: '11.5px', color: 'var(--muted)' }}>
-                          Qty: {item.qty} × ₹{Number(item.price).toLocaleString('en-IN')}
+                        <span className="checkout-item-meta">
+                          Qty: <strong>{item.qty}</strong> × ₹{Number(item.price).toLocaleString('en-IN')}
                         </span>
                       </div>
-                      <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--gold-lt)' }}>
+                      <span className="checkout-item-price">
                         ₹{(Number(item.price) * item.qty).toLocaleString('en-IN')}
                       </span>
                     </div>

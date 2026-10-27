@@ -1,6 +1,8 @@
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
 from app.services.rbac_service import login_required, permission_required, get_current_admin
 from app.services.report_service import ReportService
+from app.services.payment_mode_service import PaymentModeService
+from app.services.whatsapp_service import WhatsAppNotificationService
 from app.models.commerce import Product, Order, Customer
 from app.models.service import PujaBooking, JyotishConsultation
 
@@ -14,7 +16,89 @@ dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/admin")
 def overview():
     user = get_current_admin()
     metrics = ReportService.get_dashboard_metrics()
-    return render_template("dashboard/overview.html", current_user=user, metrics=metrics, active_page="overview")
+    payment_mode = PaymentModeService.get_payment_mode()
+    return render_template(
+        "dashboard/overview.html",
+        current_user=user,
+        metrics=metrics,
+        active_page="overview",
+        payment_mode=payment_mode,
+    )
+
+
+@dashboard_bp.route("/payment-mode/toggle", methods=["POST"])
+@login_required
+def toggle_payment_mode():
+    user = get_current_admin()
+    if not user:
+        if request.is_json:
+            return jsonify({"error": "Unauthorized"}), 401
+        return redirect(url_for("auth.login"))
+
+    # Determine requested mode or toggle current
+    current_mode = PaymentModeService.get_payment_mode()
+    req_data = request.get_json(silent=True) or {}
+    target_mode = (
+        request.form.get("mode")
+        or req_data.get("mode")
+        or ("offline" if current_mode == "online" else "online")
+    ).strip().lower()
+
+    success, message = PaymentModeService.set_payment_mode(target_mode, user)
+
+    if request.is_json or request.headers.get("Accept") == "application/json":
+        status_code = 200 if success else 400
+        return jsonify({
+            "success": success,
+            "message": message,
+            "payment_mode": PaymentModeService.get_payment_mode(),
+        }), status_code
+
+    flash(message, "success" if success else "danger")
+    return redirect(url_for("dashboard.overview"))
+
+
+@dashboard_bp.route("/notifications/retry-whatsapp", methods=["POST"])
+@login_required
+def retry_whatsapp_notification():
+    user = get_current_admin()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    module_name = request.form.get("module") or "General"
+    reference_id = request.form.get("reference_id") or ""
+    customer_name = request.form.get("customer_name") or ""
+    customer_phone = request.form.get("customer_phone") or ""
+    customer_email = request.form.get("customer_email") or ""
+    amount = request.form.get("amount") or None
+    payment_mode = request.form.get("payment_mode") or PaymentModeService.get_payment_mode()
+    payment_status = request.form.get("payment_status") or "pending"
+    admin_url = request.form.get("admin_url") or request.referrer or ""
+
+    res = WhatsAppNotificationService.send_admin_alert(
+        module_name=module_name,
+        reference_id=reference_id,
+        customer_name=customer_name,
+        customer_phone=customer_phone,
+        customer_email=customer_email,
+        amount=amount,
+        payment_mode=payment_mode,
+        payment_status=payment_status,
+        admin_url=admin_url,
+    )
+
+    if request.is_json or request.headers.get("Accept") == "application/json":
+        return jsonify(res)
+
+    if res.get("status") == "delivered":
+        flash(f"WhatsApp notification sent to admin ({res.get('admin_phone')}).", "success")
+    elif res.get("status") == "not_configured":
+        flash("WhatsApp Business API not configured in environment. Manual dispatch link prepared.", "warning")
+    else:
+        flash(f"WhatsApp notification attempt failed: {res.get('message')}", "danger")
+
+    return redirect(request.referrer or url_for("dashboard.overview"))
+
 
 
 @dashboard_bp.route("/search")

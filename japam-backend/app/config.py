@@ -92,6 +92,8 @@ class TestingConfig(Config):
     COOKIE_SECURE = False
     WTF_CSRF_ENABLED = False
     PAYMENT_WEBHOOK_SECRET = "whsec_test_secret_32_chars_long_for_hmac"
+    RAZORPAY_KEY_ID = "rzp_test_TsrUVgiJrcebR7"
+    RAZORPAY_KEY_SECRET = "s2g28nXj6FT19Iq90Uisy4ja"
 
 
 class ProductionConfig(Config):

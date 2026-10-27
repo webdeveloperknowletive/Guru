@@ -2,10 +2,11 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from '@/context/StoreContext';
-import { getPujaServices, bookPuja, getGurujiProfile, getAvailabilitySlots } from '@/lib/api';
+import { getPujaServices, bookPuja, verifyPayment, getGurujiProfile, getAvailabilitySlots } from '@/lib/api';
+import OfflinePaymentBox from '@/components/OfflinePaymentBox';
 
 export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle }) {
-  const { showToast } = useStore();
+  const { showToast, paymentMode, offlineInstructions, offlineQrCode } = useStore();
   const [mounted, setMounted] = useState(false);
   const [pujaList, setPujaList] = useState([]);
   const [selectedServiceId, setSelectedServiceId] = useState(1);
@@ -144,6 +145,8 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
         booking_date: form.date,
         time_slot: form.timeSlot,
         booking_type: form.bookingType,
+        payment_mode: paymentMode,
+        payment_method: paymentMode === 'offline' ? 'Offline Payment' : 'Online Gateway',
         location: form.location.trim(),
         address: form.address.trim(),
         gotra: form.gotra.trim() || 'Kashyap',
@@ -156,8 +159,60 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
         ].filter(Boolean).join(' | '),
       });
 
+      if (paymentMode === 'online' && res.razorpay && typeof window !== 'undefined') {
+        const isLoaded = await (async () => {
+          if (window.Razorpay) return true;
+          return new Promise(r => {
+            const s = document.createElement('script');
+            s.src = 'https://checkout.razorpay.com/v1/checkout.js';
+            s.onload = () => r(true);
+            s.onerror = () => r(false);
+            document.body.appendChild(s);
+          });
+        })();
+
+        if (isLoaded && window.Razorpay) {
+          const rzpData = res.razorpay;
+          const options = {
+            key: rzpData.key_id,
+            amount: rzpData.amount,
+            currency: rzpData.currency || 'INR',
+            name: 'AstroVeda Puja Seva',
+            description: `${res.booking_number} (${form.name.trim()})`,
+            order_id: rzpData.order_id,
+            prefill: {
+              name: form.name.trim(),
+              email: email,
+              contact: form.phone.trim(),
+            },
+            theme: { color: '#d97706' },
+            handler: async (response) => {
+              try {
+                await verifyPayment({
+                  booking_number: res.booking_number,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                });
+                setConfirmedBooking({ ...res, status: 'confirmed', amount_paid: rzpData.amount / 100 });
+                showToast(`Puja Payment Verified & Confirmed: ${res.booking_number}`);
+              } catch (e) {
+                showToast('Payment verification failed. Please contact admin.');
+              }
+            },
+            modal: {
+              ondismiss: () => {
+                showToast('Payment cancelled. Booking saved as pending.');
+              }
+            }
+          };
+          const rzp = new window.Razorpay(options);
+          rzp.open();
+        }
+      }
+
       setConfirmedBooking(res);
-      showToast(`Puja Booking Confirmed: ${res.booking_number}`);
+      showToast(res.status === 'pending' ? `Puja Booking Received: ${res.booking_number} (Offline Pending)` : `Puja Booking Confirmed: ${res.booking_number}`);
     } catch (err) {
       showToast(err.message || 'Booking failed, please try again.');
     } finally {
@@ -211,10 +266,14 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
             </div>
             <span className="kicker">शास्त्रोक्त संकल्प नोंदणी</span>
             <h3 style={{ fontFamily: 'var(--serif)', fontSize: '24px', color: 'var(--cream)', margin: '8px 0' }}>
-              Puja Booking Confirmed!
+              {confirmedBooking.payment_mode === 'offline' || confirmedBooking.status === 'pending'
+                ? 'Puja Request Received!'
+                : 'Puja Booking Confirmed!'}
             </h3>
             <p style={{ color: 'var(--muted)', fontSize: '13.5px', maxWidth: '440px', margin: '0 auto 20px' }}>
-              तुमची पूजा यशस्वीरित्या नोंदवली गेली आहे. आमचे पुरोहित/समन्वयक संकल्प विधीसाठी तुमच्याशी संपर्क साधतील.
+              {confirmedBooking.payment_mode === 'offline' || confirmedBooking.status === 'pending'
+                ? 'तुमची पूजा यशस्वीरित्या नोंदवली गेली आहे. ऑफलाइन पेमेंट सत्यापनानंतर संकल्प विधी पुष्टी केली जाईल.'
+                : 'तुमची पूजा यशस्वीरित्या नोंदवली गेली आहे. आमचे पुरोहित/समन्वयक संकल्प विधीसाठी तुमच्याशी संपर्क साधतील.'}
             </p>
 
             <div
@@ -224,7 +283,7 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
                 borderRadius: '10px',
                 padding: '16px 20px',
                 maxWidth: '420px',
-                margin: '0 auto 24px',
+                margin: '0 auto 20px',
                 textAlign: 'left',
                 fontSize: '13px',
               }}
@@ -235,13 +294,34 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <span style={{ color: 'var(--muted)' }}>Dakshina Seva:</span>
-                <strong style={{ color: 'var(--cream)' }}>₹{Number(confirmedBooking.amount_paid).toLocaleString('en-IN')}</strong>
+                <strong style={{ color: 'var(--cream)' }}>₹{Number(confirmedBooking.amount_paid || selectedService?.price || 0).toLocaleString('en-IN')}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ color: 'var(--muted)' }}>Payment Mode:</span>
+                <span style={{ color: confirmedBooking.payment_mode === 'offline' ? '#f59e0b' : 'var(--gold-lt)', fontWeight: '700' }}>
+                  {confirmedBooking.payment_mode === 'offline' ? 'Offline Mode' : 'Online Mode'}
+                </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--muted)' }}>Status:</span>
-                <span style={{ color: 'var(--gold-lt)', textTransform: 'capitalize' }}>{confirmedBooking.status}</span>
+                <span style={{ color: confirmedBooking.status === 'pending' ? '#f59e0b' : 'var(--gold-lt)', textTransform: 'capitalize', fontWeight: '700' }}>
+                  {confirmedBooking.status === 'pending' ? 'Pending Confirmation' : confirmedBooking.status}
+                </span>
               </div>
             </div>
+
+            {(confirmedBooking.payment_mode === 'offline' || confirmedBooking.status === 'pending') && (
+              <OfflinePaymentBox
+                instructions={confirmedBooking.offline_payment_instructions || offlineInstructions}
+                qrCodeUrl={confirmedBooking.offline_qr_code || offlineQrCode || '/phonepe-qr.jpg'}
+                referenceNumber={confirmedBooking.booking_number}
+                amount={confirmedBooking.dakshina_amount || confirmedBooking.amount}
+                customerName={confirmedBooking.devotee_name || confirmedBooking.name}
+                whatsappUrl={`https://wa.me/919623117545?text=${encodeURIComponent(`Namaste! I have submitted a Puja Booking (${confirmedBooking.booking_number}). Here is my offline payment confirmation / screenshot:`)}`}
+                whatsappButtonText="💬 Share Puja Dakshina on WhatsApp"
+                title="Offline Dakshina Payment / पूजा दक्षिणा पद्धत"
+              />
+            )}
 
             <button className="btn btn-gold" onClick={onClose} style={{ padding: '12px 30px', borderRadius: '99px' }}>
               Done / पूर्ण झाले

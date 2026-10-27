@@ -1,13 +1,35 @@
 'use client';
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { findProduct, getAllProducts } from '@/lib/products';
-import { calculateCart, checkoutOrder } from '@/lib/api';
+import { calculateCart, checkoutOrder, createRazorpayOrder, verifyPayment, recordPaymentFailure, getPaymentMode } from '@/lib/api';
 import { getTranslation } from '@/lib/translations';
 import { recordEvent } from '@/lib/analytics';
+
+function loadRazorpayScript() {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined') return resolve(false);
+    if (window.Razorpay) return resolve(true);
+
+    const existing = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(true));
+      existing.addEventListener('error', () => resolve(false));
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
 
 const StoreContext = createContext(null);
 
 export function StoreProvider({ children }) {
+
 
   const [cart, setCart] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -86,6 +108,34 @@ export function StoreProvider({ children }) {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState(null);
   const [lastOrder, setLastOrder] = useState(null);
+
+  // Store payment mode: 'online' or 'offline'
+  const [paymentMode, setPaymentMode] = useState('online');
+  const [offlineInstructions, setOfflineInstructions] = useState('');
+  const [offlineQrCode, setOfflineQrCode] = useState('/phonepe-qr.jpg');
+
+  // Fetch store payment mode on mount and periodically sync
+  useEffect(() => {
+    let isMounted = true;
+    const loadMode = () => {
+      getPaymentMode()
+        .then(res => {
+          if (isMounted && res) {
+            if (res.payment_mode) setPaymentMode(res.payment_mode);
+            if (res.offline_payment_instructions) setOfflineInstructions(res.offline_payment_instructions);
+            if (res.offline_qr_code) setOfflineQrCode(res.offline_qr_code);
+          }
+        })
+        .catch(() => {});
+    };
+
+    loadMode();
+    const interval = setInterval(loadMode, 30000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   // Sync cart to localStorage
   useEffect(() => {
@@ -444,12 +494,16 @@ export function StoreProvider({ children }) {
     // Generate random client-side idempotency key for network resilience
     const idempotencyKey = `idemp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
+    const isOffline = paymentMode === 'offline' || paymentMethod === 'Offline / Direct UPI / Bank Transfer' || paymentMethod === 'Offline Payment';
+    const effectivePaymentMethod = isOffline ? 'Offline Payment' : (paymentMethod || 'Razorpay');
+
     const payload = {
       customer_name: customerData.name.trim(),
       customer_email: customerData.email.trim(),
       customer_phone: customerData.phone.trim(),
       shipping_address: customerData.address.trim(),
-      payment_method: paymentMethod,
+      payment_method: effectivePaymentMethod,
+      payment_mode: isOffline ? 'offline' : 'online',
       coupon_code: couponCode.trim(),
       items: cart.map(item => ({
         product_id: item.id,
@@ -459,9 +513,6 @@ export function StoreProvider({ children }) {
 
     try {
       const result = await checkoutOrder(payload, idempotencyKey);
-      setLastOrder(result);
-      setCheckoutStep('confirmed');
-      clearCart();
 
       // Store secure order access token in localStorage for devotee tracking
       if (result.order_number && result.access_token) {
@@ -474,14 +525,139 @@ export function StoreProvider({ children }) {
         }
       }
 
-      setCheckoutLoading(false);
-      return { success: true, order: result };
+      // Offline mode or Cash on Delivery: finish without Razorpay gateway
+      if (isOffline || result.offline_payment || effectivePaymentMethod === 'Cash on Delivery' || result.payment_status === 'offline_pending') {
+        setLastOrder(result);
+        setCheckoutStep('confirmed');
+        clearCart();
+        setCheckoutLoading(false);
+        return { success: true, order: result };
+      }
+
+      // Online Razorpay Payment Flow
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded || !window.Razorpay) {
+        throw new Error('Could not load Razorpay payment gateway. Please check your internet connection or try again.');
+      }
+
+      let rzpDetails = result.razorpay;
+      if (!rzpDetails || !rzpDetails.order_id) {
+        // Fallback: request order creation from backend
+        const orderRes = await createRazorpayOrder({
+          order_number: result.order_number,
+          token: result.access_token,
+        });
+        rzpDetails = {
+          order_id: orderRes.razorpay_order_id,
+          amount: orderRes.amount,
+          currency: orderRes.currency || 'INR',
+          key_id: orderRes.key_id,
+        };
+      }
+
+      return new Promise((resolve) => {
+        const options = {
+          key: rzpDetails.key_id,
+          amount: rzpDetails.amount,
+          currency: rzpDetails.currency || 'INR',
+          name: 'AstroVeda',
+          description: `Order ${result.order_number}`,
+          order_id: rzpDetails.order_id,
+          prefill: {
+            name: customerData.name,
+            email: customerData.email,
+            contact: customerData.phone,
+          },
+          theme: {
+            color: '#d97706',
+          },
+          modal: {
+            ondismiss: async () => {
+              setCheckoutLoading(false);
+              try {
+                await recordPaymentFailure({
+                  order_number: result.order_number,
+                  token: result.access_token,
+                  error_code: 'MODAL_DISMISSED',
+                  error_description: 'Payment was dismissed by user before completion',
+                  razorpay_order_id: rzpDetails.order_id,
+                });
+              } catch (e) {
+                console.warn('Error recording payment dismissal:', e);
+              }
+              setCheckoutError('पेमेंट रद्द केले गेले. तुम्ही पुन्हा प्रयत्न करू शकता. (Payment was cancelled. You can retry.)');
+              resolve({ success: false, cancelled: true });
+            },
+          },
+          handler: async function (response) {
+            setCheckoutLoading(true);
+            try {
+              // Authoritative cryptographic verification on backend (never trust browser callback alone!)
+              const verifyRes = await verifyPayment({
+                order_number: result.order_number,
+                token: result.access_token,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              });
+
+              if (verifyRes.status === 'success' || verifyRes.payment_status === 'paid' || verifyRes.status === 'already_verified') {
+                const confirmedOrder = {
+                  ...result,
+                  payment_status: 'paid',
+                  order_status: 'processing',
+                  transaction_number: verifyRes.transaction_number,
+                  gateway_payment_id: response.razorpay_payment_id,
+                };
+                setLastOrder(confirmedOrder);
+                setCheckoutStep('confirmed');
+                clearCart();
+                setCheckoutLoading(false);
+                resolve({ success: true, order: confirmedOrder });
+              } else {
+                const errMsg = verifyRes.message || 'Payment signature verification failed. Order not marked paid.';
+                setCheckoutError(errMsg);
+                setCheckoutLoading(false);
+                resolve({ success: false, error: errMsg });
+              }
+            } catch (vErr) {
+              const errMsg = vErr.message || 'Payment verification failed. Please contact support.';
+              setCheckoutError(errMsg);
+              setCheckoutLoading(false);
+              resolve({ success: false, error: errMsg });
+            }
+          },
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.on('payment.failed', async function (failedResp) {
+          setCheckoutLoading(false);
+          const errCode = failedResp.error?.code || 'PAYMENT_FAILED';
+          const errDesc = failedResp.error?.description || 'Payment was declined by bank or gateway';
+          try {
+            await recordPaymentFailure({
+              order_number: result.order_number,
+              token: result.access_token,
+              error_code: errCode,
+              error_description: errDesc,
+              razorpay_order_id: failedResp.error?.metadata?.order_id || rzpDetails.order_id,
+              razorpay_payment_id: failedResp.error?.metadata?.payment_id,
+            });
+          } catch (e) {
+            console.warn('Error recording payment failure:', e);
+          }
+          setCheckoutError(`पेमेंट अयशस्वी: ${errDesc} (Payment failed: ${errDesc}. You can retry.)`);
+          resolve({ success: false, error: errDesc });
+        });
+
+        rzp.open();
+      });
     } catch (err) {
       setCheckoutError(err.message || 'Failed to place order. Please verify your details.');
       setCheckoutLoading(false);
       return { success: false, error: err.message };
     }
-  }, [cart, couponCode, clearCart]);
+  }, [cart, couponCode, clearCart, paymentMode]);
 
   const cartCount = cart.reduce((s, it) => s + it.qty, 0);
   const cartSubtotal = cart.reduce((s, it) => s + (Number(it.price) || 0) * it.qty, 0);
@@ -499,6 +675,8 @@ export function StoreProvider({ children }) {
       serverCart, couponCode, setCouponCode,
       checkoutOpen, checkoutStep, checkoutLoading, checkoutError, lastOrder,
       openCheckout, closeCheckout, submitCheckout,
+      // Payment Mode
+      paymentMode, setPaymentMode, offlineInstructions, offlineQrCode,
       // Connected Modals & Workflows
       trackingModal, openTracking, closeTracking,
       contactModal, openContact, closeContact,

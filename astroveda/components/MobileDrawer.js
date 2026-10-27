@@ -8,6 +8,23 @@ export default function MobileDrawer() {
     setDrawerOpen(false);
   };
 
+  const handleHomeClick = (e) => {
+    setDrawerOpen(false);
+    if (typeof window !== 'undefined') {
+      if (window.location.pathname === '/' || window.location.pathname === '') {
+        e.preventDefault();
+        window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+        if (window.location.hash) {
+          try {
+            history.pushState(null, '', window.location.pathname);
+          } catch {
+            window.location.hash = '';
+          }
+        }
+      }
+    }
+  };
+
   const handleTrackClick = () => {
     setDrawerOpen(false);
     openTracking();
@@ -32,7 +49,7 @@ export default function MobileDrawer() {
       />
       <aside className={`mobile-drawer${drawerOpen ? ' open' : ''}`} id="mobileDrawer">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 10px 16px', borderBottom: '1px solid rgba(212, 175, 55, 0.15)' }}>
-          <a href="#top" onClick={handleLinkClick} style={{ display: 'flex', alignItems: 'center' }}>
+          <a href="/" onClick={handleHomeClick} style={{ display: 'flex', alignItems: 'center' }}>
             <img
               src={brandLogo || '/swami-guruji-logo-cropped.jpg'}
               alt="Swami Guruji"
@@ -97,7 +114,7 @@ export default function MobileDrawer() {
           <span>→</span>
         </a>
         <ul>
-          <li><a href="#top" onClick={handleLinkClick}>{t ? t('nav_home', 'Home') : 'Home'}</a></li>
+          <li><a href="/" onClick={handleHomeClick}>{t ? t('nav_home', 'Home') : 'Home'}</a></li>
           <li><a href="#about" onClick={handleLinkClick}>{t ? t('nav_about', 'About Guruji') : 'About Guruji'}</a></li>
           <li><a href="#puja" onClick={handleLinkClick}>{t ? t('nav_puja', 'Pooja Services') : 'Pooja Services'}</a></li>
           <li><a href="#jyotish" onClick={handleLinkClick}>{t ? t('nav_jyotish', 'Astrology Consultation') : 'Astrology Consultation'}</a></li>

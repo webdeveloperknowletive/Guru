@@ -223,3 +223,62 @@ class CommerceService:
             return f"/static/uploads/products/{filename}"
 
         return path_str.replace("\\", "/")
+
+    @staticmethod
+    def verify_offline_payment(order_id: int, admin_user, transaction_reference: str = None, notes: str = None) -> Order:
+        """
+        Manually verify and capture an offline payment for an order.
+        Updates order payment_status to 'paid' and creates a PaymentTransaction record.
+        """
+        order = Order.query.filter_by(id=order_id).first()
+        if not order:
+            raise ValueError(f"Order ID {order_id} not found.")
+
+        old_status = order.payment_status
+        order.payment_status = "paid"
+        if order.order_status == "pending":
+            order.order_status = "processing"
+
+        timestamp_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        audit_note = f"[{timestamp_str}] Offline payment manually verified by {admin_user.email}."
+        if transaction_reference:
+            audit_note += f" Ref: {transaction_reference}."
+        if notes:
+            audit_note += f" Note: {notes}"
+
+        order.admin_notes = f"{order.admin_notes or ''}\n{audit_note}".strip()
+
+        # Create captured PaymentTransaction
+        txn_ref = transaction_reference or f"OFFLINE-{int(datetime.now(timezone.utc).timestamp())}"
+        txn = PaymentTransaction(
+            transaction_number=f"TXN-{order.order_number.replace('#', '')}-{txn_ref}",
+            order_id=order.id,
+            amount=order.total_amount,
+            currency="INR",
+            gateway=order.payment_method or "Offline / Manual",
+            gateway_payment_id=txn_ref,
+            status="captured",
+            customer_name=order.customer_name,
+            customer_email=order.customer_email,
+            created_at=datetime.now(timezone.utc),
+        )
+        db.session.add(txn)
+        db.session.commit()
+
+        AuditService.log(
+            action="OFFLINE_PAYMENT_VERIFIED",
+            module="commerce",
+            actor_email=admin_user.email if admin_user else "system",
+            actor_user_id=admin_user.id if admin_user else None,
+            entity_type="Order",
+            entity_id=str(order.id),
+            details={
+                "order_number": order.order_number,
+                "old_payment_status": old_status,
+                "new_payment_status": "paid",
+                "amount": str(order.total_amount),
+                "reference": transaction_reference,
+            },
+        )
+        return order
+

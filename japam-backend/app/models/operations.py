@@ -15,6 +15,7 @@ class PaymentTransaction(db.Model):
     currency = db.Column(db.String(10), default="INR", nullable=False)
     gateway = db.Column(db.String(50), default="Razorpay", nullable=False)  # Razorpay, Stripe, BankTransfer, COD
     gateway_payment_id = db.Column(db.String(120), nullable=True, index=True)
+    gateway_order_id = db.Column(db.String(120), nullable=True, index=True)
 
     # captured, pending, failed, refunded
     status = db.Column(db.String(50), default="captured", nullable=False, index=True)

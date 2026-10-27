@@ -20,11 +20,17 @@ class BookingService:
         rashi: str = None,
         sankalp_text: str = None,
         admin_user = None,
+        payment_mode: str = None,
+        payment_method: str = None,
     ) -> PujaBooking:
         """
         Creates a Puja Booking after checking and locking the availability slot.
-        Prevents double-booking.
+        Prevents double-booking. Assigns status based on active payment_mode.
         """
+        from app.services.payment_mode_service import PaymentModeService
+        if payment_mode is None:
+            payment_mode = PaymentModeService.get_payment_mode()
+
         service = PujaService.query.filter_by(id=service_id, is_active=True).first()
         if not service:
             raise ValueError(f"Puja service ID {service_id} not found or inactive.")
@@ -46,6 +52,10 @@ class BookingService:
         booking_count = PujaBooking.query.count() + 1
         booking_number = f"#PUJ-{booking_date.strftime('%Y%m')}-{booking_count:04d}"
 
+        # In offline mode, booking status is pending payment confirmation
+        initial_status = "pending" if payment_mode == "offline" else "confirmed"
+        notes_text = f"Payment Mode: {payment_mode.upper()} | Method: {payment_method or ('Offline Payment' if payment_mode == 'offline' else 'Online Gateway')}"
+
         booking = PujaBooking(
             booking_number=booking_number,
             service_id=service.id,
@@ -60,8 +70,9 @@ class BookingService:
             time_slot=time_slot,
             booking_type=booking_type,
             priest_name=slot.assigned_priest_or_astrologer if slot else "Pandit Ji",
-            status="confirmed",
-            amount_paid=service.price,
+            status=initial_status,
+            amount_paid=service.price if initial_status == "confirmed" else Decimal("0.00"),
+            notes=notes_text,
             created_at=datetime.now(timezone.utc),
         )
         db.session.add(booking)

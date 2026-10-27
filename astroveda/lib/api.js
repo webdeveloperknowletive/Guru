@@ -197,6 +197,65 @@ export async function checkoutOrder(orderData, idempotencyKey = '') {
 }
 
 /**
+ * POST /api/v1/payments/create-order
+ */
+export async function createRazorpayOrder(paymentData) {
+  const headers = {};
+  if (paymentData.token) {
+    headers['X-Order-Token'] = paymentData.token;
+  }
+  return request('/payments/create-order', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(paymentData),
+  });
+}
+
+/**
+ * POST /api/v1/payments/verify
+ */
+export async function verifyPayment(verificationData) {
+  const headers = {};
+  if (verificationData.token) {
+    headers['X-Order-Token'] = verificationData.token;
+  }
+  return request('/payments/verify', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(verificationData),
+  });
+}
+
+/**
+ * POST /api/v1/payments/failure
+ */
+export async function recordPaymentFailure(failureData) {
+  const headers = {};
+  if (failureData.token) {
+    headers['X-Order-Token'] = failureData.token;
+  }
+  return request('/payments/failure', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(failureData),
+  });
+}
+
+/**
+ * GET /api/v1/payments/status/<order_number>
+ */
+export async function getPaymentStatus(orderNumber, token = '') {
+  const headers = {};
+  if (token) {
+    headers['X-Order-Token'] = token;
+  }
+  return request(`/payments/status/${encodeURIComponent(orderNumber)}`, {
+    method: 'GET',
+    headers,
+  });
+}
+
+/**
  * GET /api/v1/orders/<order_number>
  */
 export async function getOrderTracking(orderNumber, token = '', email = '') {
@@ -314,6 +373,13 @@ export async function getSiteText() {
 }
 
 /**
+ * GET /api/v1/system/payment-mode
+ */
+export async function getPaymentMode() {
+  return request('/system/payment-mode', { method: 'GET' });
+}
+
+/**
  * GET /api/v1/content/ads?position=...
  */
 export async function getAds(position = '') {
@@ -351,6 +417,10 @@ const api = {
   requestConsultation,
   calculateCart,
   checkoutOrder,
+  createRazorpayOrder,
+  verifyPayment,
+  recordPaymentFailure,
+  getPaymentStatus,
   getOrderTracking,
   cancelOrder,
   returnOrder,
@@ -363,10 +433,12 @@ const api = {
   getConsultations,
   getWelcomePopup,
   getSiteText,
+  getPaymentMode,
   getAds,
   getSections,
 };
 
 export default api;
+
 
 

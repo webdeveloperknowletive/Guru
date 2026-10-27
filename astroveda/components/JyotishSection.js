@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useStore } from '@/context/StoreContext';
 import { requestConsultation, getConsultations, getAvailabilitySlots } from '@/lib/api';
 import { JYOTISH_SERVICES, getServiceById } from '@/config/jyotishServices';
+import OfflinePaymentBox from '@/components/OfflinePaymentBox';
 
 export default function JyotishSection({ sectionText }) {
   const kicker = sectionText?.kicker || 'Jyotish Consultation';
@@ -13,7 +14,7 @@ export default function JyotishSection({ sectionText }) {
   const baseWaLink = sectionText?.wa_link || 'https://wa.me/919822000000';
   const formNote = sectionText?.form_note || '🔒 तुमची माहिती सुरक्षित आहे. Payment consultation confirm झाल्यावर.';
 
-  const { showToast } = useStore();
+  const { showToast, paymentMode, offlineInstructions, offlineQrCode } = useStore();
   const [selectedServiceId, setSelectedServiceId] = useState('janma-kundali');
   const [loading, setLoading] = useState(false);
   const [confirmedBooking, setConfirmedBooking] = useState(null);
@@ -431,15 +432,26 @@ export default function JyotishSection({ sectionText }) {
         }
       }
 
+      payload.payment_mode = paymentMode;
+      payload.payment_method = paymentMode === 'offline' ? 'Offline Payment' : 'Online Video Consultation';
+
       const res = await requestConsultation(payload);
 
       setConfirmedBooking({
         number: res.consultation_number,
         serviceTitle: activeService.title,
         customerName: commonData.name.trim(),
+        paymentMode: res.payment_mode || paymentMode,
+        status: res.status,
+        offlineInstructions: res.offline_payment_instructions || offlineInstructions,
+        offlineQrCode: res.offline_qr_code || offlineQrCode || '/phonepe-qr.jpg',
+        fee: activeService.price || null,
       });
 
-      showToast(`✓ Consultation नोंदणी यशस्वी: ${res.consultation_number}`);
+      showToast(res.status === 'pending' && (res.payment_mode === 'offline' || paymentMode === 'offline')
+        ? `✓ Consultation नोंदणी प्राप्त: ${res.consultation_number} (Offline Pending)`
+        : `✓ Consultation नोंदणी यशस्वी: ${res.consultation_number}`
+      );
     } catch (err) {
       showToast(err.message || 'त्रुटी आली, कृपया पुन्हा प्रयत्न करा.');
     } finally {
@@ -531,7 +543,11 @@ export default function JyotishSection({ sectionText }) {
               {confirmedBooking && (
                 <div className="jyotish-success-card" role="alert" aria-live="polite">
                   <div className="success-icon">✓</div>
-                  <h4>Consultation नोंदणी यशस्वी!</h4>
+                  <h4>
+                    {confirmedBooking.paymentMode === 'offline'
+                      ? 'Consultation विनंती प्राप्त!'
+                      : 'Consultation नोंदणी यशस्वी!'}
+                  </h4>
                   <p>
                     आदरणीय <strong>{confirmedBooking.customerName}</strong>, तुमची <strong>{confirmedBooking.serviceTitle}</strong> साठी नोंदणी झाली आहे.
                   </p>
@@ -539,8 +555,24 @@ export default function JyotishSection({ sectionText }) {
                     <span>Reference Number:</span>
                     <strong>{confirmedBooking.number}</strong>
                   </div>
+
+                  {confirmedBooking.paymentMode === 'offline' && (
+                    <OfflinePaymentBox
+                      instructions={confirmedBooking.offlineInstructions}
+                      qrCodeUrl={confirmedBooking.offlineQrCode || '/phonepe-qr.jpg'}
+                      referenceNumber={confirmedBooking.number}
+                      amount={confirmedBooking.fee}
+                      customerName={confirmedBooking.customerName}
+                      whatsappUrl={`https://wa.me/919623117545?text=${encodeURIComponent(`Namaste! I have submitted a Jyotish Consultation request (${confirmedBooking.number}) for ${confirmedBooking.serviceTitle}. Here is my payment confirmation screenshot:`)}`}
+                      whatsappButtonText="💬 Share Consultation Payment on WhatsApp"
+                      title="Offline Dakshina Payment / दक्षिणा पद्धत"
+                    />
+                  )}
+
                   <p className="success-footer-note">
-                    आम्ही २४ तासांत तुमच्याशी संपर्क करून वेळ निश्चित करू.
+                    {confirmedBooking.paymentMode === 'offline'
+                      ? 'आमचे समन्वयक २४ तासांत पेमेंट सत्यापन व वेळ निश्चित करण्यासाठी संपर्क करतील.'
+                      : 'आम्ही २४ तासांत तुमच्याशी संपर्क करून वेळ निश्चित करू.'}
                   </p>
                   <button type="button" onClick={handleReset} className="btn btn-ghost reset-btn">
                     Book Another Consultation →

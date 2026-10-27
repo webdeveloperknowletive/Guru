@@ -379,6 +379,12 @@ def book_puja():
         else:
             booking_date = booking_date_raw
 
+        from app.services.payment_mode_service import PaymentModeService
+        from app.services.whatsapp_service import WhatsAppNotificationService
+
+        current_payment_mode = PaymentModeService.get_payment_mode()
+        chosen_method = data.get("payment_method") or ("Offline Payment" if current_payment_mode == "offline" else "Online Gateway")
+
         booking = BookingService.book_puja_slot(
             service_id=service_id,
             customer_name=customer_name,
@@ -391,15 +397,65 @@ def book_puja():
             nakshatra=data.get("nakshatra"),
             rashi=data.get("rashi"),
             sankalp_text=data.get("sankalp_text") or data.get("sankalp"),
+            payment_mode=current_payment_mode,
+            payment_method=chosen_method,
         )
-        return jsonify({
-            "message": "Puja booking created successfully",
+
+        # Trigger admin WhatsApp alert safely
+        wa_result = WhatsAppNotificationService.send_admin_alert(
+            module_name="Puja Booking",
+            reference_id=booking.booking_number,
+            customer_name=booking.customer_name,
+            customer_phone=booking.customer_phone,
+            customer_email=booking.customer_email,
+            amount=float(booking.service.price) if booking.service else None,
+            payment_mode=current_payment_mode,
+            payment_status=booking.status,
+            admin_url="/admin/services/puja-bookings",
+            extra_info=f"Service: {booking.service.name if booking.service else 'Puja'} | Date: {booking.booking_date} ({booking.time_slot})",
+        )
+
+        resp = {
+            "message": "Puja booking created successfully" if current_payment_mode == "online" else "Puja booking submitted successfully. Offline payment pending confirmation.",
             "booking_number": booking.booking_number,
             "amount_paid": float(booking.amount_paid),
             "status": booking.status,
-        }), 201
+            "payment_mode": current_payment_mode,
+            "payment_method": chosen_method,
+            "whatsapp_notification_status": wa_result.get("status"),
+        }
+        if current_payment_mode == "online" and booking.service and booking.service.price > 0:
+            try:
+                from app.services.razorpay_service import RazorpayService
+                amount_paise = int(booking.service.price * 100)
+                clean_receipt = f"puj_{booking.booking_number.replace('#', '').replace('-', '')}"[:40]
+                rzp_res = RazorpayService.create_order(
+                    amount_paise=amount_paise,
+                    receipt=clean_receipt,
+                    notes={
+                        "booking_number": booking.booking_number,
+                        "booking_id": str(booking.id),
+                        "customer_email": booking.customer_email,
+                        "service_name": booking.service.name,
+                    }
+                )
+                resp["razorpay"] = {
+                    "order_id": rzp_res["razorpay_order_id"],
+                    "amount": rzp_res["amount"],
+                    "currency": rzp_res["currency"],
+                    "key_id": rzp_res["key_id"],
+                }
+            except Exception as e:
+                current_app.logger.warning(f"Could not auto-generate Razorpay order on puja booking: {e}")
+
+        if current_payment_mode == "offline":
+            resp["offline_payment_instructions"] = PaymentModeService.get_offline_payment_instructions()
+            resp["offline_qr_code"] = PaymentModeService.get_offline_qr_code()
+
+        return jsonify(resp), 201
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
+
 
 
 @api_v1_bp.route("/services/request-consultation", methods=["POST"])
@@ -556,6 +612,17 @@ def request_consultation():
     elif time_slot:
         notes_lines.append(f"Preferred Time Slot: {time_slot}")
 
+    from app.services.payment_mode_service import PaymentModeService
+    from app.services.whatsapp_service import WhatsAppNotificationService
+
+    current_payment_mode = PaymentModeService.get_payment_mode()
+    chosen_method = data.get("payment_method") or ("Offline Payment" if current_payment_mode == "offline" else "Online Video Consultation")
+
+    if current_payment_mode == "offline":
+        notes_lines.append(f"Payment Mode: OFFLINE PAYMENT (Pending Devotee Confirmation) | Method: {chosen_method}")
+    else:
+        notes_lines.append(f"Payment Mode: ONLINE (Standard Gateway) | Method: {chosen_method}")
+
     full_astrologer_notes = "\n".join(notes_lines)
 
     try:
@@ -582,14 +649,39 @@ def request_consultation():
         db.session.add(consultation)
         db.session.commit()
 
-        return jsonify({
-            "message": "Jyotish consultation request submitted successfully",
+        # Trigger admin WhatsApp alert safely
+        # Note: Sensitive birth particulars (DOB/TOB/POB) are maintained strictly within
+        # the authenticated admin panel to preserve devotee privacy and consent standards.
+        wa_result = WhatsAppNotificationService.send_admin_alert(
+            module_name="Jyotish Consultation",
+            reference_id=consultation.consultation_number,
+            customer_name=consultation.customer_name,
+            customer_phone=consultation.customer_phone,
+            customer_email=consultation.customer_email,
+            amount=float(consultation.amount_paid),
+            payment_mode=current_payment_mode,
+            payment_status=consultation.status,
+            admin_url="/admin/services/consultations",
+            extra_info=f"Topic: {consultation.topic}",
+        )
+
+        resp = {
+            "message": "Jyotish consultation request submitted successfully" if current_payment_mode == "online" else "Jyotish consultation submitted successfully. Offline payment pending confirmation.",
             "consultation_number": consultation.consultation_number,
             "topic": consultation.topic,
             "status": consultation.status,
-        }), 201
+            "payment_mode": current_payment_mode,
+            "payment_method": chosen_method,
+            "whatsapp_notification_status": wa_result.get("status"),
+        }
+        if current_payment_mode == "offline":
+            resp["offline_payment_instructions"] = PaymentModeService.get_offline_payment_instructions()
+            resp["offline_qr_code"] = PaymentModeService.get_offline_qr_code()
+
+        return jsonify(resp), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
 
 
 @api_v1_bp.route("/services/consultations", methods=["GET"])
@@ -786,7 +878,18 @@ def api_checkout():
     customer_name = data.get("customer_name", "").strip()
     customer_email = data.get("customer_email", "").strip().lower()
     customer_phone = data.get("customer_phone", "").strip()
-    shipping_address = data.get("shipping_address", "").strip()
+    raw_shipping_addr = data.get("shipping_address", "")
+    if isinstance(raw_shipping_addr, dict):
+        parts = [
+            raw_shipping_addr.get("address_line1"),
+            raw_shipping_addr.get("address_line2"),
+            raw_shipping_addr.get("city"),
+            raw_shipping_addr.get("state"),
+            raw_shipping_addr.get("pincode") or raw_shipping_addr.get("postal_code"),
+        ]
+        shipping_address = ", ".join([str(p).strip() for p in parts if p and str(p).strip()])
+    else:
+        shipping_address = str(raw_shipping_addr or "").strip()
     payment_method = data.get("payment_method", "Razorpay")
     raw_items = data.get("items", [])
     coupon_code = data.get("coupon_code", "").strip().upper()
@@ -804,6 +907,7 @@ def api_checkout():
         if existing_order:
             return jsonify({
                 "message": "Order already processed (idempotent)",
+                "order_id": existing_order.id,
                 "order_number": existing_order.order_number,
                 "access_token": existing_order.access_token,
                 "total_amount": float(existing_order.total_amount),
@@ -915,6 +1019,25 @@ def api_checkout():
         # Generate high-entropy order access token for customer ownership protection
         order_access_token = secrets.token_urlsafe(32)
 
+        from app.services.payment_mode_service import PaymentModeService
+        from app.services.whatsapp_service import WhatsAppNotificationService
+
+        current_payment_mode = PaymentModeService.get_payment_mode()
+
+        if current_payment_mode == "offline":
+            raw_method = data.get("payment_method") or "Offline Payment"
+            # When offline mode is active, prevent online gateway assignment
+            if raw_method.lower() in ("razorpay", "online", "card"):
+                order_payment_method = "Offline Payment"
+            else:
+                order_payment_method = raw_method
+            order_payment_status = "offline_pending"
+            notes_record = "Payment Mode: OFFLINE PAYMENT (Pending Devotee Confirmation)"
+        else:
+            order_payment_method = payment_method or "Razorpay"
+            order_payment_status = "pending"
+            notes_record = "Payment Mode: ONLINE GATEWAY (Awaiting Verification/Capture)"
+
         order = Order(
             order_number=order_number,
             customer_id=customer.id,
@@ -927,8 +1050,9 @@ def api_checkout():
             tax_amount=tax_amount,
             total_amount=total_amount,
             order_status="pending",
-            payment_status="pending",
-            payment_method=payment_method,
+            payment_status=order_payment_status,
+            payment_method=order_payment_method,
+            admin_notes=notes_record,
             access_token=order_access_token,
             idempotency_key=idempotency_key if idempotency_key else None,
             placed_at=datetime.now(timezone.utc),
@@ -950,15 +1074,65 @@ def api_checkout():
 
         db.session.commit()
 
-        return jsonify({
-            "message": "Order placed successfully",
+        # Trigger admin WhatsApp alert safely without rollback
+        wa_result = WhatsAppNotificationService.send_admin_alert(
+            module_name="Product Order",
+            reference_id=order.order_number,
+            customer_name=order.customer_name,
+            customer_phone=order.customer_phone,
+            customer_email=order.customer_email,
+            amount=float(order.total_amount),
+            payment_mode=current_payment_mode,
+            payment_status=order.payment_status,
+            admin_url=f"/admin/commerce/orders/{order.id}",
+            extra_info=f"{len(line_items_to_create)} item(s) | Method: {order.payment_method}",
+        )
+
+        response_payload = {
+            "message": "Order placed successfully" if current_payment_mode == "online" else "Order submitted successfully. Offline payment pending confirmation.",
+            "order_id": order.id,
             "order_number": order.order_number,
             "access_token": order.access_token,
             "total_amount": float(order.total_amount),
             "payment_status": order.payment_status,
             "payment_method": order.payment_method,
+            "payment_mode": current_payment_mode,
+            "offline_payment": current_payment_mode == "offline",
             "order_status": order.order_status,
-        }), 201
+            "whatsapp_notification_status": wa_result.get("status"),
+        }
+
+        if current_payment_mode == "online" and order.payment_method == "Razorpay":
+            try:
+                from app.services.razorpay_service import RazorpayService
+                amount_paise = int(order.total_amount * 100)
+                receipt = f"rcpt_{order.order_number.replace('#', '')}"[:40]
+                rzp_res = RazorpayService.create_order(
+                    amount_paise=amount_paise,
+                    receipt=receipt,
+                    notes={
+                        "order_number": order.order_number,
+                        "order_id": str(order.id),
+                        "customer_email": order.customer_email,
+                        "customer_phone": order.customer_phone or "",
+                    }
+                )
+                response_payload["razorpay"] = {
+                    "order_id": rzp_res["razorpay_order_id"],
+                    "amount": rzp_res["amount"],
+                    "currency": rzp_res["currency"],
+                    "key_id": rzp_res["key_id"],
+                }
+            except Exception as e:
+                current_app.logger.warning(f"Could not auto-generate Razorpay order on checkout: {e}")
+
+        if current_payment_mode == "offline":
+            instr = PaymentModeService.get_offline_payment_instructions()
+            response_payload["offline_payment_instructions"] = instr
+            response_payload["offline_instructions"] = instr
+            response_payload["offline_qr_code"] = PaymentModeService.get_offline_qr_code()
+
+        return jsonify(response_payload), 201
 
     except ValueError as e:
         db.session.rollback()
@@ -1039,6 +1213,30 @@ def payment_webhook():
                 "expected_amount": expected_paise
             }), 400
 
+    event_type = data.get("event")
+    if event_type == "payment.failed":
+        if order.payment_status != "paid":
+            fail_txn_num = f"TXN-WH-FAIL-{order.order_number.replace('#', '')}-{gateway_payment_id}"
+            if not PaymentTransaction.query.filter_by(transaction_number=fail_txn_num).first():
+                error_desc = payment_obj.get("error_description") or "Webhook: Payment failed"
+                txn = PaymentTransaction(
+                    transaction_number=fail_txn_num,
+                    order_id=order.id,
+                    amount=order.total_amount,
+                    currency="INR",
+                    gateway="Razorpay",
+                    gateway_payment_id=gateway_payment_id,
+                    gateway_order_id=payment_obj.get("order_id"),
+                    status="failed",
+                    customer_name=order.customer_name,
+                    customer_email=order.customer_email,
+                    error_message=error_desc,
+                    created_at=datetime.now(timezone.utc),
+                )
+                db.session.add(txn)
+                db.session.commit()
+        return jsonify({"status": "payment_failure_processed", "order_number": order.order_number}), 200
+
     # Successful payment: transition order and create transaction
     if order.payment_status != "paid":
         order.payment_status = "paid"
@@ -1052,6 +1250,7 @@ def payment_webhook():
             currency="INR",
             gateway="Razorpay",
             gateway_payment_id=gateway_payment_id,
+            gateway_order_id=payment_obj.get("order_id"),
             status="captured",
             customer_name=order.customer_name,
             customer_email=order.customer_email,
@@ -1132,6 +1331,404 @@ def _find_order(order_number):
                 (Order.order_number == f"ORD{digits}")
             ).first()
     return order
+
+
+# --------------------------------------------------------------------------
+# Razorpay Payment Endpoints (Test Mode)
+# --------------------------------------------------------------------------
+@api_v1_bp.route("/payments/create-order", methods=["POST"])
+def payment_create_order():
+    """
+    Creates an authoritative Razorpay payment order for an existing Order or PujaBooking.
+    Server calculates authoritative amount from database record (never trusts client amount).
+    Validates ownership to prevent IDOR attacks.
+    """
+    data = request.get_json() or {}
+    order_number = data.get("order_number") or data.get("order_id")
+    booking_number = data.get("booking_number") or data.get("booking_id")
+
+    if not order_number and not booking_number:
+        return jsonify({"error": "order_number or booking_number is required"}), 400
+
+    from app.services.razorpay_service import RazorpayService
+    from app.services.payment_mode_service import PaymentModeService
+
+    current_mode = PaymentModeService.get_payment_mode()
+    if current_mode == "offline":
+        return jsonify({"error": "Store is currently in Offline Payment Mode. Online checkout is disabled."}), 400
+
+    if order_number:
+        order = _find_order(order_number)
+        if not order:
+            return jsonify({"error": f"Order '{order_number}' not found"}), 404
+
+        is_owner, err_msg = _verify_order_ownership(order)
+        if not is_owner:
+            return jsonify({"error": err_msg or "Unauthorized"}), 403
+
+        if order.payment_status == "paid":
+            return jsonify({"error": "Order is already paid"}), 400
+
+        amount_paise = int(order.total_amount * 100)
+        receipt = f"rcpt_{order.order_number.replace('#', '')}"[:40]
+        notes = {
+            "order_number": order.order_number,
+            "order_id": str(order.id),
+            "customer_email": order.customer_email,
+            "customer_phone": order.customer_phone or "",
+            "type": "product_order",
+        }
+
+        try:
+            rzp_res = RazorpayService.create_order(
+                amount_paise=amount_paise,
+                receipt=receipt,
+                notes=notes,
+            )
+            return jsonify({
+                "success": True,
+                "order_number": order.order_number,
+                "order_id": order.id,
+                "amount": rzp_res["amount"],
+                "currency": rzp_res["currency"],
+                "razorpay_order_id": rzp_res["razorpay_order_id"],
+                "key_id": rzp_res["key_id"],
+                "customer_name": order.customer_name,
+                "customer_email": order.customer_email,
+                "customer_phone": order.customer_phone or "",
+            }), 200
+        except Exception as e:
+            current_app.logger.error(f"Razorpay order creation failed: {e}")
+            return jsonify({"error": f"Failed to initialize payment: {str(e)}"}), 500
+
+    elif booking_number:
+        booking = PujaBooking.query.filter_by(booking_number=str(booking_number).strip()).first()
+        if not booking:
+            return jsonify({"error": f"Booking '{booking_number}' not found"}), 404
+
+        if booking.status in ("confirmed", "completed") and booking.amount_paid > 0:
+            return jsonify({"error": "Puja booking is already confirmed and paid"}), 400
+
+        svc_price = booking.service.price if booking.service else Decimal("0.00")
+        amount_paise = int(svc_price * 100)
+        clean_receipt = f"puj_{booking.booking_number.replace('#', '').replace('-', '')}"[:40]
+        notes = {
+            "booking_number": booking.booking_number,
+            "booking_id": str(booking.id),
+            "customer_email": booking.customer_email,
+            "type": "puja_booking",
+        }
+
+        try:
+            rzp_res = RazorpayService.create_order(
+                amount_paise=amount_paise,
+                receipt=clean_receipt,
+                notes=notes,
+            )
+            return jsonify({
+                "success": True,
+                "booking_number": booking.booking_number,
+                "booking_id": booking.id,
+                "amount": rzp_res["amount"],
+                "currency": rzp_res["currency"],
+                "razorpay_order_id": rzp_res["razorpay_order_id"],
+                "key_id": rzp_res["key_id"],
+                "customer_name": booking.customer_name,
+                "customer_email": booking.customer_email,
+                "customer_phone": booking.customer_phone or "",
+            }), 200
+        except Exception as e:
+            current_app.logger.error(f"Razorpay order creation failed for booking: {e}")
+            return jsonify({"error": f"Failed to initialize booking payment: {str(e)}"}), 500
+
+
+@api_v1_bp.route("/payments/verify", methods=["POST"])
+def payment_verify():
+    """
+    Authoritative verification of Razorpay payment signature.
+    Updates database only upon cryptographic signature verification.
+    Idempotent: Duplicate verification requests do not duplicate transactions or corrupt status.
+    """
+    data = request.get_json() or {}
+    order_number = data.get("order_number")
+    booking_number = data.get("booking_number")
+    razorpay_order_id = data.get("razorpay_order_id")
+    razorpay_payment_id = data.get("razorpay_payment_id")
+    razorpay_signature = data.get("razorpay_signature")
+
+    if not razorpay_payment_id or not razorpay_signature:
+        return jsonify({"error": "razorpay_payment_id and razorpay_signature are required"}), 400
+
+    from app.services.razorpay_service import RazorpayService
+    from app.services.audit_service import AuditService
+    from app.services.whatsapp_service import WhatsAppNotificationService
+
+    # Cryptographic signature verification using official Razorpay SDK
+    valid, err = RazorpayService.verify_payment_signature(
+        razorpay_order_id=razorpay_order_id,
+        razorpay_payment_id=razorpay_payment_id,
+        razorpay_signature=razorpay_signature,
+    )
+    if not valid:
+        AuditService.log(
+            action="PAYMENT_SIGNATURE_FAILED",
+            module="commerce",
+            actor_email=data.get("email") or "customer",
+            entity_type="Order",
+            entity_id=str(order_number or booking_number or ""),
+            details={"error": err, "razorpay_payment_id": razorpay_payment_id},
+        )
+        return jsonify({"error": "Invalid payment signature", "details": err}), 400
+
+    if order_number:
+        order = _find_order(order_number)
+        if not order:
+            return jsonify({"error": f"Order '{order_number}' not found"}), 404
+
+        is_owner, err_msg = _verify_order_ownership(order)
+        if not is_owner:
+            return jsonify({"error": err_msg or "Unauthorized"}), 403
+
+        # Idempotency check: Has this transaction already been recorded or order paid?
+        existing_txn = PaymentTransaction.query.filter_by(gateway_payment_id=razorpay_payment_id).first()
+        if existing_txn and existing_txn.status == "captured":
+            return jsonify({
+                "status": "already_verified",
+                "message": "Payment has already been verified and recorded",
+                "order_number": order.order_number,
+                "payment_status": order.payment_status,
+                "transaction_number": existing_txn.transaction_number,
+            }), 200
+
+        # Transition order to paid
+        order.payment_status = "paid"
+        order.payment_method = "Razorpay"
+        if order.order_status == "pending":
+            order.order_status = "processing"
+
+        txn_number = f"TXN-{order.order_number.replace('#', '')}-{razorpay_payment_id}"
+        existing_num = PaymentTransaction.query.filter_by(transaction_number=txn_number).first()
+        if not existing_num:
+            txn = PaymentTransaction(
+                transaction_number=txn_number,
+                order_id=order.id,
+                amount=order.total_amount,
+                currency="INR",
+                gateway="Razorpay",
+                gateway_payment_id=razorpay_payment_id,
+                gateway_order_id=razorpay_order_id,
+                status="captured",
+                customer_name=order.customer_name,
+                customer_email=order.customer_email,
+                created_at=datetime.now(timezone.utc),
+            )
+            db.session.add(txn)
+
+        db.session.commit()
+
+        AuditService.log(
+            action="PAYMENT_CAPTURED",
+            module="commerce",
+            actor_email=order.customer_email,
+            entity_type="Order",
+            entity_id=str(order.id),
+            details={
+                "order_number": order.order_number,
+                "amount": str(order.total_amount),
+                "gateway_payment_id": razorpay_payment_id,
+                "gateway_order_id": razorpay_order_id,
+            },
+        )
+
+        WhatsAppNotificationService.send_admin_alert(
+            module_name="Product Order Payment",
+            reference_id=order.order_number,
+            customer_name=order.customer_name,
+            customer_phone=order.customer_phone,
+            customer_email=order.customer_email,
+            amount=float(order.total_amount),
+            payment_mode="online",
+            payment_status="paid",
+            admin_url=f"/admin/commerce/orders/{order.id}",
+            extra_info=f"Razorpay Payment Verified: {razorpay_payment_id}",
+        )
+
+        return jsonify({
+            "status": "success",
+            "message": "Payment verified and order confirmed",
+            "order_number": order.order_number,
+            "payment_status": order.payment_status,
+            "order_status": order.order_status,
+            "transaction_number": txn_number,
+            "gateway_payment_id": razorpay_payment_id,
+        }), 200
+
+    elif booking_number:
+        booking = PujaBooking.query.filter_by(booking_number=str(booking_number).strip()).first()
+        if not booking:
+            return jsonify({"error": f"Booking '{booking_number}' not found"}), 404
+
+        booking_price = booking.service.price if booking.service else Decimal("0.00")
+        booking.status = "confirmed"
+        booking.amount_paid = booking_price
+
+        txn_number = f"TXN-PUJ-{booking.id}-{razorpay_payment_id}"
+        if not PaymentTransaction.query.filter_by(transaction_number=txn_number).first():
+            txn = PaymentTransaction(
+                transaction_number=txn_number,
+                booking_id=booking.id,
+                amount=booking_price,
+                currency="INR",
+                gateway="Razorpay",
+                gateway_payment_id=razorpay_payment_id,
+                gateway_order_id=razorpay_order_id,
+                status="captured",
+                customer_name=booking.customer_name,
+                customer_email=booking.customer_email,
+                created_at=datetime.now(timezone.utc),
+            )
+            db.session.add(txn)
+
+        db.session.commit()
+
+        AuditService.log(
+            action="PUJA_PAYMENT_CAPTURED",
+            module="services",
+            actor_email=booking.customer_email,
+            entity_type="PujaBooking",
+            entity_id=str(booking.id),
+            details={
+                "booking_number": booking.booking_number,
+                "amount": str(booking_price),
+                "gateway_payment_id": razorpay_payment_id,
+            },
+        )
+
+        return jsonify({
+            "status": "success",
+            "message": "Puja payment verified and booking confirmed",
+            "booking_number": booking.booking_number,
+            "booking_status": booking.status,
+            "amount_paid": float(booking.amount_paid),
+            "transaction_number": txn_number,
+        }), 200
+
+
+@api_v1_bp.route("/payments/failure", methods=["POST"])
+def payment_failure():
+    """
+    Records payment failure or checkout cancellation.
+    Preserves unpaid/pending state of order so devotee can retry payment.
+    Never marks order as paid.
+    """
+    data = request.get_json() or {}
+    order_number = data.get("order_number")
+    booking_number = data.get("booking_number")
+    error_code = data.get("error_code") or "PAYMENT_CANCELLED"
+    error_description = data.get("error_description") or data.get("description") or "Devotee cancelled or closed checkout modal"
+    razorpay_order_id = data.get("razorpay_order_id")
+    razorpay_payment_id = data.get("razorpay_payment_id")
+
+    from app.services.audit_service import AuditService
+
+    if order_number:
+        order = _find_order(order_number)
+        if not order:
+            return jsonify({"error": f"Order '{order_number}' not found"}), 404
+
+        is_owner, err_msg = _verify_order_ownership(order)
+        if not is_owner:
+            return jsonify({"error": err_msg or "Unauthorized"}), 403
+
+        if order.payment_status != "paid":
+            fail_txn_num = f"TXN-FAIL-{order.order_number.replace('#', '')}-{int(datetime.now(timezone.utc).timestamp())}"
+            txn = PaymentTransaction(
+                transaction_number=fail_txn_num,
+                order_id=order.id,
+                amount=order.total_amount,
+                currency="INR",
+                gateway="Razorpay",
+                gateway_payment_id=razorpay_payment_id or "cancelled",
+                gateway_order_id=razorpay_order_id,
+                status="failed",
+                customer_name=order.customer_name,
+                customer_email=order.customer_email,
+                error_message=f"[{error_code}] {error_description}",
+                created_at=datetime.now(timezone.utc),
+            )
+            db.session.add(txn)
+
+            order.admin_notes = f"{order.admin_notes or ''}\n[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}] Payment Attempt Failed: {error_description}".strip()
+            db.session.commit()
+
+            AuditService.log(
+                action="PAYMENT_FAILED",
+                module="commerce",
+                actor_email=order.customer_email,
+                entity_type="Order",
+                entity_id=str(order.id),
+                details={"error_code": error_code, "description": error_description},
+            )
+
+        return jsonify({
+            "status": "failure_recorded",
+            "order_number": order.order_number,
+            "payment_status": order.payment_status,
+            "message": "Payment failure recorded. Devotee can retry.",
+        }), 200
+
+    elif booking_number:
+        booking = PujaBooking.query.filter_by(booking_number=str(booking_number).strip()).first()
+        if not booking:
+            return jsonify({"error": f"Booking '{booking_number}' not found"}), 404
+
+        return jsonify({
+            "status": "failure_recorded",
+            "booking_number": booking.booking_number,
+            "booking_status": booking.status,
+        }), 200
+
+    return jsonify({"error": "order_number or booking_number is required"}), 400
+
+
+@api_v1_bp.route("/payments/status/<order_number>", methods=["GET"])
+def payment_status(order_number):
+    """
+    Authenticated check of authoritative payment status and transaction history.
+    """
+    order = _find_order(order_number)
+    if not order:
+        return jsonify({"error": f"Order '{order_number}' not found"}), 404
+
+    is_owner, err_msg = _verify_order_ownership(order)
+    if not is_owner:
+        return jsonify({"error": err_msg or "Unauthorized"}), 403
+
+    transactions = PaymentTransaction.query.filter_by(order_id=order.id).order_by(PaymentTransaction.created_at.desc()).all()
+    txn_list = [
+        {
+            "transaction_number": t.transaction_number,
+            "gateway": t.gateway,
+            "gateway_payment_id": t.gateway_payment_id,
+            "gateway_order_id": t.gateway_order_id,
+            "amount": float(t.amount),
+            "currency": t.currency,
+            "status": t.status,
+            "error_message": t.error_message,
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+        }
+        for t in transactions
+    ]
+
+    return jsonify({
+        "order_number": order.order_number,
+        "payment_status": order.payment_status,
+        "payment_method": order.payment_method,
+        "order_status": order.order_status,
+        "total_amount": float(order.total_amount),
+        "is_paid": order.payment_status == "paid",
+        "transactions": txn_list,
+    }), 200
 
 
 @api_v1_bp.route("/orders/<order_number>", methods=["GET"])
@@ -1502,6 +2099,27 @@ def get_site_text():
     from app.services.site_text_service import SiteTextService
     texts = SiteTextService.get_all()
     return jsonify({"site_text": texts, **texts})
+
+
+@api_v1_bp.route("/system/payment-mode", methods=["GET"])
+def get_public_payment_mode():
+    """
+    Public REST API endpoint returning current authoritative payment mode
+    ('online' or 'offline') and configured offline instructions.
+    """
+    from app.services.payment_mode_service import PaymentModeService
+    mode = PaymentModeService.get_payment_mode()
+    instructions = PaymentModeService.get_offline_payment_instructions()
+    qr_code = PaymentModeService.get_offline_qr_code()
+    return jsonify({
+        "payment_mode": mode,
+        "is_offline": mode == "offline",
+        "offline_payment_instructions": instructions,
+        "instructions": instructions,
+        "offline_qr_code": qr_code,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
 
 
 

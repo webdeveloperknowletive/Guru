@@ -18,6 +18,14 @@
     <a href="{{ url_for('commerce.order_packing_slip', order_id=order.id) }}" target="_blank" class="btn-secondary" style="display:inline-flex; align-items:center; gap:5px;">
       📦 Print Packing Slip
     </a>
+    {% if order.payment_status == 'offline_pending' %}
+      <button type="button" class="btn-primary" style="background:#16a34a; border-color:#86efac; font-weight:700;" onclick="openModal('verifyOfflinePaymentModal')">
+        ✓ Verify Offline Payment
+      </button>
+    {% endif %}
+    <button type="button" class="btn-secondary" style="display:inline-flex; align-items:center; gap:5px;" onclick="openModal('retryWhatsAppModal')">
+      📲 WhatsApp Notification
+    </button>
     {% if order.payment_status != 'refunded' and order.order_status != 'cancelled' %}
       <button type="button" class="btn-secondary" style="color:var(--status-red-text); border-color:#fca5a5;" onclick="openModal('refundModal')">
         Process Refund
@@ -184,4 +192,83 @@
     </form>
   </div>
 </div>
+
+<!-- Verify Offline Payment Modal -->
+<div class="modal-overlay" id="verifyOfflinePaymentModal">
+  <div class="modal-container" style="max-width:500px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Verify & Capture Offline Payment</h3>
+      <button type="button" class="modal-close-btn" onclick="closeModal('verifyOfflinePaymentModal')">&times;</button>
+    </div>
+    <form action="{{ url_for('commerce.order_verify_payment', order_id=order.id) }}" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-body">
+        <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">
+          Verifying this payment transitions the order to <strong>paid</strong>, moves fulfillment status to <strong>processing</strong>, and records an authoritative transaction log and audit entry.
+        </p>
+        <div class="form-group">
+          <label class="form-label">Order Total (₹)</label>
+          <input type="text" class="form-control" value="{{ format_currency(order.total_amount) }}" readonly style="background:#faf8f5; font-weight:700;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Bank Reference / UPI UTR Number (Optional)</label>
+          <input type="text" name="transaction_reference" class="form-control" placeholder="e.g. UTR-402918491029 or CASH-RECEIPT-108">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Reconciliation Notes</label>
+          <input type="text" name="notes" class="form-control" placeholder="Verified via SBI Trust Account / Ashram counter">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('verifyOfflinePaymentModal')">Cancel</button>
+        <button type="submit" class="btn-primary" style="background:#16a34a; border-color:#86efac; font-weight:700;">
+          Confirm Payment Received
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Admin WhatsApp Alert Modal / Retry -->
+<div class="modal-overlay" id="retryWhatsAppModal">
+  <div class="modal-container" style="max-width:520px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Admin WhatsApp Notification</h3>
+      <button type="button" class="modal-close-btn" onclick="closeModal('retryWhatsAppModal')">&times;</button>
+    </div>
+    <form action="{{ url_for('dashboard.retry_whatsapp_notification') }}" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="module" value="Product Order">
+      <input type="hidden" name="reference_id" value="{{ order.order_number }}">
+      <input type="hidden" name="customer_name" value="{{ order.customer_name }}">
+      <input type="hidden" name="customer_phone" value="{{ order.customer_phone or '' }}">
+      <input type="hidden" name="customer_email" value="{{ order.customer_email }}">
+      <input type="hidden" name="amount" value="{{ order.total_amount }}">
+      <input type="hidden" name="payment_mode" value="{{ 'offline' if order.payment_status == 'offline_pending' else 'online' }}">
+      <input type="hidden" name="payment_status" value="{{ order.payment_status }}">
+      <input type="hidden" name="admin_url" value="{{ url_for('commerce.order_detail', order_id=order.id, _external=True) }}">
+
+      <div class="modal-body" style="font-size:0.86rem; color:var(--text-secondary); line-height:1.5;">
+        <p style="margin-top:0;">
+          Dispatch or retry an administrative WhatsApp alert for Order <strong>{{ order.order_number }}</strong>.
+        </p>
+        <div style="background:var(--bg-app, #faf8f5); border:1px solid var(--border-color, #e2e8f0); border-radius:8px; padding:0.85rem; font-family:monospace; font-size:0.78rem; white-space:pre-line;">
+          🕉️ AstroVeda Store Alert
+          Module: Product Order
+          Ref ID: {{ order.order_number }}
+          Customer: {{ order.customer_name }} | {{ order.customer_phone or 'N/A' }}
+          Amount: {{ format_currency(order.total_amount) }}
+          Status: {{ order.payment_status }}
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('retryWhatsAppModal')">Close</button>
+        <button type="submit" class="btn-primary" style="background:#25d366; border-color:#22c55e; color:#fff; font-weight:700;">
+          Send / Retry WhatsApp Alert
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
 {% endblock %}
+

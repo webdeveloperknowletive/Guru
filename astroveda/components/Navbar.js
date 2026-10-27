@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '@/context/StoreContext';
-import { getAllProducts, adaptApiProduct } from '@/lib/products';
+import { getAllProducts, adaptApiProduct, svgRudraksha } from '@/lib/products';
 import { getProducts } from '@/lib/api';
 
 const POPULAR_SEARCHES = [
@@ -31,6 +31,42 @@ export default function Navbar({ logo }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const searchInputRef = useRef(null);
   const searchContainerRef = useRef(null);
+
+  const [isHomeActive, setIsHomeActive] = useState(true);
+
+  // Track if user is at the top of the homepage for active state styling
+  useEffect(() => {
+    const checkHomeActive = () => {
+      if (typeof window !== 'undefined') {
+        const isRoot = window.location.pathname === '/' || window.location.pathname === '';
+        const noHashOrTop = !window.location.hash || window.location.hash === '#top';
+        setIsHomeActive(isRoot && noHashOrTop && window.scrollY < 400);
+      }
+    };
+    checkHomeActive();
+    window.addEventListener('scroll', checkHomeActive, { passive: true });
+    window.addEventListener('hashchange', checkHomeActive, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', checkHomeActive);
+      window.removeEventListener('hashchange', checkHomeActive);
+    };
+  }, []);
+
+  const handleHomeClick = (e) => {
+    if (typeof window !== 'undefined') {
+      if (window.location.pathname === '/' || window.location.pathname === '') {
+        e.preventDefault();
+        window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+        if (window.location.hash) {
+          try {
+            history.pushState(null, '', window.location.pathname);
+          } catch {
+            window.location.hash = '';
+          }
+        }
+      }
+    }
+  };
 
   const openCart = () => { setCartOpen(true); setWishOpen(false); setDropdownOpen(false); setDrawerOpen(false); };
   const openWish = () => { setWishOpen(true); setCartOpen(false); setDropdownOpen(false); setDrawerOpen(false); };
@@ -119,9 +155,64 @@ export default function Navbar({ logo }) {
     openProductModal(product);
   };
 
+  const renderProductThumb = (p) => {
+    const rawSrc = p.img || (Array.isArray(p.images) && p.images[0]) || p.thumbnail || '';
+    const imgSrc = typeof rawSrc === 'string' ? rawSrc.trim() : '';
+
+    if (imgSrc.startsWith('<')) {
+      return (
+        <div
+          className="nav-search-match-thumb"
+          dangerouslySetInnerHTML={{ __html: imgSrc }}
+        />
+      );
+    }
+
+    if (imgSrc) {
+      return (
+        <div className="nav-search-match-thumb">
+          <img
+            src={imgSrc}
+            alt={p.title || 'Product'}
+            loading="lazy"
+            onError={(e) => {
+              const target = e.currentTarget;
+              const originalSrc = target.getAttribute('data-original-src') || target.src || '';
+              if (originalSrc.includes('/static/uploads/products/')) {
+                const filename = originalSrc.split('/').pop();
+                if (filename && !target.getAttribute('data-retried')) {
+                  target.setAttribute('data-retried', 'true');
+                  target.src = `/products/${filename}`;
+                  return;
+                }
+              }
+              target.onerror = null;
+              target.style.display = 'none';
+              const fallback = target.nextElementSibling;
+              if (fallback) fallback.style.display = 'grid';
+            }}
+            data-original-src={imgSrc}
+          />
+          <div
+            className="nav-search-thumb-fallback"
+            style={{ display: 'none', width: '100%', height: '100%', placeItems: 'center' }}
+            dangerouslySetInnerHTML={{ __html: svgRudraksha('ॐ') }}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div
+        className="nav-search-match-thumb"
+        dangerouslySetInnerHTML={{ __html: svgRudraksha('ॐ') }}
+      />
+    );
+  };
+
   return (
     <nav className={`nav${isScrolled ? ' is-scrolled' : ''}`} id="top">
-      <a href="#top" className="brand" aria-label="Swami Guruji Home">
+      <a href="/" className="brand" aria-label="Swami Guruji Home" onClick={handleHomeClick}>
         <img
           src={logoSrc}
           alt="Swami Guruji"
@@ -135,7 +226,16 @@ export default function Navbar({ logo }) {
 
       {/* Nav Links */}
       <ul className="nav-links">
-        <li><a href="#top">{t ? t('nav_home', 'Home') : 'Home'}</a></li>
+        <li>
+          <a
+            href="/"
+            className={`nav-link-home${isHomeActive ? ' active' : ''}`}
+            aria-current={isHomeActive ? 'page' : undefined}
+            onClick={handleHomeClick}
+          >
+            {t ? t('nav_home', 'Home') : 'Home'}
+          </a>
+        </li>
         <li><a href="#about">{t ? t('nav_about', 'About Guruji') : 'About Guruji'}</a></li>
         <li><a href="#puja">{t ? t('nav_puja', 'Pooja Services') : 'Pooja Services'}</a></li>
         <li><a href="#jyotish">{t ? t('nav_jyotish', 'Astrology Consultation') : 'Astrology Consultation'}</a></li>
@@ -211,10 +311,7 @@ export default function Navbar({ logo }) {
                       className="nav-search-match-item"
                       onClick={() => handlePickProduct(p)}
                     >
-                      <div
-                        className="nav-search-match-thumb"
-                        dangerouslySetInnerHTML={{ __html: p.img || '' }}
-                      />
+                      {renderProductThumb(p)}
                       <div className="nav-search-match-info">
                         <div className="nav-search-match-title">{p.title}</div>
                         <div className="nav-search-match-meta">

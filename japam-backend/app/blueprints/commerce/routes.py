@@ -888,6 +888,22 @@ def order_update_status(order_id):
     return redirect(url_for("commerce.order_detail", order_id=order_id))
 
 
+@commerce_bp.route("/orders/<int:order_id>/verify-payment", methods=["POST"])
+@login_required
+@permission_required("orders", "edit")
+def order_verify_payment(order_id):
+    user = get_current_admin()
+    ref = request.form.get("transaction_reference", "").strip()
+    notes = request.form.get("notes", "").strip()
+    try:
+        CommerceService.verify_offline_payment(order_id, user, transaction_reference=ref, notes=notes)
+        flash("Offline payment verified and recorded. Order moved to processing.", "success")
+    except Exception as e:
+        flash(f"Failed to verify payment: {str(e)}", "danger")
+    return redirect(url_for("commerce.order_detail", order_id=order_id))
+
+
+
 @commerce_bp.route("/orders/<int:order_id>/refund", methods=["POST"])
 @login_required
 @permission_required("orders", "refund")
