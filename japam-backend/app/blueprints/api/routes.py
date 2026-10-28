@@ -553,10 +553,14 @@ def request_consultation():
     ]
 
     # Marriage matching details
+    groom_name = None
+    bride_name = None
     if service_id == "marriage-matching" or data.get("person2"):
         p2 = data.get("person2") or {}
-        notes_lines.append(f"Person 1 (Self): {person1.get('name', customer_name)} | DOB: {person1.get('dob')} | TOB: {'Unknown' if person1.get('time_unknown') else person1.get('tob', 'N/A')} | POB: {person1.get('pob', 'N/A')}")
-        notes_lines.append(f"Person 2 (Partner): {p2.get('name', 'N/A')} | DOB: {p2.get('dob')} | TOB: {'Unknown' if p2.get('time_unknown') else p2.get('tob', 'N/A')} | POB: {p2.get('pob', 'N/A')}")
+        groom_name = (person1.get("name") or "").strip() or "Not Specified"
+        bride_name = (p2.get("name") or "").strip() or "Not Specified"
+        notes_lines.append(f"Male / Groom Details: {groom_name} | DOB: {person1.get('dob')} | TOB: {'Unknown' if person1.get('time_unknown') else person1.get('tob', 'N/A')} | POB: {person1.get('pob', 'N/A')}")
+        notes_lines.append(f"Female / Bride Details: {bride_name} | DOB: {p2.get('dob')} | TOB: {'Unknown' if p2.get('time_unknown') else p2.get('tob', 'N/A')} | POB: {p2.get('pob', 'N/A')}")
         if data.get("marriage_period"):
             notes_lines.append(f"Preferred Marriage Period: {data.get('marriage_period')}")
         if data.get("proposed_wedding_date"):
@@ -690,6 +694,10 @@ def request_consultation():
         # Trigger admin WhatsApp alert safely
         # Note: Sensitive birth particulars (DOB/TOB/POB) are maintained strictly within
         # the authenticated admin panel to preserve devotee privacy and consent standards.
+        wa_extra = f"Topic: {consultation.topic}"
+        if (service_id == "marriage-matching" or data.get("person2")) and groom_name and bride_name:
+            wa_extra = f"Topic: Marriage Kundali Matching | Contact Person: {consultation.customer_name} | Groom: {groom_name} | Bride: {bride_name}"
+
         wa_result = WhatsAppNotificationService.send_admin_alert(
             module_name="Jyotish Consultation",
             reference_id=consultation.consultation_number,
@@ -700,7 +708,7 @@ def request_consultation():
             payment_mode=current_payment_mode,
             payment_status=consultation.status,
             admin_url="/admin/services/consultations",
-            extra_info=f"Topic: {consultation.topic}",
+            extra_info=wa_extra,
         )
 
         resp = {

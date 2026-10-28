@@ -159,12 +159,7 @@ export default function JyotishSection({ sectionText }) {
     showToast(`Selected: ${service.title}`);
   };
 
-  // Pre-fill person 1 with common name if blank
-  useEffect(() => {
-    if (commonData.name && !marriageData.person1Name) {
-      setMarriageData(prev => ({ ...prev, person1Name: commonData.name }));
-    }
-  }, [commonData.name, marriageData.person1Name]);
+// Pre-fill person 1 removed: participant names remain independent of contact person
 
   // Construct dynamic WhatsApp link
   const dynamicWaLink = (() => {
@@ -181,7 +176,9 @@ export default function JyotishSection({ sectionText }) {
 
     // Common customer fields
     if (!commonData.name.trim()) {
-      newErrors.name = 'कृपया तुमचे पूर्ण नाव प्रविष्ट करा (Full name is required)';
+      newErrors.name = selectedServiceId === 'marriage-matching'
+        ? 'कृपया बुकिंग करणाऱ्या व्यक्तीचे पूर्ण नाव प्रविष्ट करा (Contact person full name is required)'
+        : 'कृपया तुमचे पूर्ण नाव प्रविष्ट करा (Full name is required)';
     }
     const phoneClean = commonData.phone.replace(/[^0-9+]/g, '');
     if (!phoneClean || phoneClean.length < 8) {
@@ -222,23 +219,23 @@ export default function JyotishSection({ sectionText }) {
 
       case 'marriage-matching':
         if (!marriageData.person1Name.trim()) {
-          newErrors.person1Name = 'पहिल्या व्यक्तीचे नाव आवश्यक आहे (Person 1 name is required)';
+          newErrors.person1Name = 'वराचे / मुलाचे नाव आवश्यक आहे (Male / Groom name is required)';
         }
         if (!marriageData.person1Dob) {
-          newErrors.person1Dob = 'पहिल्या व्यक्तीची जन्मतारीख आवश्यक आहे (Person 1 DOB is required)';
+          newErrors.person1Dob = 'वराची / मुलाची जन्मतारीख आवश्यक आहे (Male / Groom DOB is required)';
         }
         if (!marriageData.person1Pob.trim()) {
-          newErrors.person1Pob = 'पहिल्या व्यक्तीचे जन्मस्थान आवश्यक आहे (Person 1 POB is required)';
+          newErrors.person1Pob = 'वराचे / मुलाचे जन्मस्थान आवश्यक आहे (Male / Groom POB is required)';
         }
 
         if (!marriageData.person2Name.trim()) {
-          newErrors.person2Name = 'जोडीदाराचे नाव आवश्यक आहे (Partner name is required)';
+          newErrors.person2Name = 'वधूचे / मुलीचे नाव आवश्यक आहे (Female / Bride name is required)';
         }
         if (!marriageData.person2Dob) {
-          newErrors.person2Dob = 'जोडीदाराची जन्मतारीख आवश्यक आहे (Partner DOB is required)';
+          newErrors.person2Dob = 'वधूची / मुलीची जन्मतारीख आवश्यक आहे (Female / Bride DOB is required)';
         }
         if (!marriageData.person2Pob.trim()) {
-          newErrors.person2Pob = 'जोडीदाराचे जन्मस्थान आवश्यक आहे (Partner POB is required)';
+          newErrors.person2Pob = 'वधूचे / मुलीचे जन्मस्थान आवश्यक आहे (Female / Bride POB is required)';
         }
         break;
 
@@ -439,8 +436,11 @@ export default function JyotishSection({ sectionText }) {
 
       setConfirmedBooking({
         number: res.consultation_number,
+        serviceId: selectedServiceId,
         serviceTitle: activeService.title,
         customerName: commonData.name.trim(),
+        person1Name: selectedServiceId === 'marriage-matching' ? marriageData.person1Name.trim() : null,
+        person2Name: selectedServiceId === 'marriage-matching' ? marriageData.person2Name.trim() : null,
         paymentMode: res.payment_mode || paymentMode,
         status: res.status,
         offlineInstructions: res.offline_payment_instructions || offlineInstructions,
@@ -549,7 +549,20 @@ export default function JyotishSection({ sectionText }) {
                       : 'Consultation नोंदणी यशस्वी!'}
                   </h4>
                   <p>
-                    आदरणीय <strong>{confirmedBooking.customerName}</strong>, तुमची <strong>{confirmedBooking.serviceTitle}</strong> साठी नोंदणी झाली आहे.
+                    {confirmedBooking.serviceId === 'marriage-matching' ? (
+                      <>
+                        आदरणीय <strong>{confirmedBooking.customerName}</strong> (Contact Person), <strong>{confirmedBooking.serviceTitle}</strong> साठी नोंदणी झाली आहे.
+                        {confirmedBooking.person1Name && confirmedBooking.person2Name && (
+                          <span style={{ display: 'block', fontSize: '13px', color: 'var(--gold-lt)', marginTop: '4px' }}>
+                            (वर / Groom: <strong>{confirmedBooking.person1Name}</strong> · वधू / Bride: <strong>{confirmedBooking.person2Name}</strong>)
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        आदरणीय <strong>{confirmedBooking.customerName}</strong>, तुमची <strong>{confirmedBooking.serviceTitle}</strong> साठी नोंदणी झाली आहे.
+                      </>
+                    )}
                   </p>
                   <div className="reference-badge">
                     <span>Reference Number:</span>
@@ -563,7 +576,11 @@ export default function JyotishSection({ sectionText }) {
                       referenceNumber={confirmedBooking.number}
                       amount={confirmedBooking.fee}
                       customerName={confirmedBooking.customerName}
-                      whatsappUrl={`https://wa.me/919623117545?text=${encodeURIComponent(`Namaste! I have submitted a Jyotish Consultation request (${confirmedBooking.number}) for ${confirmedBooking.serviceTitle}. Here is my payment confirmation screenshot:`)}`}
+                      whatsappUrl={`https://wa.me/919623117545?text=${encodeURIComponent(
+                        confirmedBooking.serviceId === 'marriage-matching'
+                          ? `Namaste! I have submitted a Marriage Kundali Matching consultation (${confirmedBooking.number}). Contact Person: ${confirmedBooking.customerName}${confirmedBooking.person1Name ? `, Groom: ${confirmedBooking.person1Name}` : ''}${confirmedBooking.person2Name ? `, Bride: ${confirmedBooking.person2Name}` : ''}. Here is my payment confirmation screenshot:`
+                          : `Namaste! I have submitted a Jyotish Consultation request (${confirmedBooking.number}) for ${confirmedBooking.serviceTitle}. Here is my payment confirmation screenshot:`
+                      )}`}
                       whatsappButtonText="💬 Share Consultation Payment on WhatsApp"
                       title="Offline Dakshina Payment / दक्षिणा पद्धत"
                     />
@@ -585,12 +602,16 @@ export default function JyotishSection({ sectionText }) {
                   <div className="form-grid">
                     {/* Common Customer Details */}
                     <div className="field full">
-                      <label htmlFor="f-name">Full Name · नाव <span className="req">*</span></label>
+                      <label htmlFor="f-name">
+                        {selectedServiceId === 'marriage-matching' ? "Contact Person’s Full Name / बुकिंग करणाऱ्या व्यक्तीचे नाव" : "Full Name · नाव"} <span className="req">*</span>
+                      </label>
                       <input
                         type="text"
                         id="f-name"
+                        name="contact_person_name"
+                        autoComplete="name"
                         data-error-key="name"
-                        placeholder="तुमचे पूर्ण नाव (e.g. Rahul Sharma)"
+                        placeholder={selectedServiceId === 'marriage-matching' ? "बुकिंग करणाऱ्या व्यक्तीचे पूर्ण नाव (Contact Person's Full Name)" : "तुमचे पूर्ण नाव (e.g. Rahul Sharma)"}
                         value={commonData.name}
                         onChange={(e) => {
                           setCommonData(prev => ({ ...prev, name: e.target.value }));
@@ -782,14 +803,16 @@ export default function JyotishSection({ sectionText }) {
                         <div className="marriage-section-block full">
                           {/* Person 1 Box */}
                           <div className="person-box">
-                            <h4 className="person-box-title">👦Male: Your Details (प्रथम व्यक्ती)</h4>
+                            <h4 className="person-box-title">👦 Male / Groom Details (वर / मुलाचे तपशील)</h4>
                             <div className="field">
-                              <label htmlFor="p1-name">Full Name <span className="req">*</span></label>
+                              <label htmlFor="p1-name">Full Name · पूर्ण नाव <span className="req">*</span></label>
                               <input
                                 type="text"
                                 id="p1-name"
+                                name="groom_name"
+                                autoComplete="off"
                                 data-error-key="person1Name"
-                                placeholder="Full Name"
+                                placeholder="वराचे पूर्ण नाव (Groom's Full Name)"
                                 value={marriageData.person1Name}
                                 onChange={(e) => {
                                   setMarriageData(prev => ({ ...prev, person1Name: e.target.value }));
@@ -856,14 +879,16 @@ export default function JyotishSection({ sectionText }) {
 
                           {/* Person 2 Box */}
                           <div className="person-box">
-                            <h4 className="person-box-title">👧Female: Partner Details (जोडीदार व्यक्ती)</h4>
+                            <h4 className="person-box-title">👧 Female / Bride Details (वधू / मुलीचे तपशील)</h4>
                             <div className="field">
-                              <label htmlFor="p2-name">Full Name <span className="req">*</span></label>
+                              <label htmlFor="p2-name">Full Name · पूर्ण नाव <span className="req">*</span></label>
                               <input
                                 type="text"
                                 id="p2-name"
+                                name="bride_name"
+                                autoComplete="off"
                                 data-error-key="person2Name"
-                                placeholder="Partner's Full Name"
+                                placeholder="वधूचे पूर्ण नाव (Bride's Full Name)"
                                 value={marriageData.person2Name}
                                 onChange={(e) => {
                                   setMarriageData(prev => ({ ...prev, person2Name: e.target.value }));

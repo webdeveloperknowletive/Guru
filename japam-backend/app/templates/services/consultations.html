@@ -43,15 +43,30 @@
           <td style="font-weight:700; color:var(--text-muted); font-size:0.8rem;">{{ loop.index }}</td>
           <td style="font-weight:700; font-family:monospace; white-space:nowrap;">{{ c.consultation_number }}</td>
           <td>
-            <div style="font-weight:600;">{{ c.customer_name }}</div>
+            <div style="font-weight:600;">
+              {% if 'Marriage' in c.topic %}
+                <span style="font-size:0.7rem; color:var(--text-muted); display:block; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">Contact Person:</span>
+              {% endif %}
+              {{ c.customer_name }}
+            </div>
             <div style="font-size:0.72rem; color:var(--text-muted); margin-top:2px;">
               <span>✉️ {{ c.customer_email }}</span>
               {% if c.customer_phone %} · <span>📞 {{ c.customer_phone }}</span>{% endif %}
             </div>
           </td>
           <td style="font-size:0.78rem;">
-            <div>DOB: <strong>{{ c.dob.strftime('%d %b %Y') }}</strong> ({{ c.tob }})</div>
-            <div style="color:var(--text-muted);">POB: {{ c.pob }}</div>
+            {% if 'Marriage' in c.topic and c.astrologer_notes and 'Male / Groom Details:' in c.astrologer_notes %}
+              {% for line in c.astrologer_notes.split('\n') %}
+                {% if 'Male / Groom Details:' in line %}
+                  <div style="color:var(--text-primary); font-weight:600;">👦 {{ line.replace('Male / Groom Details:', 'Groom:') }}</div>
+                {% elif 'Female / Bride Details:' in line %}
+                  <div style="color:var(--text-primary); font-weight:600; margin-top:2px;">👧 {{ line.replace('Female / Bride Details:', 'Bride:') }}</div>
+                {% endif %}
+              {% endfor %}
+            {% else %}
+              <div>DOB: <strong>{{ c.dob.strftime('%d %b %Y') }}</strong> ({{ c.tob }})</div>
+              <div style="color:var(--text-muted);">POB: {{ c.pob }}</div>
+            {% endif %}
           </td>
           <td>
             <span style="font-weight:600; color:var(--saffron-700);">{{ c.topic }}</span>
