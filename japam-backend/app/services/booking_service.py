@@ -56,10 +56,17 @@ class BookingService:
         booking_number = SequenceService.next_puja_booking_number()
 
         # Preserve existing online/offline mode and payment-status rules.
+        # WhatsApp mode: booking is pending admin confirmation.
         # Online mode: booking is confirmed on slot, but payment is not marked as successful until verified.
         # Offline mode: booking is pending admin payment confirmation.
-        initial_status = status if status else ("pending" if payment_mode == "offline" else "confirmed")
-        notes_text = f"Payment Mode: {(payment_mode or 'ONLINE').upper()} | Method: {payment_method or ('Offline Payment' if payment_mode == 'offline' else 'Online Gateway')}"
+        is_whatsapp = (booking_type and booking_type.lower() == "whatsapp") or (payment_mode and payment_mode.lower() == "whatsapp")
+        if is_whatsapp:
+            initial_status = status if status else "pending"
+            notes_text = "Mode: WHATSAPP | Method: WhatsApp Booking"
+            booking_type = "whatsapp"
+        else:
+            initial_status = status if status else ("pending" if payment_mode == "offline" else "confirmed")
+            notes_text = f"Payment Mode: {(payment_mode or 'ONLINE').upper()} | Method: {payment_method or ('Offline Payment' if payment_mode == 'offline' else 'Online Gateway')}"
 
         booking = PujaBooking(
             booking_number=booking_number,

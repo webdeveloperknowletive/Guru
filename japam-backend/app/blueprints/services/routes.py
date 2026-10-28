@@ -283,10 +283,12 @@ def puja_bookings_list():
     user = get_current_admin()
     status = request.args.get("status")
     q = PujaBooking.query
-    if status:
+    if status == "whatsapp":
+        q = q.filter((PujaBooking.booking_type.ilike("%whatsapp%")) | (PujaBooking.notes.ilike("%whatsapp%")))
+    elif status:
         q = q.filter_by(status=status)
 
-    bookings = q.order_by(PujaBooking.booking_date.desc()).all()
+    bookings = q.order_by(PujaBooking.booking_date.desc(), PujaBooking.id.desc()).all()
     puja_services = PujaService.query.filter_by(is_active=True).all()
     return render_template(
         "services/puja_bookings.html",

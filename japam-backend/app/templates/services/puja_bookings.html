@@ -9,10 +9,11 @@
     <p class="page-subtitle">Manage devotee sankalp details, priest assignments, and ceremony status.</p>
   </div>
   <div class="page-header-actions">
-    <div style="display:flex; gap:0.5rem;">
-      <a href="{{ url_for('services.puja_bookings_list') }}" class="btn-secondary {% if not selected_status %}style='background:#f4eee6;'{% endif %}">All</a>
-      <a href="{{ url_for('services.puja_bookings_list', status='confirmed') }}" class="btn-secondary">Confirmed</a>
-      <a href="{{ url_for('services.puja_bookings_list', status='pending') }}" class="btn-secondary">Pending</a>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+      <a href="{{ url_for('services.puja_bookings_list') }}" class="btn-secondary" {% if not selected_status %}style="background:#f4eee6; font-weight:700;"{% endif %}>All</a>
+      <a href="{{ url_for('services.puja_bookings_list', status='whatsapp') }}" class="btn-secondary" {% if selected_status == 'whatsapp' %}style="background:rgba(37,211,102,0.15); color:#15803d; border:1px solid rgba(37,211,102,0.4); font-weight:700;"{% endif %}>💬 WhatsApp</a>
+      <a href="{{ url_for('services.puja_bookings_list', status='confirmed') }}" class="btn-secondary" {% if selected_status == 'confirmed' %}style="background:#f4eee6; font-weight:700;"{% endif %}>Confirmed</a>
+      <a href="{{ url_for('services.puja_bookings_list', status='pending') }}" class="btn-secondary" {% if selected_status == 'pending' %}style="background:#f4eee6; font-weight:700;"{% endif %}>Pending</a>
     </div>
   </div>
 </div>
@@ -73,9 +74,15 @@
             <div style="font-size:0.73rem; color:var(--text-muted); font-family:monospace;">{{ format_date(b.created_at, "%I:%M %p") }}</div>
           </td>
           <td>
-            <span class="badge {% if b.booking_type == 'online' %}badge-type-puja{% else %}badge-confirmed{% endif %}">
-              {{ b.booking_type|upper }}
-            </span>
+            {% if b.booking_type|lower == 'whatsapp' or (b.notes and 'whatsapp' in b.notes|lower) %}
+              <span class="badge" style="background:rgba(37,211,102,0.15); color:#15803d; border:1px solid rgba(37,211,102,0.4); font-weight:700; white-space:nowrap;">
+                💬 WHATSAPP
+              </span>
+            {% elif b.booking_type == 'online' %}
+              <span class="badge badge-type-puja">ONLINE</span>
+            {% else %}
+              <span class="badge badge-confirmed">{{ b.booking_type|upper }}</span>
+            {% endif %}
           </td>
           <td>{{ b.priest_name or '—' }}</td>
           <td>
@@ -94,8 +101,8 @@
               data-email="{{ b.customer_email or '' }}"
               data-date="{{ format_date(b.booking_date, '%A, %d %b %Y') }}"
               data-time="{{ b.time_slot }}"
+              data-mode="{{ 'whatsapp' if (b.booking_type|lower == 'whatsapp' or (b.notes and 'whatsapp' in b.notes|lower)) else (b.booking_type or 'online') }}"
               data-booked-on="{{ format_date(b.created_at, '%A, %d %b %Y, %I:%M %p') }}"
-              data-mode="{{ b.booking_type|upper }}"
               data-status="{{ b.status }}"
               data-priest="{{ b.priest_name or '' }}"
               data-link="{{ b.meeting_link_or_venue or '' }}"
@@ -245,11 +252,25 @@
 
     const modeBadge = document.getElementById("viewModeBadge");
     const modeVal = (d.mode || "ONLINE").toUpperCase();
-    modeBadge.innerText = modeVal;
-    if (modeVal === "OFFLINE") {
+    if (modeVal === "WHATSAPP") {
+      modeBadge.className = "badge";
+      modeBadge.style.background = "rgba(37,211,102,0.15)";
+      modeBadge.style.color = "#15803d";
+      modeBadge.style.border = "1px solid rgba(37,211,102,0.4)";
+      modeBadge.style.fontWeight = "700";
+      modeBadge.innerText = "💬 WHATSAPP";
+    } else if (modeVal === "OFFLINE") {
       modeBadge.className = "badge badge-confirmed";
+      modeBadge.style.background = "";
+      modeBadge.style.color = "";
+      modeBadge.style.border = "";
+      modeBadge.innerText = modeVal;
     } else {
       modeBadge.className = "badge badge-type-puja";
+      modeBadge.style.background = "";
+      modeBadge.style.color = "";
+      modeBadge.style.border = "";
+      modeBadge.innerText = modeVal;
     }
 
     const priceNum = Number(d.price || 0);

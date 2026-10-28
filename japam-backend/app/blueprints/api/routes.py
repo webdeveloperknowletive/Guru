@@ -407,6 +407,11 @@ def book_puja():
             PujaBooking.created_at >= recent_cutoff,
         ).order_by(PujaBooking.id.desc()).first()
 
+        raw_booking_type = (data.get("booking_type") or data.get("bookingType") or "whatsapp").strip().lower()
+        effective_booking_type = "whatsapp" if "whatsapp" in raw_booking_type else raw_booking_type
+        effective_payment_mode = "whatsapp" if effective_booking_type == "whatsapp" else current_payment_mode
+        effective_payment_method = "WhatsApp Booking" if effective_booking_type == "whatsapp" else chosen_method
+
         if existing_booking:
             booking = existing_booking
         else:
@@ -417,29 +422,30 @@ def book_puja():
                 customer_phone=customer_phone,
                 booking_date=booking_date,
                 time_slot=time_slot,
-                booking_type=data.get("booking_type") or data.get("bookingType") or "online",
+                booking_type=effective_booking_type,
                 gotra=gotra,
                 nakshatra=nakshatra,
                 rashi=rashi,
                 sankalp_text=sankalp_text,
                 location=location,
                 address=address,
-                payment_mode=current_payment_mode,
-                payment_method=chosen_method,
+                payment_mode=effective_payment_mode,
+                payment_method=effective_payment_method,
+                status="pending" if effective_booking_type == "whatsapp" else None,
             )
 
         # Trigger admin WhatsApp alert safely
         wa_result = WhatsAppNotificationService.send_admin_alert(
-            module_name="Puja Booking",
+            module_name="Puja Booking (WhatsApp)" if booking.booking_type == "whatsapp" else "Puja Booking",
             reference_id=booking.booking_number,
             customer_name=booking.customer_name,
             customer_phone=booking.customer_phone,
             customer_email=booking.customer_email,
             amount=float(booking.service.price) if booking.service else None,
-            payment_mode=current_payment_mode,
+            payment_mode="whatsapp" if booking.booking_type == "whatsapp" else current_payment_mode,
             payment_status=booking.status,
-            admin_url="/admin/services/puja-bookings",
-            extra_info=f"Service: {booking.service.name if booking.service else 'Puja'} | Date: {booking.booking_date} ({booking.time_slot})",
+            admin_url="/admin/services/bookings",
+            extra_info=f"Service: {booking.service.name if booking.service else 'Puja'} | Date: {booking.booking_date} ({booking.time_slot}) | Mode: {booking.booking_type.upper()}",
         )
 
         resp = {
