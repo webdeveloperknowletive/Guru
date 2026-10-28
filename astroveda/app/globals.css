@@ -3203,12 +3203,12 @@ footer {
   box-shadow: 0 8px 24px rgba(224, 176, 74, 0.35);
 }
 
-/* FLOATING SCROLL TO TOP CTA */
+/* FLOATING SCROLL TO TOP CTA - POSITIONED TO THE LEFT OF SOCIAL ICONS */
 .scroll-to-top-cta {
   position: fixed;
   bottom: 88px;
-  right: 22px;
-  z-index: 799;
+  right: 84px;
+  z-index: 800;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3267,8 +3267,8 @@ footer {
 
 @media(max-width: 480px) {
   .scroll-to-top-cta {
-    bottom: 74px;
-    right: 16px;
+    bottom: max(74px, calc(env(safe-area-inset-bottom, 16px) + 58px));
+    right: 70px;
     padding: 8px 12px;
     font-size: 11px;
   }
