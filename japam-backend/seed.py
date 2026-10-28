@@ -82,7 +82,7 @@ def seed_database():
             ("Brass Diya (Medium)", "BD-002", "puja-samagri", Decimal("1299.00"), Decimal("1499.00"), 8, 10,
              "certified", "published", {"metal": "Pure Brass", "capacity": "150ml"}),
             ("Rudraksha Mala (5 Mukhi)", "RM-005", "rudraksha", Decimal("2499.00"), Decimal("2999.00"), 4, 10,
-             "certified", "published", {"mukhi": "5 Mukhi", "origin": "Nepal", "bead_size": "8mm", "beads_count": 108}),
+             "certified", "archived", {"mukhi": "5 Mukhi", "origin": "Nepal", "bead_size": "8mm", "beads_count": 108}),
             ("Puja Samagri Kit", "PK-010", "puja-samagri", Decimal("899.00"), Decimal("1199.00"), 6, 10,
              "certified", "published", {"items_count": "21 sacred items", "shelf_life": "12 months"}),
             ("Brass Kalash", "BK-003", "puja-samagri", Decimal("1750.00"), Decimal("1950.00"), 18, 10,

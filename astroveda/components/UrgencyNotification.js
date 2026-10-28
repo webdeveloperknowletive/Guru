@@ -34,11 +34,11 @@ const RECENT_PRODUCTS = [
     slug: 'rose-quartz-bracelet',
   },
   {
-    id: 3,
-    title: '5 Mukhi Rudraksha Mala (108 Beads)',
+    id: 17,
+    title: 'Panchamukhi Rudraksha Mala (108 Beads)',
     price: '₹2,499',
     img: '/Five-Mukhi Rudraksha in Golden Light-1.png',
-    slug: 'rudraksha-mala-5-mukhi-rm-005',
+    slug: 'panchamukhi-rudraksha-mala-rm-006',
   },
   {
     id: 28,
