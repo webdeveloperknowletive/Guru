@@ -344,14 +344,24 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
                   marginBottom: '16px',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
-                  <div>
-                    <span style={{ fontSize: '11px', color: 'var(--gold-lt)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, display: 'block' }}>
-                      {selectedService.deity ? `🪔 ${selectedService.deity}` : 'शास्त्रोक्त वैदिक विधी'}
-                    </span>
-                    <h4 style={{ margin: '3px 0 4px', fontSize: '18px', color: 'var(--cream)', fontFamily: 'var(--serif)', fontWeight: 700 }}>
-                      {selectedService.name || selectedService.title}
-                    </h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {selectedService.image_url && (
+                      <img
+                        src={selectedService.image_url}
+                        alt={selectedService.name || selectedService.title}
+                        style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover', border: '1px solid rgba(224, 176, 74, 0.4)', flexShrink: 0 }}
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      />
+                    )}
+                    <div>
+                      <span style={{ fontSize: '11px', color: 'var(--gold-lt)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, display: 'block' }}>
+                        {selectedService.deity ? `🪔 ${selectedService.deity}` : 'शास्त्रोक्त वैदिक विधी'}
+                      </span>
+                      <h4 style={{ margin: '3px 0 4px', fontSize: '18px', color: 'var(--cream)', fontFamily: 'var(--serif)', fontWeight: 700 }}>
+                        {selectedService.name || selectedService.title}
+                      </h4>
+                    </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <span style={{ fontSize: '11px', color: 'var(--muted)', textTransform: 'uppercase', display: 'block' }}>Seva Dakshina</span>

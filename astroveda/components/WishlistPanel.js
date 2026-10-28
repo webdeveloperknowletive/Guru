@@ -84,7 +84,7 @@ export default function WishlistPanel() {
             <div className="panel-empty">
               <div className="ico">❤️</div>
               <h4>Your wishlist is empty</h4>
-              <p>Tap the heart on any product or add products to your cart to save them.</p>
+              <p>Tap the heart on any product to save it to your wishlist.</p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px', width: '100%', maxWidth: '280px' }}>
                 {cartCount > 0 && (

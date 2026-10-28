@@ -298,14 +298,6 @@ export function StoreProvider({ children }) {
       return [...prev, { id, title, price, qty: 1, img, sku, slug }];
     });
 
-    // Link cart additions to wishlist so user never sees a disconnected empty wishlist
-    setWishlist(prev => {
-      if (prev.some(it => it.id === id || it.title === title)) {
-        return prev;
-      }
-      return [...prev, { id, title, price, img, sku, slug }];
-    });
-
     setCartOpen(true);
     setWishOpen(false);
     setSearchOpen(false);
@@ -382,13 +374,11 @@ export function StoreProvider({ children }) {
   }, [showToast]);
 
   const moveToCart = useCallback((indexOrId) => {
-    setWishlist(prev => {
-      const item = typeof indexOrId === 'number' ? prev[indexOrId] : prev.find(it => it.id === indexOrId);
-      if (!item) return prev;
-      addToCart(item, item.price);
-      return prev.filter((it, i) => (typeof indexOrId === 'number' ? i !== indexOrId : it.id !== indexOrId));
-    });
-  }, [addToCart]);
+    const item = typeof indexOrId === 'number' ? wishlist[indexOrId] : wishlist.find(it => it.id === indexOrId);
+    if (!item) return;
+    addToCart(item, item.price);
+    setWishlist(prev => prev.filter((it, i) => (typeof indexOrId === 'number' ? i !== indexOrId : it.id !== indexOrId)));
+  }, [wishlist, addToCart]);
 
   const closeAll = useCallback(() => {
     setCartOpen(false);
@@ -556,6 +546,8 @@ export function StoreProvider({ children }) {
       }
 
       return new Promise((resolve) => {
+        let paymentFailedHandled = false;
+
         const options = {
           key: rzpDetails.key_id,
           amount: rzpDetails.amount,
@@ -574,19 +566,21 @@ export function StoreProvider({ children }) {
           modal: {
             ondismiss: async () => {
               setCheckoutLoading(false);
-              try {
-                await recordPaymentFailure({
-                  order_number: result.order_number,
-                  token: result.access_token,
-                  error_code: 'MODAL_DISMISSED',
-                  error_description: 'Payment was dismissed by user before completion',
-                  razorpay_order_id: rzpDetails.order_id,
-                });
-              } catch (e) {
-                console.warn('Error recording payment dismissal:', e);
+              if (!paymentFailedHandled) {
+                try {
+                  await recordPaymentFailure({
+                    order_number: result.order_number,
+                    token: result.access_token,
+                    error_code: 'MODAL_DISMISSED',
+                    error_description: 'Payment was dismissed by user before completion',
+                    razorpay_order_id: rzpDetails.order_id,
+                  });
+                } catch (e) {
+                  console.warn('Error recording payment dismissal:', e);
+                }
+                setCheckoutError('पेमेंट रद्द केले गेले. तुम्ही पुन्हा प्रयत्न करू शकता. (Payment was cancelled. You can retry.)');
+                resolve({ success: false, cancelled: true });
               }
-              setCheckoutError('पेमेंट रद्द केले गेले. तुम्ही पुन्हा प्रयत्न करू शकता. (Payment was cancelled. You can retry.)');
-              resolve({ success: false, cancelled: true });
             },
           },
           handler: async function (response) {
@@ -631,6 +625,7 @@ export function StoreProvider({ children }) {
 
         const rzp = new window.Razorpay(options);
         rzp.on('payment.failed', async function (failedResp) {
+          paymentFailedHandled = true;
           setCheckoutLoading(false);
           const errCode = failedResp.error?.code || 'PAYMENT_FAILED';
           const errDesc = failedResp.error?.description || 'Payment was declined by bank or gateway';

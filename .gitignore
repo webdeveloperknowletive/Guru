@@ -86,6 +86,8 @@ uploads/*
 !uploads/.gitkeep
 JAPAM - Copy/uploads/*
 !JAPAM - Copy/uploads/.gitkeep
+japam-backend/app/static/uploads/services/*
+!japam-backend/app/static/uploads/services/.gitkeep
 
 # -------------------------------------------------------------
 # IDE, Editor & OS Artifacts

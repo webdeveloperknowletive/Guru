@@ -98,7 +98,7 @@ class TestingConfig(Config):
 
 class ProductionConfig(Config):
     DEBUG = False
-    COOKIE_SECURE = True
+    COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true").lower() in ("true", "1", "yes")
     # In production, SQLAlchemy pool parameters can be tuned
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_size": int(os.getenv("DB_POOL_SIZE", "10")),

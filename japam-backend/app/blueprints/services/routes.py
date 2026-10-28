@@ -1,6 +1,6 @@
 from datetime import datetime, date, timezone
 from decimal import Decimal
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, jsonify
 from app.extensions import db
 from app.models.service import PujaService, PujaBooking, JyotishConsultation, AvailabilitySlot
 from app.services.booking_service import BookingService
@@ -18,7 +18,7 @@ services_bp = Blueprint("services", __name__, url_prefix="/admin/services")
 @permission_required("services", "view")
 def puja_services_list():
     user = get_current_admin()
-    services = PujaService.query.order_by(PujaService.id.asc()).all()
+    services = PujaService.query.order_by(PujaService.display_order.asc(), PujaService.id.asc()).all()
     return render_template("services/puja_services.html", current_user=user, services=services, active_page="puja_services")
 
 
@@ -35,12 +35,30 @@ def puja_service_create():
     description = request.form.get("description", "").strip()
     online_avail = request.form.get("is_online_available") == "on"
     offline_avail = request.form.get("is_offline_available") == "on"
+    display_order_val = request.form.get("display_order", type=int)
 
     if not name:
         flash("Puja name is required.", "danger")
         return redirect(url_for("services.puja_services_list"))
 
+    # Handle image file upload or URL
+    image_file = request.files.get("image") or request.files.get("image_file") or request.files.get("file")
+    image_url_val = request.form.get("image_url", "").strip()
+    image_url = None
+    try:
+        if image_file and image_file.filename:
+            image_url = BookingService.ingest_service_image(file_obj=image_file)
+        elif image_url_val:
+            image_url = BookingService.ingest_service_image(raw_path_or_url=image_url_val)
+    except ValueError as e:
+        flash(str(e), "danger")
+        return redirect(url_for("services.puja_services_list"))
+
     slug = name.lower().replace(" ", "-").replace("/", "-")
+    # Auto-assign next display_order if not specified
+    if display_order_val is None:
+        from app.services.sequence_service import SequenceService
+        display_order_val = SequenceService.next_puja_display_order()
     puja = PujaService(
         name=name,
         slug=slug,
@@ -49,8 +67,10 @@ def puja_service_create():
         icon=icon,
         duration_minutes=duration,
         description=description,
+        image_url=image_url,
         is_online_available=online_avail,
         is_offline_available=offline_avail,
+        display_order=display_order_val,
         inclusions=["Vedic Pandit Ji", "Live Sankalp", "Prasad Delivery"],
         created_at=datetime.now(timezone.utc),
     )
@@ -64,7 +84,7 @@ def puja_service_create():
         actor_user_id=user.id,
         entity_type="PujaService",
         entity_id=str(puja.id),
-        details={"name": name, "price": str(price)},
+        details={"name": name, "price": str(price), "image_url": image_url},
     )
     flash(f"Puja service '{name}' created successfully.", "success")
     return redirect(url_for("services.puja_services_list"))
@@ -86,6 +106,23 @@ def puja_service_update(service_id):
     online_avail = request.form.get("is_online_available") == "on"
     offline_avail = request.form.get("is_offline_available") == "on"
     is_active = request.form.get("is_active") == "1" or request.form.get("is_active") == "on"
+    display_order_val = request.form.get("display_order", type=int)
+
+    # Handle image upload, replacement, or removal
+    image_file = request.files.get("image") or request.files.get("image_file") or request.files.get("file")
+    image_url_val = request.form.get("image_url", "").strip()
+    remove_image = request.form.get("remove_image") in ("1", "true", "on")
+
+    try:
+        if remove_image:
+            puja.image_url = None
+        elif image_file and image_file.filename:
+            puja.image_url = BookingService.ingest_service_image(file_obj=image_file)
+        elif image_url_val:
+            puja.image_url = BookingService.ingest_service_image(raw_path_or_url=image_url_val)
+    except ValueError as e:
+        flash(str(e), "danger")
+        return redirect(url_for("services.puja_services_list"))
 
     if name:
         puja.name = name
@@ -99,6 +136,8 @@ def puja_service_update(service_id):
     puja.is_online_available = online_avail
     puja.is_offline_available = offline_avail
     puja.is_active = is_active
+    if display_order_val is not None:
+        puja.display_order = display_order_val
     db.session.commit()
 
     AuditService.log(
@@ -108,7 +147,7 @@ def puja_service_update(service_id):
         actor_user_id=user.id,
         entity_type="PujaService",
         entity_id=str(puja.id),
-        details={"name": puja.name, "price": str(puja.price), "is_active": puja.is_active},
+        details={"name": puja.name, "price": str(puja.price), "is_active": puja.is_active, "image_url": puja.image_url},
     )
     flash(f"Puja service '{puja.name}' updated successfully.", "success")
     return redirect(url_for("services.puja_services_list"))
@@ -165,6 +204,73 @@ def puja_service_delete(service_id):
 
     return redirect(url_for("services.puja_services_list"))
 
+
+@services_bp.route("/puja/<int:service_id>/reorder", methods=["POST"])
+@login_required
+@permission_required("services", "edit")
+def puja_service_reorder(service_id):
+    """Move a puja service up or down in display_order by swapping with its neighbour."""
+    direction = request.form.get("direction")  # 'up' or 'down'
+    puja = PujaService.query.get_or_404(service_id)
+    all_services = PujaService.query.order_by(PujaService.display_order.asc(), PujaService.id.asc()).all()
+    idx = next((i for i, s in enumerate(all_services) if s.id == service_id), None)
+
+    if idx is None:
+        flash("Service not found.", "danger")
+        return redirect(url_for("services.puja_services_list"))
+
+    swap_idx = idx - 1 if direction == "up" else idx + 1
+    if swap_idx < 0 or swap_idx >= len(all_services):
+        flash("Cannot move further.", "warning")
+        return redirect(url_for("services.puja_services_list"))
+
+    neighbour = all_services[swap_idx]
+    # Swap display_order values
+    puja.display_order, neighbour.display_order = neighbour.display_order, puja.display_order
+    db.session.commit()
+
+    user = get_current_admin()
+    AuditService.log(
+        action="PUJA_SERVICE_REORDER",
+        module="services",
+        actor_email=user.email,
+        actor_user_id=user.id,
+        entity_type="PujaService",
+        entity_id=str(puja.id),
+        details={"direction": direction, "swapped_with": neighbour.id},
+    )
+    return redirect(url_for("services.puja_services_list"))
+
+
+@services_bp.route("/puja/reorder-bulk", methods=["POST"])
+@login_required
+@permission_required("services", "edit")
+def puja_service_reorder_bulk():
+    """Accept JSON {orders:[{id, order},...]} and persist display_order for all puja services."""
+    data = request.get_json(silent=True)
+    if not data or "orders" not in data:
+        return jsonify({"error": "Invalid payload"}), 400
+
+    user = get_current_admin()
+    try:
+        for item in data["orders"]:
+            svc = PujaService.query.get(item["id"])
+            if svc:
+                svc.display_order = int(item["order"])
+        db.session.commit()
+        AuditService.log(
+            action="PUJA_SERVICE_REORDER_BULK",
+            module="services",
+            actor_email=user.email,
+            actor_user_id=user.id,
+            entity_type="PujaService",
+            entity_id="bulk",
+            details={"count": len(data["orders"])},
+        )
+        return jsonify({"success": True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 
 # -------------------------------------------------------------
@@ -279,8 +385,8 @@ def consultation_create():
         return redirect(url_for("services.consultations_list"))
 
     dob = datetime.strptime(dob_str, "%Y-%m-%d").date()
-    consult_count = JyotishConsultation.query.count() + 1
-    consult_num = f"#JYT-{dob.strftime('%Y%m')}-{consult_count:04d}"
+    from app.services.sequence_service import SequenceService
+    consult_num = SequenceService.next_consultation_number()
 
     consultation = JyotishConsultation(
         consultation_number=consult_num,

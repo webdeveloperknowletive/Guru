@@ -20,7 +20,10 @@ class PujaService(db.Model):
     is_offline_available = db.Column(db.Boolean, default=True, nullable=False)
     is_active = db.Column(db.Boolean, default=True, nullable=False, index=True)
 
+    display_order = db.Column(db.Integer, default=0, nullable=False, index=True)  # Controls order on website; lower = appears first
+
     inclusions = db.Column(db.JSON, default=list)  # list of strings: ["Samagri included", "Prasad delivery", "Live stream"]
+    image_url = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     bookings = db.relationship("PujaBooking", back_populates="service")

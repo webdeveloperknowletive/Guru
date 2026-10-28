@@ -25,11 +25,13 @@
     <table class="spiritual-table">
       <thead>
         <tr>
+          <th style="width:48px;">#</th>
           <th>Ref #</th>
           <th>Devotee Name</th>
           <th>Birth Details</th>
           <th>Topic</th>
-          <th>Scheduled Date</th>
+          <th>Scheduled Date, Day & Time</th>
+          <th>Requested On</th>
           <th>Mode</th>
           <th>Status</th>
           <th>Actions</th>
@@ -38,10 +40,14 @@
       <tbody>
         {% for c in consultations %}
         <tr>
-          <td style="font-weight:700; font-family:monospace;">{{ c.consultation_number }}</td>
+          <td style="font-weight:700; color:var(--text-muted); font-size:0.8rem;">{{ loop.index }}</td>
+          <td style="font-weight:700; font-family:monospace; white-space:nowrap;">{{ c.consultation_number }}</td>
           <td>
             <div style="font-weight:600;">{{ c.customer_name }}</div>
-            <div style="font-size:0.72rem; color:var(--text-muted);">{{ c.customer_email }}</div>
+            <div style="font-size:0.72rem; color:var(--text-muted); margin-top:2px;">
+              <span>✉️ {{ c.customer_email }}</span>
+              {% if c.customer_phone %} · <span>📞 {{ c.customer_phone }}</span>{% endif %}
+            </div>
           </td>
           <td style="font-size:0.78rem;">
             <div>DOB: <strong>{{ c.dob.strftime('%d %b %Y') }}</strong> ({{ c.tob }})</div>
@@ -52,10 +58,15 @@
           </td>
           <td style="white-space:nowrap;">
             {% if c.scheduled_at %}
-              {{ format_date(c.scheduled_at, "%b %d, %Y %I:%M %p") }}
+              <div style="font-weight:600; color:var(--text-primary);">{{ format_date(c.scheduled_at, "%A, %d %b %Y") }}</div>
+              <div style="font-size:0.75rem; color:var(--saffron-700); font-weight:700; margin-top:2px;">🕒 {{ format_date(c.scheduled_at, "%I:%M %p") }}</div>
             {% else %}
-              <span style="color:var(--text-muted); font-style:italic;">Awaiting slot</span>
+              <span style="color:var(--text-muted); font-style:italic;">Awaiting slot assignment</span>
             {% endif %}
+          </td>
+          <td style="white-space:nowrap;">
+            <div style="font-size:0.8rem; color:var(--text-secondary); font-weight:500;">{{ format_date(c.created_at, "%A, %d %b %Y") }}</div>
+            <div style="font-size:0.73rem; color:var(--text-muted); font-family:monospace;">{{ format_date(c.created_at, "%I:%M %p") }}</div>
           </td>
           <td>
             <span class="badge badge-type-consultation">
@@ -64,7 +75,7 @@
           </td>
           <td>
             <span class="badge badge-{{ 'confirmed' if c.status == 'confirmed' else ('delivered' if c.status == 'completed' else 'pending') }}">
-              {{ c.status }}
+              {{ c.status|title }}
             </span>
           </td>
           <td>

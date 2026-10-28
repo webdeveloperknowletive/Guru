@@ -49,8 +49,8 @@ class BookingService:
                 raise ValueError(f"The slot {time_slot} on {booking_date} is fully booked.")
             slot.booked_count += 1
 
-        booking_count = PujaBooking.query.count() + 1
-        booking_number = f"#PUJ-{booking_date.strftime('%Y%m')}-{booking_count:04d}"
+        from app.services.sequence_service import SequenceService
+        booking_number = SequenceService.next_puja_booking_number()
 
         # In offline mode, booking status is pending payment confirmation
         initial_status = "pending" if payment_mode == "offline" else "confirmed"
@@ -154,3 +154,89 @@ class BookingService:
             },
         )
         return consultation
+
+    @staticmethod
+    def ingest_service_image(file_obj=None, raw_path_or_url: str = None) -> str:
+        """
+        Validates and securely saves puja service images.
+        Validates allowed formats (jpg, jpeg, png, webp, svg) and file size (MAX_CONTENT_LENGTH).
+        Stores in app/static/uploads/services/ and returns public URL (/static/uploads/services/<filename>).
+        """
+        import os, shutil, uuid
+        from flask import current_app
+        from werkzeug.utils import secure_filename
+
+        upload_dir = os.path.join(current_app.root_path, "static", "uploads", "services")
+        os.makedirs(upload_dir, exist_ok=True)
+
+        allowed_exts = {"jpg", "jpeg", "png", "webp", "svg"}
+        max_size = current_app.config.get("MAX_CONTENT_LENGTH", 10 * 1024 * 1024)
+
+        # 1. Direct file upload
+        if file_obj and hasattr(file_obj, "filename") and file_obj.filename:
+            raw_filename = file_obj.filename.strip()
+            if not raw_filename:
+                return None
+
+            orig = secure_filename(raw_filename)
+            ext = orig.rsplit(".", 1)[-1].lower() if "." in orig else ""
+            if ext not in allowed_exts:
+                raise ValueError(f"Invalid image format '.{ext}'. Allowed formats: JPG, JPEG, PNG, WEBP, SVG.")
+
+            # Validate size
+            file_obj.seek(0, os.SEEK_END)
+            size = file_obj.tell()
+            file_obj.seek(0)
+            if size > max_size:
+                max_mb = max_size // (1024 * 1024)
+                raise ValueError(f"Image file exceeds maximum allowed size of {max_mb}MB.")
+
+            filename = f"puja_{uuid.uuid4().hex[:8]}_{orig}"
+            dest_path = os.path.join(upload_dir, filename)
+            file_obj.save(dest_path)
+            return f"/static/uploads/services/{filename}"
+
+        # 2. Path or URL string handling
+        if not raw_path_or_url:
+            return None
+
+        path_str = str(raw_path_or_url).strip()
+        if not path_str:
+            return None
+
+        if path_str.startswith("http://") or path_str.startswith("https://") or path_str.startswith("/static/"):
+            return path_str
+
+        # Clean file:/// prefix if present
+        clean_path = path_str
+        if clean_path.startswith("file:///"):
+            clean_path = clean_path[8:]
+        elif clean_path.startswith("file://"):
+            clean_path = clean_path[7:]
+
+        candidates = [
+            clean_path,
+            clean_path.replace("/", "\\"),
+            clean_path.replace("\\", "/"),
+        ]
+        basename = os.path.basename(clean_path.replace("\\", "/"))
+        candidates.append(os.path.join("D:\\Downloads", basename))
+
+        found_src = None
+        for cand in candidates:
+            if cand and os.path.isfile(cand):
+                found_src = cand
+                break
+
+        if found_src:
+            orig = secure_filename(os.path.basename(found_src))
+            ext = orig.rsplit(".", 1)[-1].lower() if "." in orig else ""
+            if ext not in allowed_exts:
+                raise ValueError(f"Invalid image format '.{ext}'. Allowed formats: JPG, JPEG, PNG, WEBP, SVG.")
+            filename = f"puja_{uuid.uuid4().hex[:8]}_{orig}"
+            dest_path = os.path.join(upload_dir, filename)
+            shutil.copy2(found_src, dest_path)
+            return f"/static/uploads/services/{filename}"
+
+        return path_str.replace("\\", "/")
+

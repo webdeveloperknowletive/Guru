@@ -257,7 +257,11 @@ def get_categories():
 
 @api_v1_bp.route("/services/puja", methods=["GET"])
 def get_puja_services():
-    services = PujaService.query.filter_by(is_active=True).all()
+    services = (
+        PujaService.query.filter_by(is_active=True)
+        .order_by(PujaService.display_order.asc(), PujaService.id.asc())
+        .all()
+    )
     results = [
         {
             "id": s.id,
@@ -270,9 +274,12 @@ def get_puja_services():
             "description": s.description or "",
             "price": float(s.price),
             "duration_minutes": s.duration_minutes,
+            "display_order": s.display_order,
             "is_online_available": s.is_online_available,
             "is_offline_available": s.is_offline_available,
             "inclusions": s.inclusions,
+            "image_url": s.image_url,
+            "image": s.image_url,
         }
         for s in services
     ]
@@ -626,8 +633,8 @@ def request_consultation():
     full_astrologer_notes = "\n".join(notes_lines)
 
     try:
-        consult_count = JyotishConsultation.query.count() + 1
-        consult_num = f"#JYT-{dob.strftime('%Y%m')}-{consult_count:04d}"
+        from app.services.sequence_service import SequenceService
+        consult_num = SequenceService.next_consultation_number()
 
         consultation = JyotishConsultation(
             consultation_number=consult_num,
@@ -1818,9 +1825,9 @@ def return_order_api(order_number):
     if not reason:
         return jsonify({"error": "Return reason is required"}), 400
 
-    ret_count = ReturnRequest.query.count() + 1
+    from app.services.sequence_service import SequenceService
     ret = ReturnRequest(
-        return_number=f"#RET-{order.order_number.replace('#', '')}-{ret_count:02d}",
+        return_number=SequenceService.next_return_number(),
         order_id=order.id,
         customer_name=order.customer_name,
         reason=reason,
@@ -1851,8 +1858,8 @@ def submit_contact_enquiry():
     if not name or not email or not message:
         return jsonify({"error": "Name, email, and message are required"}), 400
 
-    enq_count = CustomerEnquiry.query.count() + 1
-    enquiry_number = f"#ENQ-{datetime.now(timezone.utc).strftime('%Y%m')}-{enq_count:04d}"
+    from app.services.sequence_service import SequenceService
+    enquiry_number = SequenceService.next_enquiry_number()
 
     enq = CustomerEnquiry(
         enquiry_number=enquiry_number,

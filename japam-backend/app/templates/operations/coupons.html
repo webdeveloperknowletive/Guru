@@ -21,10 +21,13 @@
     <table class="spiritual-table">
       <thead>
         <tr>
+          <th style="width:48px;">#</th>
           <th>Coupon Code</th>
           <th>Discount Value</th>
           <th>Min Order</th>
           <th>Usage Stats</th>
+          <th>Expiry Date, Day &amp; Time</th>
+          <th>Created On</th>
           <th>Status</th>
           <th>Actions</th>
         </tr>
@@ -32,6 +35,7 @@
       <tbody>
         {% for c in coupons %}
         <tr>
+          <td style="font-weight:700; color:var(--text-muted); font-size:0.8rem;">{{ loop.index }}</td>
           <td>
             <span style="font-family:monospace; font-weight:700; background:#feecd9; color:#b43d12; padding:3px 8px; border-radius:4px;">
               {{ c.code }}
@@ -47,6 +51,18 @@
           <td>{{ format_currency(c.min_order_amount) }}</td>
           <td>
             <span style="font-weight:700;">{{ c.used_count }}</span> / {{ c.max_uses }} used
+          </td>
+          <td style="white-space:nowrap;">
+            {% if c.expires_at %}
+              <div style="font-weight:600; color:var(--text-primary); font-size:0.82rem;">{{ format_date(c.expires_at, "%A, %d %b %Y") }}</div>
+              <div style="font-size:0.73rem; color:var(--status-red-text, #b91c1c); font-family:monospace; margin-top:2px;">⏰ {{ format_date(c.expires_at, "%I:%M %p") }}</div>
+            {% else %}
+              <span style="color:#15803d; font-weight:600; font-size:0.78rem;">✓ Never Expires</span>
+            {% endif %}
+          </td>
+          <td style="white-space:nowrap;">
+            <div style="font-size:0.8rem; font-weight:600; color:#334155;">{{ format_date(c.created_at, "%A, %d %b %Y") }}</div>
+            <div style="font-size:0.72rem; color:#64748b; font-family:monospace; margin-top:2px;">🕒 {{ format_date(c.created_at, "%I:%M %p") }}</div>
           </td>
           <td>
             <span class="badge badge-{{ 'delivered' if c.is_active else 'cancelled' }}">
@@ -65,7 +81,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="6" style="text-align:center; padding:30px; color:var(--text-muted);">No coupon codes configured yet.</td>
+          <td colspan="9" style="text-align:center; padding:30px; color:var(--text-muted);">No coupon codes configured yet.</td>
         </tr>
         {% endfor %}
       </tbody>

@@ -40,11 +40,21 @@ export default function PujaSection({ services: initialServices, headerText }) {
   const [selectedPuja, setSelectedPuja] = useState('');
 
   const services = (initialServices !== undefined && initialServices !== null)
-    ? initialServices.map(s => ({
-      icon: s.icon || '🪔',
-      title: s.title || s.name,
-      desc: s.description || s.desc || 'शास्त्रोक्त विधी व वैदिक संकल्प सेवेसह.',
-    }))
+    ? [...initialServices]
+        .sort((a, b) => {
+          const ordA = Number(a.display_order ?? a.order ?? a.id ?? 999);
+          const ordB = Number(b.display_order ?? b.order ?? b.id ?? 999);
+          return ordA - ordB;
+        })
+        .map(s => ({
+          id: s.id,
+          icon: s.icon || '🪔',
+          title: s.title || s.name,
+          name: s.name || s.title,
+          desc: s.description || s.desc || 'शास्त्रोक्त विधी व वैदिक संकल्प सेवेसह.',
+          image_url: s.image_url || s.image || null,
+          display_order: s.display_order,
+        }))
     : defaultPujaServices;
 
   const kicker = headerText?.kicker || 'Puja Services';
@@ -75,7 +85,12 @@ export default function PujaSection({ services: initialServices, headerText }) {
           {services.map((puja) => {
             const rawTitle = puja.title || puja.name || '';
             const displayTitle = rawTitle.replace(/\bPooja\b/g, 'Puja');
-            const bgImage = getPujaBgImage(displayTitle);
+            const fallbackBg = getPujaBgImage(displayTitle);
+            let activeBg = puja.image_url || fallbackBg;
+            if (activeBg && !activeBg.startsWith('http://') && !activeBg.startsWith('https://') && !activeBg.startsWith('/')) {
+              activeBg = `/${activeBg}`;
+            }
+
             return (
               <div
                 key={puja.id || displayTitle}
@@ -91,14 +106,34 @@ export default function PujaSection({ services: initialServices, headerText }) {
                 }}
                 aria-label={`View details and book ${displayTitle}`}
                 style={{
-                  backgroundImage: `url("${bgImage}")`,
+                  position: 'relative',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  backgroundImage: `url("${fallbackBg}")`,
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
-                  backgroundRepeat: 'no-repeat',
-                  cursor: 'pointer',
                 }}
               >
-                <div className="puja-card-content">
+                <img
+                  src={activeBg}
+                  alt={displayTitle}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    zIndex: 1,
+                    transition: 'transform 0.4s ease',
+                  }}
+                  onError={(e) => {
+                    if (e.currentTarget.src !== fallbackBg) {
+                      e.currentTarget.src = fallbackBg;
+                    }
+                  }}
+                />
+                <div className="puja-card-content" style={{ position: 'relative', zIndex: 2 }}>
                   <div className="puja-card-text">
                     <h4 className="puja-title">{displayTitle}</h4>
                     <p className="puja-desc">Why {displayTitle}?</p>

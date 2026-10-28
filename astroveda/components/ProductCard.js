@@ -54,14 +54,18 @@ export default function ProductCard({ product, showDesc = true }) {
       <div className="prod-img">
         {badgeLabel && <span className={`prod-badge ${badgeMap[badge] || 'badge-lab'}`}>{badgeLabel}</span>}
         <button
+          type="button"
           className={`wish${inWish ? ' on' : ''}`}
-          aria-label="Add to wishlist"
+          aria-label={inWish ? 'Remove from wishlist' : 'Add to wishlist'}
           onClick={(e) => {
             e.stopPropagation();
             toggleWishlist(product, priceNum);
           }}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+          }}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg viewBox="0 0 24 24" fill={inWish ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 00-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 000-7.8z"/>
           </svg>
         </button>
@@ -130,6 +134,7 @@ export default function ProductCard({ product, showDesc = true }) {
         </div>
         <div className="prod-actions">
           <button
+            type="button"
             className="btn-add"
             disabled={!isInStock}
             style={!isInStock ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
@@ -143,6 +148,7 @@ export default function ProductCard({ product, showDesc = true }) {
             {isInStock ? '🛒 Add to Cart' : 'Out of Stock'}
           </button>
           <button
+            type="button"
             className="btn-view"
             onClick={(e) => {
               e.stopPropagation();

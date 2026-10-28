@@ -52,6 +52,43 @@ def format_date_ist(dt, fmt: str = "%b %d, %Y") -> str:
         return str(dt)
 
 
+def format_date_day_ist(dt) -> str:
+    """Format as 'Day, DD Mon YYYY' (e.g. 'Thursday, 12 Nov 2026') in IST."""
+    return format_date_ist(dt, fmt="%A, %d %b %Y")
+
+
+def format_time_ist(dt) -> str:
+    """Format time only as 'hh:mm AM/PM' in IST."""
+    if not dt:
+        return ""
+    try:
+        if isinstance(dt, datetime):
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            ist_tz = zoneinfo.ZoneInfo("Asia/Kolkata")
+            dt = dt.astimezone(ist_tz)
+            return dt.strftime("%I:%M %p")
+        return ""
+    except Exception:
+        return ""
+
+
+def format_datetime_day_time_ist(dt) -> str:
+    """Format full Date, Day of Week, and Time: 'Thursday, 12 Nov 2026 · 11:30 AM' in IST."""
+    if not dt:
+        return ""
+    try:
+        if isinstance(dt, datetime):
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            ist_tz = zoneinfo.ZoneInfo("Asia/Kolkata")
+            dt = dt.astimezone(ist_tz)
+            return dt.strftime("%A, %d %b %Y · %I:%M %p")
+        return format_date_ist(dt, fmt="%A, %d %b %Y")
+    except Exception:
+        return str(dt)
+
+
 def create_app(config_name=None) -> Flask:
     if config_name is None:
         config_name = os.getenv("FLASK_ENV", "development").lower()
@@ -211,6 +248,9 @@ def create_app(config_name=None) -> Flask:
     import json
     app.jinja_env.filters["currency"] = format_currency
     app.jinja_env.filters["datetime_ist"] = format_date_ist
+    app.jinja_env.filters["date_day"] = format_date_day_ist
+    app.jinja_env.filters["time_ist"] = format_time_ist
+    app.jinja_env.filters["datetime_day_time"] = format_datetime_day_time_ist
     app.jinja_env.filters["escapejs"] = lambda val: json.dumps(str(val or ""))[1:-1]
 
     # Context Processors for Jinja
@@ -293,6 +333,9 @@ def create_app(config_name=None) -> Flask:
             "current_user": admin,
             "format_currency": format_currency,
             "format_date": format_date_ist,
+            "format_date_day": format_date_day_ist,
+            "format_time": format_time_ist,
+            "format_datetime_day_time": format_datetime_day_time_ist,
             "csrf_token": csrf_tok,
             "app_name": app.config.get("APP_NAME", "Spiritual Commerce Admin"),
             "app_subtitle": app.config.get("APP_SUBTITLE", "Seva · Sanskriti · Samṛddhi"),
