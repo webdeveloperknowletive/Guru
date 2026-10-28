@@ -39,13 +39,28 @@
         <tr>
           <td style="font-weight:700; color:var(--text-muted); font-size:0.8rem;">{{ loop.index }}</td>
           <td style="font-weight:700; font-family:monospace; color:var(--text-primary); white-space:nowrap;">{{ b.booking_number }}</td>
-          <td style="font-weight:600;">{{ b.service.name if b.service else 'Puja' }}</td>
+          <td style="font-weight:600;">
+            <div>{{ b.service.name if b.service else 'Puja' }}</div>
+            {% if b.service and b.service.price %}
+              <div style="font-size:0.75rem; color:var(--saffron-700); font-weight:700;">₹{{ "{:,.0f}".format(b.service.price) }}</div>
+            {% endif %}
+          </td>
           <td>
             <div style="font-weight:600;">{{ b.customer_name }}</div>
-            <div style="font-size:0.72rem; color:var(--text-muted); margin-top:2px;">
+            <div style="font-size:0.72rem; color:var(--text-muted); margin-top:2px; display:flex; flex-direction:column; gap:2px;">
               {% if b.customer_phone %}<span>📞 {{ b.customer_phone }}</span>{% endif %}
-              {% if b.gotra or b.nakshatra %}
-                <div>Gotra: <strong>{{ b.gotra or 'Kashyap' }}</strong> · Nakshatra: <strong>{{ b.nakshatra or 'Rohini' }}</strong></div>
+              {% if b.customer_email and '@astroveda.in' not in b.customer_email %}<span>✉️ {{ b.customer_email }}</span>{% endif %}
+              {% set spiritual_parts = [] %}
+              {% if b.gotra %}{% set _ = spiritual_parts.append('Gotra: <strong>' ~ b.gotra ~ '</strong>') %}{% endif %}
+              {% if b.rashi %}{% set _ = spiritual_parts.append('Rashi: <strong>' ~ b.rashi ~ '</strong>') %}{% endif %}
+              {% if b.nakshatra %}{% set _ = spiritual_parts.append('Nakshatra: <strong>' ~ b.nakshatra ~ '</strong>') %}{% endif %}
+              {% if spiritual_parts %}
+                <div>{{ spiritual_parts|join(' · ')|safe }}</div>
+              {% endif %}
+              {% if b.display_location or b.display_address %}
+                <div style="color:var(--text-secondary); font-size:0.72rem;">
+                  📍 {{ b.display_location or '' }}{% if b.display_location and b.display_address %}, {% endif %}{{ b.display_address or '' }}
+                </div>
               {% endif %}
             </div>
           </td>
@@ -62,14 +77,37 @@
               {{ b.booking_type|upper }}
             </span>
           </td>
-          <td>{{ b.priest_name or 'Unassigned' }}</td>
+          <td>{{ b.priest_name or '—' }}</td>
           <td>
             <span class="badge badge-{{ 'confirmed' if b.status == 'confirmed' else ('delivered' if b.status == 'completed' else 'pending') }}">
               {{ b.status|title }}
             </span>
           </td>
           <td>
-            <button type="button" class="btn-action-outline" onclick="openBookingModal('{{ b.id }}', '{{ b.booking_number }}', '{{ b.status }}', '{{ b.priest_name or '' }}', '{{ b.meeting_link_or_venue or '' }}')">
+            <button type="button" class="btn-action-outline"
+              data-id="{{ b.id }}"
+              data-number="{{ b.booking_number }}"
+              data-service="{{ b.service.name if b.service else 'Puja' }}"
+              data-price="{{ b.service.price if b.service else '0.00' }}"
+              data-name="{{ b.customer_name }}"
+              data-phone="{{ b.customer_phone or '' }}"
+              data-email="{{ b.customer_email or '' }}"
+              data-date="{{ format_date(b.booking_date, '%A, %d %b %Y') }}"
+              data-time="{{ b.time_slot }}"
+              data-booked-on="{{ format_date(b.created_at, '%A, %d %b %Y, %I:%M %p') }}"
+              data-mode="{{ b.booking_type|upper }}"
+              data-status="{{ b.status }}"
+              data-priest="{{ b.priest_name or '' }}"
+              data-link="{{ b.meeting_link_or_venue or '' }}"
+              data-gotra="{{ b.gotra or '' }}"
+              data-rashi="{{ b.rashi or '' }}"
+              data-nakshatra="{{ b.nakshatra or '' }}"
+              data-sankalp="{{ b.display_sankalp or '' }}"
+              data-location="{{ b.display_location or '' }}"
+              data-address="{{ b.display_address or '' }}"
+              data-notes="{{ b.notes or '' }}"
+              data-amount-paid="{{ b.amount_paid }}"
+              onclick="openBookingDetailsModal(this)">
               Manage
             </button>
           </td>
@@ -84,35 +122,106 @@
   </div>
 </div>
 
-<!-- Manage Booking Modal -->
+<!-- Manage Booking Modal with Complete Devotee Details -->
 <div class="modal-overlay" id="manageBookingModal">
-  <div class="modal-container">
+  <div class="modal-container" style="max-width: 680px; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
     <div class="modal-header">
       <h3 class="modal-title" id="modalBookingTitle">Manage Puja Booking</h3>
       <button type="button" class="modal-close-btn" onclick="closeModal('manageBookingModal')">&times;</button>
     </div>
-    <form id="manageBookingForm" method="POST">
+    <form id="manageBookingForm" method="POST" style="display:flex; flex-direction:column; flex:1 1 auto; overflow:hidden;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <div class="modal-body">
-        <div class="form-group">
-          <label class="form-label">Booking Status</label>
-          <select name="status" id="modalBookingStatus" class="form-control">
-            <option value="pending">Pending</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
+      <div class="modal-body" style="flex:1 1 auto; overflow-y:auto; padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;">
+        
+        <!-- Devotee & Ceremony Details Snapshot Card -->
+        <div style="background: #faf7f2; border: 1px solid var(--border-color); border-radius: var(--radius-md, 8px); padding: 1rem 1.25rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.75rem; border-bottom: 1px solid #ebd9c8; padding-bottom: 0.5rem; flex-wrap:wrap; gap:0.5rem;">
+            <div>
+              <span style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; letter-spacing: 0.05em;">Selected Puja Service</span>
+              <div id="viewServiceName" style="font-weight: 700; color: var(--text-primary); font-size: 1.05rem;">—</div>
+            </div>
+            <div style="text-align: right;">
+              <span style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; letter-spacing: 0.05em;">Mode &amp; Dakshina</span>
+              <div>
+                <span id="viewModeBadge" class="badge badge-type-puja" style="font-size:0.75rem; margin-right:4px;">ONLINE</span>
+                <strong id="viewAmount" style="color: var(--saffron-700, #b45309); font-size: 0.95rem;">₹0.00</strong>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem 1rem; font-size: 0.85rem;">
+            <div>
+              <span style="color: var(--text-muted); display: block; font-size: 0.73rem;">Yajman / Devotee Name</span>
+              <strong id="viewDevoteeName" style="color: var(--text-primary);">—</strong>
+            </div>
+            <div>
+              <span style="color: var(--text-muted); display: block; font-size: 0.73rem;">Mobile / WhatsApp</span>
+              <strong id="viewDevoteePhone" style="color: var(--text-primary);">—</strong>
+            </div>
+            <div>
+              <span style="color: var(--text-muted); display: block; font-size: 0.73rem;">Email Address</span>
+              <span id="viewDevoteeEmail" style="color: var(--text-primary);">—</span>
+            </div>
+            <div>
+              <span style="color: var(--text-muted); display: block; font-size: 0.73rem;">Ceremony Date &amp; Time</span>
+              <strong id="viewCeremonyDate" style="color: var(--text-primary);">—</strong>
+            </div>
+            <div>
+              <span style="color: var(--text-muted); display: block; font-size: 0.73rem;">Gotra · गोत्र</span>
+              <span id="viewGotra" style="color: var(--text-primary);">—</span>
+            </div>
+            <div>
+              <span style="color: var(--text-muted); display: block; font-size: 0.73rem;">Rashi · राशी</span>
+              <span id="viewRashi" style="color: var(--text-primary);">—</span>
+            </div>
+            <div>
+              <span style="color: var(--text-muted); display: block; font-size: 0.73rem;">Nakshatra · नक्षत्र</span>
+              <span id="viewNakshatra" style="color: var(--text-primary);">—</span>
+            </div>
+            <div>
+              <span style="color: var(--text-muted); display: block; font-size: 0.73rem;">Booked On (Submission Time)</span>
+              <span id="viewBookedOn" style="color: var(--text-secondary); font-size: 0.8rem;">—</span>
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <span style="color: var(--text-muted); display: block; font-size: 0.73rem;">Sankalp Purpose · संकल्प उद्देश</span>
+              <div id="viewSankalp" style="color: var(--text-primary); background: #ffffff; padding: 6px 10px; border-radius: 6px; border: 1px solid #ebd9c8; margin-top: 2px; line-height: 1.4;">—</div>
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <span style="color: var(--text-muted); display: block; font-size: 0.73rem;">Location &amp; Address · स्थान व पत्ता</span>
+              <div id="viewLocationAddress" style="color: var(--text-primary); background: #ffffff; padding: 6px 10px; border-radius: 6px; border: 1px solid #ebd9c8; margin-top: 2px; line-height: 1.4;">—</div>
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <span style="color: var(--text-muted); display: block; font-size: 0.73rem;">Payment Notes &amp; Status</span>
+              <span id="viewNotes" style="color: var(--text-muted); font-size: 0.75rem; font-family: monospace;">—</span>
+            </div>
+          </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Assigned Priest / Acharya</label>
-          <input type="text" name="priest_name" id="modalPriestName" class="form-control" placeholder="e.g. Pandit Radheshyam Shastri">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Live Video Stream Link / Temple Venue</label>
-          <input type="text" name="meeting_link_or_venue" id="modalMeetingLink" class="form-control" placeholder="https://meet.google.com/xyz-abc or Haridwar Ghat">
+
+        <!-- Editable Form Section -->
+        <div>
+          <h4 style="font-size: 0.92rem; font-weight: 700; color: var(--text-primary); margin: 0 0 0.75rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.4rem;">
+            Admin Priest Assignment &amp; Status
+          </h4>
+          <div class="form-group" style="margin-bottom: 0.85rem;">
+            <label class="form-label" style="font-weight: 600;">Booking Status *</label>
+            <select name="status" id="modalBookingStatus" class="form-control" required>
+              <option value="pending">Pending</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom: 0.85rem;">
+            <label class="form-label" style="font-weight: 600;">Assigned Priest / Acharya</label>
+            <input type="text" name="priest_name" id="modalPriestName" class="form-control" placeholder="e.g. Pandit Radheshyam Shastri">
+          </div>
+          <div class="form-group" style="margin-bottom: 0.5rem;">
+            <label class="form-label" style="font-weight: 600;">Live Video Stream Link / Temple Venue</label>
+            <input type="text" name="meeting_link_or_venue" id="modalMeetingLink" class="form-control" placeholder="https://meet.google.com/xyz-abc or Trimbakeshwar Temple">
+          </div>
         </div>
       </div>
-      <div class="modal-footer">
+      <div class="modal-footer" style="padding: 1rem 1.5rem; border-top: 1px solid var(--border-color);">
         <button type="button" class="btn-secondary" onclick="closeModal('manageBookingModal')">Cancel</button>
         <button type="submit" class="btn-primary">Save Changes</button>
       </div>
@@ -121,12 +230,47 @@
 </div>
 
 <script>
-  function openBookingModal(id, num, status, priest, link) {
-    document.getElementById("modalBookingTitle").innerText = "Manage " + num;
-    document.getElementById("manageBookingForm").action = "/admin/services/bookings/" + id + "/update";
-    document.getElementById("modalBookingStatus").value = status;
-    document.getElementById("modalPriestName").value = priest;
-    document.getElementById("modalMeetingLink").value = link;
+  function openBookingDetailsModal(btn) {
+    const d = btn.dataset;
+    document.getElementById("modalBookingTitle").innerText = "Manage " + d.number + " · " + d.service;
+    document.getElementById("manageBookingForm").action = "/admin/services/bookings/" + d.id + "/update";
+
+    document.getElementById("viewServiceName").innerText = d.service || "Puja Service";
+    document.getElementById("viewDevoteeName").innerText = d.name || "—";
+    document.getElementById("viewDevoteePhone").innerText = d.phone || "—";
+    const emailVal = d.email && !d.email.includes("@astroveda.in") ? d.email : "—";
+    document.getElementById("viewDevoteeEmail").innerText = emailVal;
+    document.getElementById("viewCeremonyDate").innerText = (d.date ? d.date + (d.time ? " (" + d.time + ")" : "") : "—");
+    document.getElementById("viewBookedOn").innerText = d.bookedOn || "—";
+
+    const modeBadge = document.getElementById("viewModeBadge");
+    const modeVal = (d.mode || "ONLINE").toUpperCase();
+    modeBadge.innerText = modeVal;
+    if (modeVal === "OFFLINE") {
+      modeBadge.className = "badge badge-confirmed";
+    } else {
+      modeBadge.className = "badge badge-type-puja";
+    }
+
+    const priceNum = Number(d.price || 0);
+    const paidNum = Number(d.amountPaid || 0);
+    document.getElementById("viewAmount").innerText = "₹" + priceNum.toLocaleString("en-IN") + (paidNum > 0 ? " (Paid: ₹" + paidNum.toLocaleString("en-IN") + ")" : " (Unpaid / Pending)");
+
+    document.getElementById("viewGotra").innerText = d.gotra || "—";
+    document.getElementById("viewRashi").innerText = d.rashi || "—";
+    document.getElementById("viewNakshatra").innerText = d.nakshatra || "—";
+    document.getElementById("viewSankalp").innerText = d.sankalp || "—";
+
+    let locAddr = "";
+    if (d.location) locAddr += "📍 " + d.location;
+    if (d.address) locAddr += (locAddr ? " | " : "") + d.address;
+    document.getElementById("viewLocationAddress").innerText = locAddr || "—";
+    document.getElementById("viewNotes").innerText = d.notes || "—";
+
+    document.getElementById("modalBookingStatus").value = d.status || "pending";
+    document.getElementById("modalPriestName").value = d.priest || "";
+    document.getElementById("modalMeetingLink").value = d.link || "";
+
     openModal("manageBookingModal");
   }
 </script>

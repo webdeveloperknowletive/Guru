@@ -48,7 +48,7 @@ class PujaBooking(db.Model):
     service_id = db.Column(db.Integer, db.ForeignKey("puja_services.id"), nullable=False, index=True)
 
     customer_name = db.Column(db.String(150), nullable=False, index=True)
-    customer_email = db.Column(db.String(255), nullable=False)
+    customer_email = db.Column(db.String(255), nullable=True)
     customer_phone = db.Column(db.String(30), nullable=True)
 
     # Spiritual particulars
@@ -56,6 +56,10 @@ class PujaBooking(db.Model):
     nakshatra = db.Column(db.String(80), nullable=True)
     rashi = db.Column(db.String(80), nullable=True)
     sankalp_text = db.Column(db.Text, nullable=True)
+
+    # Location & Venue particulars
+    location = db.Column(db.String(255), nullable=True)
+    address = db.Column(db.Text, nullable=True)
 
     booking_date = db.Column(db.Date, nullable=False, index=True)
     time_slot = db.Column(db.String(50), nullable=False)  # e.g., '10:00 AM'
@@ -72,6 +76,36 @@ class PujaBooking(db.Model):
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
     service = db.relationship("PujaService", back_populates="bookings")
+
+    @property
+    def display_location(self):
+        if self.location:
+            return self.location
+        if self.sankalp_text and "Location:" in self.sankalp_text:
+            for part in self.sankalp_text.split("|"):
+                if "Location:" in part:
+                    return part.replace("Location:", "").strip()
+        return None
+
+    @property
+    def display_address(self):
+        if self.address:
+            return self.address
+        if self.meeting_link_or_venue and not str(self.meeting_link_or_venue).startswith("http"):
+            return self.meeting_link_or_venue
+        if self.sankalp_text and "Address:" in self.sankalp_text:
+            for part in self.sankalp_text.split("|"):
+                if "Address:" in part:
+                    return part.replace("Address:", "").strip()
+        return None
+
+    @property
+    def display_sankalp(self):
+        if not self.sankalp_text:
+            return None
+        parts = [p.strip() for p in self.sankalp_text.split("|") if not p.strip().startswith("Location:") and not p.strip().startswith("Address:")]
+        clean_text = " | ".join(parts).strip()
+        return clean_text or None
 
     def __repr__(self):
         return f"<PujaBooking {self.booking_number} - {self.customer_name}>"

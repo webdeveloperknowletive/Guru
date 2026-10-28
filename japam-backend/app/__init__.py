@@ -113,6 +113,17 @@ def create_app(config_name=None) -> Flask:
                     with db.engine.connect() as conn:
                         conn.execute(text("ALTER TABLE categories ADD COLUMN image_url VARCHAR(500)"))
                         conn.commit()
+
+            if "puja_bookings" in inspector.get_table_names():
+                p_cols = [c["name"] for c in inspector.get_columns("puja_bookings")]
+                with db.engine.connect() as conn:
+                    if "location" not in p_cols:
+                        conn.execute(text("ALTER TABLE puja_bookings ADD COLUMN location VARCHAR(255)"))
+                    if "address" not in p_cols:
+                        conn.execute(text("ALTER TABLE puja_bookings ADD COLUMN address TEXT"))
+                    if db.engine.dialect.name == "postgresql":
+                        conn.execute(text("ALTER TABLE puja_bookings ALTER COLUMN customer_email DROP NOT NULL"))
+                    conn.commit()
         except Exception:
             pass
 

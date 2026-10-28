@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify, current_app, session
 from sqlalchemy.orm.attributes import flag_modified
 from app.extensions import db
 from app.models.commerce import Product, Category, Order, OrderItem, Customer, ProductReview
-from app.models.service import PujaService, JyotishConsultation, AvailabilitySlot
+from app.models.service import PujaService, JyotishConsultation, AvailabilitySlot, PujaBooking
 from app.models.operations import ReturnRequest, CustomerEnquiry, PaymentTransaction
 from app.models.content import Testimonial, BlogPost, GurujiProfile, Banner, AdBanner
 from app.models.user import AdminUser
@@ -341,19 +341,23 @@ def book_puja():
     data = request.get_json() or {}
 
     customer_name = (data.get("customer_name") or data.get("name") or "").strip()
-    customer_email = (data.get("customer_email") or data.get("email") or "").strip()
-    customer_phone = (data.get("customer_phone") or data.get("phone") or "").strip()
+    raw_email = (data.get("customer_email") or data.get("email") or "").strip()
+    customer_email = raw_email if raw_email else ""
+    customer_phone = str(data.get("customer_phone") or data.get("phone") or "").strip()
     booking_date_raw = data.get("booking_date") or data.get("preferred_date") or data.get("date")
     time_slot = (data.get("time_slot") or data.get("time") or data.get("timeSlot") or "10:00 AM").strip()
     service_id = data.get("service_id")
+    location = (data.get("location") or "").strip() or None
+    address = (data.get("address") or "").strip() or None
+    gotra = (data.get("gotra") or "").strip() or None
+    nakshatra = (data.get("nakshatra") or "").strip() or None
+    rashi = (data.get("rashi") or "").strip() or None
+    sankalp_text = (data.get("sankalp_text") or data.get("sankalp") or "").strip() or None
 
     if not customer_name:
         return jsonify({"error": "Field 'customer_name' (or 'name') is required"}), 400
-    if not customer_email and customer_phone:
-        customer_email = f"{customer_phone.replace('+', '').replace(' ', '')}@astroveda.in"
-    elif not customer_email:
-        customer_email = "devotee@astroveda.in"
-
+    if not customer_phone:
+        return jsonify({"error": "Field 'customer_phone' (or 'phone') is required"}), 400
     if not booking_date_raw:
         return jsonify({"error": "Field 'booking_date' is required"}), 400
 
@@ -392,21 +396,37 @@ def book_puja():
         current_payment_mode = PaymentModeService.get_payment_mode()
         chosen_method = data.get("payment_method") or ("Offline Payment" if current_payment_mode == "offline" else "Online Gateway")
 
-        booking = BookingService.book_puja_slot(
-            service_id=service_id,
-            customer_name=customer_name,
-            customer_email=customer_email,
-            customer_phone=customer_phone,
-            booking_date=booking_date,
-            time_slot=time_slot,
-            booking_type=data.get("booking_type") or data.get("bookingType") or "online",
-            gotra=data.get("gotra"),
-            nakshatra=data.get("nakshatra"),
-            rashi=data.get("rashi"),
-            sankalp_text=data.get("sankalp_text") or data.get("sankalp"),
-            payment_mode=current_payment_mode,
-            payment_method=chosen_method,
-        )
+        # Duplicate prevention guard: return existing booking if identical submission within 30s
+        from datetime import timedelta
+        recent_cutoff = datetime.now(timezone.utc) - timedelta(seconds=30)
+        existing_booking = PujaBooking.query.filter(
+            PujaBooking.customer_phone == customer_phone,
+            PujaBooking.service_id == service_id,
+            PujaBooking.booking_date == booking_date,
+            PujaBooking.time_slot == time_slot,
+            PujaBooking.created_at >= recent_cutoff,
+        ).order_by(PujaBooking.id.desc()).first()
+
+        if existing_booking:
+            booking = existing_booking
+        else:
+            booking = BookingService.book_puja_slot(
+                service_id=service_id,
+                customer_name=customer_name,
+                customer_email=customer_email,
+                customer_phone=customer_phone,
+                booking_date=booking_date,
+                time_slot=time_slot,
+                booking_type=data.get("booking_type") or data.get("bookingType") or "online",
+                gotra=gotra,
+                nakshatra=nakshatra,
+                rashi=rashi,
+                sankalp_text=sankalp_text,
+                location=location,
+                address=address,
+                payment_mode=current_payment_mode,
+                payment_method=chosen_method,
+            )
 
         # Trigger admin WhatsApp alert safely
         wa_result = WhatsAppNotificationService.send_admin_alert(
@@ -426,10 +446,15 @@ def book_puja():
             "message": "Puja booking created successfully" if current_payment_mode == "online" else "Puja booking submitted successfully. Offline payment pending confirmation.",
             "booking_number": booking.booking_number,
             "amount_paid": float(booking.amount_paid),
+            "dakshina_amount": float(booking.service.price) if booking.service else 0.0,
+            "amount": float(booking.service.price) if booking.service else 0.0,
+            "customer_name": booking.customer_name,
+            "devotee_name": booking.customer_name,
+            "name": booking.customer_name,
             "status": booking.status,
             "payment_mode": current_payment_mode,
             "payment_method": chosen_method,
-            "whatsapp_notification_status": wa_result.get("status"),
+            "whatsapp_notification_status": wa_result.get("status") if 'wa_result' in locals() else None,
         }
         if current_payment_mode == "online" and booking.service and booking.service.price > 0:
             try:

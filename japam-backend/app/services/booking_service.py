@@ -19,9 +19,12 @@ class BookingService:
         nakshatra: str = None,
         rashi: str = None,
         sankalp_text: str = None,
+        location: str = None,
+        address: str = None,
         admin_user = None,
         payment_mode: str = None,
         payment_method: str = None,
+        status: str = None,
     ) -> PujaBooking:
         """
         Creates a Puja Booking after checking and locking the availability slot.
@@ -52,26 +55,30 @@ class BookingService:
         from app.services.sequence_service import SequenceService
         booking_number = SequenceService.next_puja_booking_number()
 
-        # In offline mode, booking status is pending payment confirmation
-        initial_status = "pending" if payment_mode == "offline" else "confirmed"
-        notes_text = f"Payment Mode: {payment_mode.upper()} | Method: {payment_method or ('Offline Payment' if payment_mode == 'offline' else 'Online Gateway')}"
+        # Preserve existing online/offline mode and payment-status rules.
+        # Online mode: booking is confirmed on slot, but payment is not marked as successful until verified.
+        # Offline mode: booking is pending admin payment confirmation.
+        initial_status = status if status else ("pending" if payment_mode == "offline" else "confirmed")
+        notes_text = f"Payment Mode: {(payment_mode or 'ONLINE').upper()} | Method: {payment_method or ('Offline Payment' if payment_mode == 'offline' else 'Online Gateway')}"
 
         booking = PujaBooking(
             booking_number=booking_number,
             service_id=service.id,
             customer_name=customer_name,
-            customer_email=customer_email,
+            customer_email=customer_email or "",
             customer_phone=customer_phone,
             gotra=gotra,
             nakshatra=nakshatra,
             rashi=rashi,
             sankalp_text=sankalp_text,
+            location=location,
+            address=address,
             booking_date=booking_date,
             time_slot=time_slot,
             booking_type=booking_type,
-            priest_name=slot.assigned_priest_or_astrologer if slot else "Pandit Ji",
+            priest_name=slot.assigned_priest_or_astrologer if (slot and slot.assigned_priest_or_astrologer) else None,
             status=initial_status,
-            amount_paid=service.price if initial_status == "confirmed" else Decimal("0.00"),
+            amount_paid=Decimal("0.00"),  # A booking submission must not automatically mark a payment as successful
             notes=notes_text,
             created_at=datetime.now(timezone.utc),
         )
@@ -102,10 +109,8 @@ class BookingService:
 
         old_status = booking.status
         booking.status = new_status
-        if priest_name:
-            booking.priest_name = priest_name
-        if meeting_link:
-            booking.meeting_link_or_venue = meeting_link
+        booking.priest_name = priest_name.strip() if priest_name and priest_name.strip() else None
+        booking.meeting_link_or_venue = meeting_link.strip() if meeting_link and meeting_link.strip() else None
 
         db.session.commit()
 

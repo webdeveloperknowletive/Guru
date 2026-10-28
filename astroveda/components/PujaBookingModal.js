@@ -129,6 +129,7 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // Prevent double-clicks / repeated submissions
     if (!form.name.trim() || !form.phone.trim() || !form.date) {
       showToast('कृपया नाव, फोन आणि तारीख प्रविष्ट करा (Please enter name, phone, and date)');
       return;
@@ -136,7 +137,7 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
 
     setLoading(true);
     try {
-      const email = form.email.trim() || `${form.phone.replace(/[^\d]/g, '')}@astroveda.in`;
+      const email = form.email.trim() || null;
       const res = await bookPuja({
         service_id: selectedServiceId,
         customer_name: form.name.trim(),
@@ -147,17 +148,17 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
         booking_type: form.bookingType,
         payment_mode: paymentMode,
         payment_method: paymentMode === 'offline' ? 'Offline Payment' : 'Online Gateway',
-        location: form.location.trim(),
-        address: form.address.trim(),
-        gotra: form.gotra.trim() || 'Kashyap',
+        location: form.location.trim() || null,
+        address: form.address.trim() || null,
+        gotra: form.gotra.trim() || null,
         nakshatra: form.nakshatra.trim() || null,
         rashi: form.rashi.trim() || null,
-        sankalp_text: [
-          form.sankalp.trim() || 'Parivar Samriddhi & Arogya Sankalp',
-          form.location.trim() ? `Location: ${form.location.trim()}` : null,
-          form.address.trim() ? `Address: ${form.address.trim()}` : null,
-        ].filter(Boolean).join(' | '),
+        sankalp_text: form.sankalp.trim() || null,
       });
+
+      if (!res || !res.booking_number) {
+        throw new Error(res?.error || 'Booking submission failed. Please try again.');
+      }
 
       if (paymentMode === 'online' && res.razorpay && typeof window !== 'undefined') {
         const isLoaded = await (async () => {
@@ -315,9 +316,9 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
                 instructions={confirmedBooking.offline_payment_instructions || offlineInstructions}
                 qrCodeUrl={confirmedBooking.offline_qr_code || offlineQrCode || '/phonepe-qr.jpg'}
                 referenceNumber={confirmedBooking.booking_number}
-                amount={confirmedBooking.dakshina_amount || confirmedBooking.amount}
-                customerName={confirmedBooking.devotee_name || confirmedBooking.name}
-                whatsappUrl={`https://wa.me/919623117545?text=${encodeURIComponent(`Namaste! I have submitted a Puja Booking (${confirmedBooking.booking_number}). Here is my offline payment confirmation / screenshot:`)}`}
+                amount={confirmedBooking.dakshina_amount || confirmedBooking.amount || selectedService?.price}
+                customerName={confirmedBooking.customer_name || confirmedBooking.devotee_name || form.name.trim()}
+                whatsappUrl={`https://wa.me/919623117545?text=${encodeURIComponent(`Namaste! I have submitted a Puja Booking (${confirmedBooking.booking_number}) for ${selectedService?.name || 'Puja'}. Here is my offline payment confirmation / screenshot:`)}`}
                 whatsappButtonText="💬 Share Puja Dakshina on WhatsApp"
                 title="Offline Dakshina Payment / पूजा दक्षिणा पद्धत"
               />
@@ -569,6 +570,18 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
                     name="rashi"
                     placeholder="e.g. Mesh, Vrishabh"
                     value={form.rashi}
+                    onChange={handleFieldChange}
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="puj-nakshatra">Nakshatra · नक्षत्र (Optional)</label>
+                  <input
+                    type="text"
+                    id="puj-nakshatra"
+                    name="nakshatra"
+                    placeholder="e.g. Rohini, Ashwini"
+                    value={form.nakshatra}
                     onChange={handleFieldChange}
                   />
                 </div>
