@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useStore } from '@/context/StoreContext';
 import OfflinePaymentBox from '@/components/OfflinePaymentBox';
 
@@ -34,6 +34,29 @@ export default function CheckoutModal() {
   const [paymentMethod, setPaymentMethod] = useState(paymentMode === 'offline' ? 'Offline / Direct UPI / Bank Transfer' : 'Razorpay');
   const [couponInput, setCouponInput] = useState(couponCode || '');
   const [localValidationErr, setLocalValidationErr] = useState('');
+
+  const confirmedScrollRef = useRef(null);
+
+  // Auto-focus the confirmation container for keyboard scrolling and accessibility
+  useEffect(() => {
+    if (checkoutOpen && checkoutStep === 'confirmed') {
+      if (confirmedScrollRef.current) {
+        confirmedScrollRef.current.focus({ preventScroll: true });
+      }
+    }
+  }, [checkoutOpen, checkoutStep]);
+
+  // Clean keyboard listener for Escape key to dismiss confirmation or modal
+  useEffect(() => {
+    if (!checkoutOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && !checkoutLoading) {
+        closeCheckout();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [checkoutOpen, checkoutLoading, closeCheckout]);
 
   useEffect(() => {
     if (paymentMode === 'offline') {
@@ -164,7 +187,13 @@ export default function CheckoutModal() {
 
         {checkoutStep === 'confirmed' && lastOrder ? (
           /* ================= ORDER CONFIRMATION VIEW ================= */
-          <div style={{ padding: '40px 32px', textAlign: 'center', gridColumn: '1 / -1' }}>
+          <div
+            className="checkout-confirmed-col"
+            ref={confirmedScrollRef}
+            tabIndex={0}
+            role="region"
+            aria-label="Order Confirmation Details"
+          >
             <div
               style={{
                 width: '72px',
