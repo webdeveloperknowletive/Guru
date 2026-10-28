@@ -546,11 +546,49 @@ def request_consultation():
         # For services where DOB is optional, default to today's date for database constraint
         dob = datetime.now(timezone.utc).date()
 
+    # Trusted backend pricing calculation and server-side package validation
+    sid = (service_id or "").strip().lower()
+    raw_pkg = (data.get("package_type") or data.get("package") or "").strip().lower().replace("-", "_")
+
+    if sid == "janma-kundali":
+        if raw_pkg in ("soft_copy", "soft"):
+            payable_amount = Decimal("101.00")
+            package_type = "soft-copy"
+            package_name = "Soft Copy — Digital Kundali Report"
+        elif raw_pkg in ("hard_copy", "hard", ""):
+            payable_amount = Decimal("1001.00")
+            package_type = "hard-copy"
+            package_name = "Hard Copy — Printed Hard Copy with Kundali Consultation"
+        else:
+            return jsonify({
+                "error": f"Invalid package '{raw_pkg}' for Janma Kundali Preparation. Expected 'hard-copy' or 'soft-copy'."
+            }), 400
+    else:
+        # All other seven consultation services under Diwali Special Offer (₹201 -> ₹101)
+        payable_amount = Decimal("101.00")
+        package_type = None
+        package_name = "Diwali Special Offer (₹101)"
+
+    # Reject client-side price tampering if client explicitly submitted an amount
+    client_amount = data.get("amount") or data.get("fee") or data.get("amount_paid")
+    if client_amount is not None:
+        try:
+            if Decimal(str(client_amount)) != payable_amount:
+                return jsonify({
+                    "error": f"Invalid consultation fee. Expected ₹{payable_amount:,.0f}, received ₹{client_amount}."
+                }), 400
+        except Exception:
+            return jsonify({"error": "Invalid amount format."}), 400
+
     # Compile comprehensive, structured astrologer notes for admin & consultation review
     notes_lines = [
         f"--- {topic} ({service_id or 'General'}) ---",
         f"Contact Person: {customer_name} | Phone: {customer_phone} | Email: {customer_email}",
     ]
+    if sid == "janma-kundali":
+        notes_lines.append(f"Package: {package_name} | Fee: ₹{payable_amount:,.0f}")
+    else:
+        notes_lines.append(f"Special Offer: Diwali Special Offer (₹201 -> ₹101) | Fee: ₹{payable_amount:,.0f}")
 
     # Marriage matching details
     groom_name = None
@@ -685,7 +723,7 @@ def request_consultation():
             status="pending",
             astrologer_name=astrologer_name,
             astrologer_notes=full_astrologer_notes,
-            amount_paid=Decimal("1500.00"),
+            amount_paid=payable_amount,
             created_at=datetime.now(timezone.utc),
         )
         db.session.add(consultation)
@@ -694,9 +732,11 @@ def request_consultation():
         # Trigger admin WhatsApp alert safely
         # Note: Sensitive birth particulars (DOB/TOB/POB) are maintained strictly within
         # the authenticated admin panel to preserve devotee privacy and consent standards.
-        wa_extra = f"Topic: {consultation.topic}"
-        if (service_id == "marriage-matching" or data.get("person2")) and groom_name and bride_name:
-            wa_extra = f"Topic: Marriage Kundali Matching | Contact Person: {consultation.customer_name} | Groom: {groom_name} | Bride: {bride_name}"
+        wa_extra = f"Topic: {consultation.topic} | Fee: ₹{payable_amount:,.0f}"
+        if sid == "janma-kundali":
+            wa_extra = f"Topic: Janma Kundali Preparation | Package: {package_name} | Fee: ₹{payable_amount:,.0f}"
+        elif (sid == "marriage-matching" or data.get("person2")) and groom_name and bride_name:
+            wa_extra = f"Topic: Marriage Kundali Matching | Contact Person: {consultation.customer_name} | Groom: {groom_name} | Bride: {bride_name} | Diwali Offer Fee: ₹{payable_amount:,.0f}"
 
         wa_result = WhatsAppNotificationService.send_admin_alert(
             module_name="Jyotish Consultation",
@@ -718,6 +758,10 @@ def request_consultation():
             "status": consultation.status,
             "payment_mode": current_payment_mode,
             "payment_method": chosen_method,
+            "amount_paid": float(consultation.amount_paid),
+            "fee": float(consultation.amount_paid),
+            "package_type": package_type,
+            "package_name": package_name if sid == "janma-kundali" else None,
             "whatsapp_notification_status": wa_result.get("status"),
         }
         if current_payment_mode == "offline":

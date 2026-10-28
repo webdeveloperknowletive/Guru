@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useStore } from '@/context/StoreContext';
 import { requestConsultation, getConsultations, getAvailabilitySlots } from '@/lib/api';
-import { JYOTISH_SERVICES, getServiceById } from '@/config/jyotishServices';
+import { JYOTISH_SERVICES, JANMA_KUNDALI_PACKAGES, DIWALI_OFFER, getServiceById } from '@/config/jyotishServices';
 import OfflinePaymentBox from '@/components/OfflinePaymentBox';
 
 export default function JyotishSection({ sectionText }) {
@@ -16,6 +16,7 @@ export default function JyotishSection({ sectionText }) {
 
   const { showToast, paymentMode, offlineInstructions, offlineQrCode } = useStore();
   const [selectedServiceId, setSelectedServiceId] = useState('janma-kundali');
+  const [selectedJanmaPackage, setSelectedJanmaPackage] = useState('hard-copy');
   const [loading, setLoading] = useState(false);
   const [confirmedBooking, setConfirmedBooking] = useState(null);
   const [errors, setErrors] = useState({});
@@ -323,6 +324,10 @@ export default function JyotishSection({ sectionText }) {
       const email = commonData.email.trim() || `${commonData.phone.replace(/[^\w]/g, '')}@astroveda.in`;
 
       // Build service-specific payload
+      const currentPayablePrice = selectedServiceId === 'janma-kundali'
+        ? (selectedJanmaPackage === 'soft-copy' ? 101 : 1001)
+        : 101;
+
       const payload = {
         service_id: selectedServiceId,
         topic: activeService.title,
@@ -334,7 +339,15 @@ export default function JyotishSection({ sectionText }) {
         slot_id: commonData.slotId || null,
         consultation_type: commonData.mode.toLowerCase().includes('online') ? 'online_video' : 'in_person',
         notes: commonData.notes.trim() || null,
+        amount: currentPayablePrice,
       };
+
+      if (selectedServiceId === 'janma-kundali') {
+        payload.package_type = selectedJanmaPackage;
+        payload.package_name = selectedJanmaPackage === 'soft-copy'
+          ? 'Soft Copy — Digital Kundali report'
+          : 'Hard Copy — Printed Kundali with consultation';
+      }
 
       // Add service-specific data
       if (selectedServiceId === 'marriage-matching') {
@@ -438,6 +451,10 @@ export default function JyotishSection({ sectionText }) {
         number: res.consultation_number,
         serviceId: selectedServiceId,
         serviceTitle: activeService.title,
+        packageType: selectedServiceId === 'janma-kundali' ? selectedJanmaPackage : null,
+        packageName: selectedServiceId === 'janma-kundali'
+          ? (selectedJanmaPackage === 'soft-copy' ? 'Soft Copy — Digital Kundali report' : 'Hard Copy — Printed Kundali with consultation')
+          : null,
         customerName: commonData.name.trim(),
         person1Name: selectedServiceId === 'marriage-matching' ? marriageData.person1Name.trim() : null,
         person2Name: selectedServiceId === 'marriage-matching' ? marriageData.person2Name.trim() : null,
@@ -445,7 +462,7 @@ export default function JyotishSection({ sectionText }) {
         status: res.status,
         offlineInstructions: res.offline_payment_instructions || offlineInstructions,
         offlineQrCode: res.offline_qr_code || offlineQrCode || '/phonepe-qr.jpg',
-        fee: activeService.price || null,
+        fee: res.fee || res.amount_paid || currentPayablePrice,
       });
 
       showToast(res.status === 'pending' && (res.payment_mode === 'offline' || paymentMode === 'offline')
@@ -558,6 +575,10 @@ export default function JyotishSection({ sectionText }) {
                           </span>
                         )}
                       </>
+                    ) : confirmedBooking.serviceId === 'janma-kundali' && confirmedBooking.packageName ? (
+                      <>
+                        आदरणीय <strong>{confirmedBooking.customerName}</strong>, तुमची <strong>{confirmedBooking.serviceTitle}</strong> ({confirmedBooking.packageName}) साठी नोंदणी झाली आहे.
+                      </>
                     ) : (
                       <>
                         आदरणीय <strong>{confirmedBooking.customerName}</strong>, तुमची <strong>{confirmedBooking.serviceTitle}</strong> साठी नोंदणी झाली आहे.
@@ -578,8 +599,10 @@ export default function JyotishSection({ sectionText }) {
                       customerName={confirmedBooking.customerName}
                       whatsappUrl={`https://wa.me/919623117545?text=${encodeURIComponent(
                         confirmedBooking.serviceId === 'marriage-matching'
-                          ? `Namaste! I have submitted a Marriage Kundali Matching consultation (${confirmedBooking.number}). Contact Person: ${confirmedBooking.customerName}${confirmedBooking.person1Name ? `, Groom: ${confirmedBooking.person1Name}` : ''}${confirmedBooking.person2Name ? `, Bride: ${confirmedBooking.person2Name}` : ''}. Here is my payment confirmation screenshot:`
-                          : `Namaste! I have submitted a Jyotish Consultation request (${confirmedBooking.number}) for ${confirmedBooking.serviceTitle}. Here is my payment confirmation screenshot:`
+                          ? `Namaste! I have submitted a Marriage Kundali Matching consultation (${confirmedBooking.number}). Contact Person: ${confirmedBooking.customerName}${confirmedBooking.person1Name ? `, Groom: ${confirmedBooking.person1Name}` : ''}${confirmedBooking.person2Name ? `, Bride: ${confirmedBooking.person2Name}` : ''} (Fee: ₹${confirmedBooking.fee || 101}). Here is my payment confirmation screenshot:`
+                          : confirmedBooking.serviceId === 'janma-kundali'
+                          ? `Namaste! I have submitted a Janma Kundali Preparation request (${confirmedBooking.number}) for ${confirmedBooking.packageName || 'Janma Kundali'} (Fee: ₹${confirmedBooking.fee || 1001}). Here is my payment confirmation screenshot:`
+                          : `Namaste! I have submitted a Jyotish Consultation request (${confirmedBooking.number}) for ${confirmedBooking.serviceTitle} (Diwali Offer Fee: ₹${confirmedBooking.fee || 101}). Here is my payment confirmation screenshot:`
                       )}`}
                       whatsappButtonText="💬 Share Consultation Payment on WhatsApp"
                       title="Offline Dakshina Payment / दक्षिणा पद्धत"
@@ -599,6 +622,62 @@ export default function JyotishSection({ sectionText }) {
 
               {!confirmedBooking && (
                 <>
+                  {/* Janma Kundali Preparation: Hard Copy vs Soft Copy Packages */}
+                  {selectedServiceId === 'janma-kundali' && (
+                    <div className="janma-packages-grid" role="radiogroup" aria-label="Janma Kundali Packages">
+                      {JANMA_KUNDALI_PACKAGES.map((pkg) => {
+                        const isSelected = selectedJanmaPackage === pkg.id;
+                        return (
+                          <div
+                            key={pkg.id}
+                            className={`janma-package-card ${isSelected ? 'is-selected' : ''}`}
+                            onClick={() => setSelectedJanmaPackage(pkg.id)}
+                            role="radio"
+                            aria-checked={isSelected}
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === ' ' || e.key === 'Enter') {
+                                e.preventDefault();
+                                setSelectedJanmaPackage(pkg.id);
+                              }
+                            }}
+                          >
+                            <div className="janma-pkg-header">
+                              <span className="janma-pkg-name">{pkg.name} — </span>
+                              <span className="janma-pkg-price">₹{pkg.price.toLocaleString('en-IN')}</span>
+                            </div>
+                            <div className="janma-pkg-sub">{pkg.subtitle}</div>
+                            <ul className="janma-pkg-list">
+                              {pkg.inclusions.map((item, idx) => (
+                                <li key={idx}>
+                                  <span className="check-icon" aria-hidden="true">✓</span>
+                                  <span>{item}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Diwali Special Offer for the other 7 services */}
+                  {selectedServiceId !== 'janma-kundali' && (
+                    <div className="diwali-offer-card" role="region" aria-label="Diwali Special Offer">
+                      <div className="diwali-offer-left">
+                        <span className="diwali-diya-icon" role="img" aria-label="Diwali Diya">🪔</span>
+                        <div>
+                          <div className="diwali-offer-title">{DIWALI_OFFER.title}</div>
+                          <div className="diwali-offer-sub">{DIWALI_OFFER.savingsText}</div>
+                        </div>
+                      </div>
+                      <div className="diwali-offer-pricing">
+                        <span className="diwali-old-price">₹{DIWALI_OFFER.originalPrice}</span>
+                        <span className="diwali-new-price">₹{DIWALI_OFFER.discountedPrice}/-</span>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="form-grid">
                     {/* Common Customer Details */}
                     <div className="field full">

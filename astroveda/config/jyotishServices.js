@@ -1,5 +1,45 @@
 // Centralized Jyotish Consultation Services Configuration
-// Defines stable IDs, titles, descriptions, categories, conditional fields, and validation rules
+// Defines stable IDs, titles, descriptions, categories, conditional fields, validation rules, packages, and Diwali offer
+
+export const JANMA_KUNDALI_PACKAGES = [
+  {
+    id: 'hard-copy',
+    name: 'Hard Copy',
+    price: 1001,
+    subtitle: 'Printed Kundali with consultation',
+    fullTitle: 'Hard Copy — Printed Hard Copy with Kundali Consultation',
+    inclusions: [
+      'Lagna Kundali',
+      'Kaspa Kundali',
+      'Navamsha Kundali',
+      'Ghat Chakra',
+      'Details of all 12 houses',
+      'Vimshottari Mahadasha',
+      'Shubha–Ashubha Dnyan',
+      'Kundali Consultation',
+    ],
+  },
+  {
+    id: 'soft-copy',
+    name: 'Soft Copy',
+    price: 101,
+    subtitle: 'Digital Kundali report',
+    fullTitle: 'Soft Copy — Digital Kundali report',
+    inclusions: [
+      'Mulbhut Panchang',
+      'Lagna Kundali',
+      'Kapsa Kundali',
+      'Navamsha Kundali',
+    ],
+  },
+];
+
+export const DIWALI_OFFER = {
+  title: 'Diwali Special Offer',
+  originalPrice: 201,
+  discountedPrice: 101,
+  savingsText: 'Save ₹100 on your consultation',
+};
 
 export const JYOTISH_SERVICES = [
   {
@@ -11,6 +51,8 @@ export const JYOTISH_SERVICES = [
     requiresTime: false, // optional if unknown
     allowUnknownTime: true,
     topicOptions: null,
+    packages: JANMA_KUNDALI_PACKAGES,
+    defaultPackage: 'hard-copy',
   },
   {
     id: 'kundali-analysis',
@@ -20,6 +62,9 @@ export const JYOTISH_SERVICES = [
     requiresBirthDetails: true,
     requiresTime: false,
     allowUnknownTime: true,
+    price: 101,
+    originalPrice: 201,
+    hasDiwaliOffer: true,
     topicOptions: [
       'General Life Guidance',
       'Relationships and Family',
@@ -37,6 +82,9 @@ export const JYOTISH_SERVICES = [
     tagline: 'Comprehensive compatibility analysis for prospective bride and groom with Mangal dosha review.',
     isMarriageMatching: true,
     requiresBirthDetails: false, // handled via person1 & person2
+    price: 101,
+    originalPrice: 201,
+    hasDiwaliOffer: true,
   },
   {
     id: 'career-business',
@@ -46,6 +94,9 @@ export const JYOTISH_SERVICES = [
     requiresBirthDetails: true,
     requiresTime: false,
     allowUnknownTime: true,
+    price: 101,
+    originalPrice: 201,
+    hasDiwaliOffer: true,
     categoryOptions: [
       'Job / Career Guidance',
       'Job Change',
@@ -64,6 +115,9 @@ export const JYOTISH_SERVICES = [
     requiresBirthDetails: true,
     requiresTime: false,
     allowUnknownTime: true,
+    price: 101,
+    originalPrice: 201,
+    hasDiwaliOffer: true,
     topicOptions: [
       'Savings and Investments',
       'Business Income',
@@ -79,6 +133,9 @@ export const JYOTISH_SERVICES = [
     marathiTitle: 'शुभ मुहूर्त निवड व निर्णय',
     tagline: 'Auspicious date and time selection for weddings, Griha Pravesh, ceremonies, and major beginnings.',
     isMuhurat: true,
+    price: 101,
+    originalPrice: 201,
+    hasDiwaliOffer: true,
     eventOptions: [
       'Wedding',
       'Engagement',
@@ -97,6 +154,9 @@ export const JYOTISH_SERVICES = [
     marathiTitle: 'रत्न व रुद्राक्ष योग्य निवड मार्गदर्शन',
     tagline: 'Personalized recommendations for authentic Jyotish gemstones and energized Rudraksha beads.',
     isGemstone: true,
+    price: 101,
+    originalPrice: 201,
+    hasDiwaliOffer: true,
     requestOptions: [
       'Gemstone (Ratna)',
       'Rudraksha',
@@ -119,6 +179,9 @@ export const JYOTISH_SERVICES = [
     marathiTitle: 'सामान्य ज्योतिष सल्ला व शंका समाधान',
     tagline: 'Open consultation for specific queries, spiritual guidance, and personalized astrological advice.',
     isGeneral: true,
+    price: 101,
+    originalPrice: 201,
+    hasDiwaliOffer: true,
     topicOptions: [
       'General Jyotish Question',
       'Personal Guidance',
