@@ -56,6 +56,9 @@ class Config:
     # CSRF
     CSRF_SECRET_KEY = os.getenv("CSRF_SECRET_KEY", "csrf-spiritual-protection-key-32chars")
 
+    # Google reCAPTCHA v2
+    RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY", "6LccCwUuAAAAAHV4Wcz7LBxdXwZGTLVc5XvWnVVQ")
+
     # Uploads
     UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", os.path.join(BASE_DIR, "app", "static", "uploads"))
     MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", 10 * 1024 * 1024))  # 10 MB

@@ -26,6 +26,7 @@ def test_marriage_kundali_matching_independent_names(client, app):
                 "time_unknown": False,
             },
             "marriage_period": "Within 6 months",
+            "recaptcha_token": "test-valid-recaptcha-token",
         }
 
         res = client.post(
@@ -54,6 +55,7 @@ def test_marriage_kundali_matching_independent_names(client, app):
             "service_id": "marriage-matching",
             "topic": "Marriage Kundali Matching",
             "customer_name": "Sneha Patil",
+            "recaptcha_token": "test-valid-recaptcha-token",
             "customer_phone": "9822334455",
             "customer_email": "sneha@example.com",
             "person1": {
@@ -89,6 +91,7 @@ def test_marriage_kundali_matching_independent_names(client, app):
             "service_id": "marriage-matching",
             "topic": "Marriage Kundali Matching",
             "customer_name": "Vikram Kulkarni",
+            "recaptcha_token": "test-valid-recaptcha-token",
             "customer_phone": "9811223344",
             "customer_email": "vikram@example.com",
             "person1": {

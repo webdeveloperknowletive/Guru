@@ -1,8 +1,9 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useStore } from '@/context/StoreContext';
 import { findProduct } from '@/lib/products';
 import { getProductDetail, submitProductReview } from '@/lib/api';
+import ReCaptcha from '@/components/ReCaptcha';
 
 export default function ProductModal() {
   const { productModal, closeProductModal, addToCart, showToast } = useStore();
@@ -15,6 +16,8 @@ export default function ProductModal() {
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewForm, setReviewForm] = useState({ name: '', email: '', rating: 5, comment: '' });
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewCaptchaToken, setReviewCaptchaToken] = useState('');
+  const reviewRecaptchaRef = useRef(null);
 
   const product = passedProduct || findProduct(title);
 
@@ -176,6 +179,11 @@ export default function ProductModal() {
       return;
     }
 
+    if (!reviewCaptchaToken) {
+      showToast('Please complete the CAPTCHA verification (कृपया कॅप्चा पूर्ण करा).');
+      return;
+    }
+
     setSubmittingReview(true);
     try {
       const res = await submitProductReview(product.slug, {
@@ -183,6 +191,7 @@ export default function ProductModal() {
         customer_email: reviewForm.email.trim(),
         rating: Number(reviewForm.rating),
         comment: reviewForm.comment.trim(),
+        recaptcha_token: reviewCaptchaToken,
       });
       showToast(res.message || 'Review submitted successfully!');
       setShowReviewForm(false);
@@ -192,6 +201,8 @@ export default function ProductModal() {
         getProductDetail(product.slug).then(r => setLiveDetails(r)).catch(() => {});
       }
     } catch (err) {
+      reviewRecaptchaRef.current?.reset();
+      setReviewCaptchaToken('');
       showToast(err.message || 'Could not submit review.');
     } finally {
       setSubmittingReview(false);
@@ -415,6 +426,14 @@ export default function ProductModal() {
                   required
                   style={{ width: '100%', padding: '8px 10px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(224, 176, 74, 0.2)', color: 'var(--ink)', fontSize: '12px', marginBottom: '8px' }}
                 />
+                <ReCaptcha
+                  id={`recaptcha-review-${product.id}`}
+                  ref={reviewRecaptchaRef}
+                  onChange={setReviewCaptchaToken}
+                  onExpired={() => setReviewCaptchaToken('')}
+                  onError={() => setReviewCaptchaToken('')}
+                />
+
                 <button
                   type="submit"
                   className="btn btn-gold"

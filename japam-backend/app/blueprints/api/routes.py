@@ -202,6 +202,17 @@ def submit_product_review(slug):
         return jsonify({"error": f"Product with slug '{slug}' not found"}), 404
 
     data = request.get_json() or {}
+    # Google reCAPTCHA v2 verification
+    captcha_token = data.get("recaptcha_token") or data.get("captcha_token") or data.get("recaptchaToken")
+    remote_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+    if remote_ip and "," in remote_ip:
+        remote_ip = remote_ip.split(",")[0].strip()
+
+    from app.services.captcha_service import CaptchaService
+    is_valid, captcha_err = CaptchaService.verify(captcha_token, remote_ip)
+    if not is_valid:
+        return jsonify({"error": captcha_err}), 400
+
     name = (data.get("customer_name") or data.get("name") or "").strip()
     email = (data.get("customer_email") or data.get("email") or "").strip().lower()
     comment = (data.get("comment") or data.get("review") or "").strip()
@@ -339,6 +350,17 @@ def get_availability_slots():
 @api_v1_bp.route("/services/book-puja", methods=["POST"])
 def book_puja():
     data = request.get_json() or {}
+    # Google reCAPTCHA v2 verification
+    captcha_token = data.get("recaptcha_token") or data.get("captcha_token") or data.get("recaptchaToken")
+    remote_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+    if remote_ip and "," in remote_ip:
+        remote_ip = remote_ip.split(",")[0].strip()
+
+    from app.services.captcha_service import CaptchaService
+    is_valid, captcha_err = CaptchaService.verify(captcha_token, remote_ip)
+    if not is_valid:
+        return jsonify({"error": captcha_err}), 400
+
 
     customer_name = (data.get("customer_name") or data.get("name") or "").strip()
     raw_email = (data.get("customer_email") or data.get("email") or "").strip()
@@ -499,6 +521,17 @@ def book_puja():
 @api_v1_bp.route("/services/request-consultation", methods=["POST"])
 def request_consultation():
     data = request.get_json() or {}
+    # Google reCAPTCHA v2 verification
+    captcha_token = data.get("recaptcha_token") or data.get("captcha_token") or data.get("recaptchaToken")
+    remote_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+    if remote_ip and "," in remote_ip:
+        remote_ip = remote_ip.split(",")[0].strip()
+
+    from app.services.captcha_service import CaptchaService
+    is_valid, captcha_err = CaptchaService.verify(captcha_token, remote_ip)
+    if not is_valid:
+        return jsonify({"error": captcha_err}), 400
+
 
     customer_name = (data.get("customer_name") or data.get("name") or "").strip()
     customer_email = (data.get("customer_email") or data.get("email") or "").strip()
@@ -965,6 +998,17 @@ def api_checkout():
     """
     import secrets
     data = request.get_json() or {}
+    # Google reCAPTCHA v2 verification
+    captcha_token = data.get("recaptcha_token") or data.get("captcha_token") or data.get("recaptchaToken")
+    remote_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+    if remote_ip and "," in remote_ip:
+        remote_ip = remote_ip.split(",")[0].strip()
+
+    from app.services.captcha_service import CaptchaService
+    is_valid, captcha_err = CaptchaService.verify(captcha_token, remote_ip)
+    if not is_valid:
+        return jsonify({"error": captcha_err}), 400
+
     customer_name = data.get("customer_name", "").strip()
     customer_email = data.get("customer_email", "").strip().lower()
     customer_phone = data.get("customer_phone", "").strip()
@@ -990,6 +1034,31 @@ def api_checkout():
 
     if not raw_items:
         return jsonify({"error": "Cart cannot be empty"}), 400
+
+    # Strict COD removal: Reject Cash on Delivery completely from storefront checkout
+    raw_method_check = str(data.get("payment_method") or "").strip().lower()
+    if raw_method_check in ("cash on delivery", "cod", "pay on delivery"):
+        return jsonify({"error": "Cash on Delivery is not available for this checkout."}), 400
+
+    from app.services.payment_mode_service import PaymentModeService
+    from app.services.whatsapp_service import WhatsAppNotificationService
+
+    current_payment_mode = PaymentModeService.get_payment_mode()
+    client_payment_mode = str(data.get("payment_mode") or "").strip().lower()
+
+    # Strict mode enforcement: prevent stale tabs from bypassing active mode
+    if current_payment_mode == "offline":
+        if client_payment_mode == "online" or raw_method_check in ("razorpay", "online", "card"):
+            return jsonify({"error": "Store is currently in Offline Payment Mode. Online checkout is disabled."}), 400
+        order_payment_method = "Offline Payment"
+        order_payment_status = "offline_pending"
+        notes_record = "Payment Mode: OFFLINE PAYMENT (WhatsApp / Direct Devotee Confirmation)"
+    else:
+        if client_payment_mode == "offline" or raw_method_check in ("offline payment", "whatsapp order", "whatsapp checkout", "offline / direct upi / bank transfer"):
+            return jsonify({"error": "Store is currently in Online Payment Mode. Offline checkout is disabled."}), 400
+        order_payment_method = "Razorpay"
+        order_payment_status = "pending"
+        notes_record = "Payment Mode: ONLINE GATEWAY (Awaiting Verification/Capture)"
 
     # Idempotency check: if client sent an idempotency key and order exists, return existing order
     if idempotency_key:
@@ -1108,25 +1177,6 @@ def api_checkout():
 
         # Generate high-entropy order access token for customer ownership protection
         order_access_token = secrets.token_urlsafe(32)
-
-        from app.services.payment_mode_service import PaymentModeService
-        from app.services.whatsapp_service import WhatsAppNotificationService
-
-        current_payment_mode = PaymentModeService.get_payment_mode()
-
-        if current_payment_mode == "offline":
-            raw_method = data.get("payment_method") or "Offline Payment"
-            # When offline mode is active, prevent online gateway assignment
-            if raw_method.lower() in ("razorpay", "online", "card"):
-                order_payment_method = "Offline Payment"
-            else:
-                order_payment_method = raw_method
-            order_payment_status = "offline_pending"
-            notes_record = "Payment Mode: OFFLINE PAYMENT (Pending Devotee Confirmation)"
-        else:
-            order_payment_method = payment_method or "Razorpay"
-            order_payment_status = "pending"
-            notes_record = "Payment Mode: ONLINE GATEWAY (Awaiting Verification/Capture)"
 
         order = Order(
             order_number=order_number,
@@ -1456,8 +1506,14 @@ def payment_create_order():
         if not is_owner:
             return jsonify({"error": err_msg or "Unauthorized"}), 403
 
+        if order.payment_method == "Offline Payment" or order.payment_status == "offline_pending":
+            return jsonify({"error": "Cannot verify online payment for an offline order."}), 400
+
         if order.payment_status == "paid":
             return jsonify({"error": "Order is already paid"}), 400
+
+        if order.payment_method == "Offline Payment" or order.payment_status == "offline_pending":
+            return jsonify({"error": "Cannot create online payment order for an offline order."}), 400
 
         amount_paise = int(order.total_amount * 100)
         receipt = f"rcpt_{order.order_number.replace('#', '')}"[:40]
@@ -1552,6 +1608,11 @@ def payment_verify():
     from app.services.razorpay_service import RazorpayService
     from app.services.audit_service import AuditService
     from app.services.whatsapp_service import WhatsAppNotificationService
+    from app.services.payment_mode_service import PaymentModeService
+
+    current_mode = PaymentModeService.get_payment_mode()
+    if current_mode == "offline":
+        return jsonify({"error": "Store is currently in Offline Payment Mode. Online payment verification is disabled."}), 400
 
     # Cryptographic signature verification using official Razorpay SDK
     valid, err = RazorpayService.verify_payment_signature(
@@ -1578,6 +1639,9 @@ def payment_verify():
         is_owner, err_msg = _verify_order_ownership(order)
         if not is_owner:
             return jsonify({"error": err_msg or "Unauthorized"}), 403
+
+        if order.payment_method == "Offline Payment" or order.payment_status == "offline_pending":
+            return jsonify({"error": "Cannot verify online payment for an offline order."}), 400
 
         # Idempotency check: Has this transaction already been recorded or order paid?
         existing_txn = PaymentTransaction.query.filter_by(gateway_payment_id=razorpay_payment_id).first()
@@ -1729,6 +1793,9 @@ def payment_failure():
         is_owner, err_msg = _verify_order_ownership(order)
         if not is_owner:
             return jsonify({"error": err_msg or "Unauthorized"}), 403
+
+        if order.payment_method == "Offline Payment" or order.payment_status == "offline_pending":
+            return jsonify({"error": "Cannot verify online payment for an offline order."}), 400
 
         if order.payment_status != "paid":
             fail_txn_num = f"TXN-FAIL-{order.order_number.replace('#', '')}-{int(datetime.now(timezone.utc).timestamp())}"
@@ -1932,6 +1999,17 @@ def return_order_api(order_number):
 def submit_contact_enquiry():
     """Submit customer enquiry / contact seva form."""
     data = request.get_json() or {}
+    # Google reCAPTCHA v2 verification
+    captcha_token = data.get("recaptcha_token") or data.get("captcha_token") or data.get("recaptchaToken")
+    remote_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+    if remote_ip and "," in remote_ip:
+        remote_ip = remote_ip.split(",")[0].strip()
+
+    from app.services.captcha_service import CaptchaService
+    is_valid, captcha_err = CaptchaService.verify(captcha_token, remote_ip)
+    if not is_valid:
+        return jsonify({"error": captcha_err}), 400
+
     name = (data.get("name") or data.get("customer_name") or "").strip()
     email = (data.get("email") or data.get("customer_email") or "").strip().lower()
     subject = (data.get("subject") or "").strip()
@@ -2197,18 +2275,25 @@ def get_public_payment_mode():
     Public REST API endpoint returning current authoritative payment mode
     ('online' or 'offline') and configured offline instructions.
     """
-    from app.services.payment_mode_service import PaymentModeService
-    mode = PaymentModeService.get_payment_mode()
-    instructions = PaymentModeService.get_offline_payment_instructions()
-    qr_code = PaymentModeService.get_offline_qr_code()
-    return jsonify({
-        "payment_mode": mode,
-        "is_offline": mode == "offline",
-        "offline_payment_instructions": instructions,
-        "instructions": instructions,
-        "offline_qr_code": qr_code,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    })
+    try:
+        from app.services.payment_mode_service import PaymentModeService
+        from app.services.whatsapp_service import WhatsAppNotificationService
+        mode = PaymentModeService.get_payment_mode()
+        instructions = PaymentModeService.get_offline_payment_instructions()
+        qr_code = PaymentModeService.get_offline_qr_code()
+        admin_phone = WhatsAppNotificationService.get_admin_phone()
+        return jsonify({
+            "payment_mode": mode,
+            "is_offline": mode == "offline",
+            "offline_payment_instructions": instructions,
+            "instructions": instructions,
+            "offline_qr_code": qr_code,
+            "whatsapp_number": admin_phone,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception as e:
+        current_app.logger.error("Failed to retrieve payment mode: %s", e)
+        return jsonify({"error": "Failed to retrieve payment mode", "details": str(e)}), 500
 
 
 

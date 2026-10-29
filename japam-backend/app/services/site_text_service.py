@@ -123,7 +123,7 @@ DEFAULT_SITE_TEXTS = {
         "brand_desc": "परंपरेतून मार्गदर्शन, श्रद्धेतून समाधान. 25 वर्षांहून अधिक अनुभव — पूजा, ज्योतिष, रत्न, रुद्राक्ष, यंत्र आणि ब्रेसलेट.",
         "shloka": "॥ सर्वे भवन्तु सुखिनः ॥",
         "phone": "+91 90000 00000",
-        "email": "seva@astroveda.in",
+        "email": "nagesh@gmail.com",
         "whatsapp_url": "https://wa.me/919000000000",
     },
 }

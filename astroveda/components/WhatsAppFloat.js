@@ -6,9 +6,9 @@
  * or update the fallback constants below with the website owner's verified profile URLs.
  */
 export const OFFICIAL_SOCIAL_PROFILES = {
-  instagram: process.env.NEXT_PUBLIC_INSTAGRAM_URL || 'https://www.instagram.com/astroveda', // [ACTION REQUIRED: Verify / update with real official Instagram profile URL]
-  linkedin: process.env.NEXT_PUBLIC_LINKEDIN_URL || 'https://www.linkedin.com/company/astroveda', // [ACTION REQUIRED: Verify / update with real official LinkedIn profile URL]
-  facebook: process.env.NEXT_PUBLIC_FACEBOOK_URL || 'https://www.facebook.com/astroveda', // [ACTION REQUIRED: Verify / update with real official Facebook profile URL]
+  instagram: process.env.NEXT_PUBLIC_INSTAGRAM_URL || 'https://www.instagram.com/swamiguruji', // [ACTION REQUIRED: Verify / update with real official Instagram profile URL]
+  linkedin: process.env.NEXT_PUBLIC_LINKEDIN_URL || 'https://www.linkedin.com/company/swamiguruji', // [ACTION REQUIRED: Verify / update with real official LinkedIn profile URL]
+  facebook: process.env.NEXT_PUBLIC_FACEBOOK_URL || 'https://www.facebook.com/swamiguruji', // [ACTION REQUIRED: Verify / update with real official Facebook profile URL]
 };
 
 export default function WhatsAppFloat() {

@@ -461,7 +461,7 @@ export default function WelcomeOfferModal() {
           >
             <span style={{ fontSize: '12px' }}>🕉️</span>
             <span style={{ fontSize: '10px', color: 'var(--gold-lt)', letterSpacing: '1px', textTransform: 'uppercase' }}>
-              AstroVeda
+              Swami Guruji
             </span>
           </div>
         </div>

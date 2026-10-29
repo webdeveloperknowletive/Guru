@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useStore } from '@/context/StoreContext';
 import OfflinePaymentBox from '@/components/OfflinePaymentBox';
+import ReCaptcha from '@/components/ReCaptcha';
 
 export default function CheckoutModal() {
   const {
@@ -18,10 +19,16 @@ export default function CheckoutModal() {
     submitCheckout,
     openTracking,
     paymentMode,
+    paymentModeLoading,
+    paymentModeError,
+    refreshPaymentMode,
+    businessWhatsappNumber,
     offlineInstructions,
     offlineQrCode,
   } = useStore();
 
+  const [captchaToken, setCaptchaToken] = useState('');
+  const recaptchaRef = useRef(null);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -31,7 +38,6 @@ export default function CheckoutModal() {
     city: '',
   });
 
-  const [paymentMethod, setPaymentMethod] = useState(paymentMode === 'offline' ? 'Offline / Direct UPI / Bank Transfer' : 'Razorpay');
   const [couponInput, setCouponInput] = useState(couponCode || '');
   const [localValidationErr, setLocalValidationErr] = useState('');
 
@@ -57,14 +63,6 @@ export default function CheckoutModal() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [checkoutOpen, checkoutLoading, closeCheckout]);
-
-  useEffect(() => {
-    if (paymentMode === 'offline') {
-      setPaymentMethod('Offline / Direct UPI / Bank Transfer');
-    } else {
-      setPaymentMethod('Razorpay');
-    }
-  }, [paymentMode]);
 
   useEffect(() => {
     if (couponCode) {
@@ -96,6 +94,16 @@ export default function CheckoutModal() {
     e.preventDefault();
     setLocalValidationErr('');
 
+    if (paymentModeLoading) {
+      setLocalValidationErr('कृपया पेमेंट मोड लोड होण्याची प्रतीक्षा करा (Checking payment mode, please wait...)');
+      return;
+    }
+
+    if (!paymentMode || !['online', 'offline'].includes(paymentMode) || paymentModeError) {
+      setLocalValidationErr('पेमेंट मोड उपलब्ध नाही. कृपया रीट्राय (Retry) करा किंवा पेज रीलोड करा. (Payment mode unavailable. Please retry.)');
+      return;
+    }
+
     if (!form.name.trim()) {
       setLocalValidationErr('कृपया तुमचे पूर्ण नाव प्रविष्ट करा (Please enter your full name)');
       return;
@@ -114,15 +122,28 @@ export default function CheckoutModal() {
       return;
     }
 
-    await submitCheckout(
-      {
-        name: form.name,
-        email: form.email,
-        phone: form.phone,
-        address: fullAddress,
-      },
-      paymentMethod
-    );
+    if (!captchaToken) {
+      setLocalValidationErr('Please complete the CAPTCHA verification (कृपया कॅप्चा पूर्ण करा).');
+      setTimeout(() => {
+        const captchaEl = document.getElementById('recaptcha-checkout');
+        if (captchaEl) {
+          captchaEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 50);
+      return;
+    }
+
+    const res = await submitCheckout({
+      name: form.name,
+      email: form.email,
+      phone: form.phone,
+      address: fullAddress,
+      recaptcha_token: captchaToken,
+    });
+    if (!res || !res.success) {
+      recaptchaRef.current?.reset();
+      setCaptchaToken('');
+    }
   };
 
   const renderCheckoutThumb = (item) => {
@@ -278,13 +299,35 @@ export default function CheckoutModal() {
                 referenceNumber={lastOrder.order_number}
                 amount={lastOrder.total_amount}
                 customerName={lastOrder.customer_name}
-                whatsappUrl={`https://wa.me/919623117545?text=${encodeURIComponent(`Namaste! I have placed an order (${lastOrder.order_number}) for ₹${lastOrder.total_amount}. Here is my payment confirmation screenshot:`)}`}
+                whatsappUrl={lastOrder.whatsapp_url || `https://wa.me/${(businessWhatsappNumber || '919623117545').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Namaste! I have placed order ${lastOrder.order_number} for ₹${lastOrder.total_amount}. Here is my payment confirmation screenshot:`)}`}
                 whatsappButtonText="💬 Share Payment Screenshot on WhatsApp"
                 title="Offline Payment Instructions / पेमेंट पद्धत"
               />
             )}
 
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              {lastOrder.whatsapp_url && (
+                <a
+                  href={lastOrder.whatsapp_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn"
+                  style={{
+                    padding: '12px 24px',
+                    borderRadius: '99px',
+                    background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                    color: '#fff',
+                    border: 'none',
+                    fontWeight: '700',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 14px rgba(37, 211, 102, 0.3)',
+                  }}
+                >
+                  💬 Open WhatsApp Chat
+                </a>
+              )}
               <button
                 className="btn btn-gold"
                 onClick={() => {
@@ -303,7 +346,7 @@ export default function CheckoutModal() {
                 Continue Shopping
               </button>
               <a
-                href={`https://wa.me/919000000000?text=${encodeURIComponent('Hello Guruji, I have placed order ' + lastOrder.order_number)}`}
+                href={lastOrder.whatsapp_url || `https://wa.me/${(businessWhatsappNumber || '919623117545').replace(/[^0-9]/g, '')}?text=${encodeURIComponent('Hello Guruji, I have placed order ' + lastOrder.order_number)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn btn-ghost"
@@ -427,128 +470,128 @@ export default function CheckoutModal() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                       <label style={{ margin: 0 }}>Payment Method · पेमेंट पर्याय</label>
                       {paymentMode === 'offline' && (
-                        <span style={{ fontSize: '11px', color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', padding: '2px 8px', borderRadius: '4px', fontWeight: '600' }}>
+                        <span style={{ fontSize: '11px', color: '#f59e0b', background: 'rgba(245, 158, 11, 0.12)', padding: '2px 8px', borderRadius: '4px', fontWeight: '600' }}>
                           Offline Mode Active
+                        </span>
+                      )}
+                      {paymentMode === 'online' && (
+                        <span style={{ fontSize: '11px', color: '#10b981', background: 'rgba(16, 185, 129, 0.12)', padding: '2px 8px', borderRadius: '4px', fontWeight: '600' }}>
+                          Online Mode Active
                         </span>
                       )}
                     </div>
 
-                    {paymentMode === 'offline' ? (
-                      <div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '8px' }}>
-                          <label
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '8px',
-                              padding: '12px 14px',
-                              borderRadius: '8px',
-                              border: paymentMethod === 'Offline / Direct UPI / Bank Transfer' ? '1px solid var(--gold)' : '1px solid rgba(224,176,74,0.15)',
-                              background: paymentMethod === 'Offline / Direct UPI / Bank Transfer' ? 'rgba(224,176,74,0.08)' : 'rgba(255,255,255,0.02)',
-                              cursor: 'pointer',
-                              fontSize: '12.5px',
-                              color: 'var(--cream)',
-                            }}
+                    {paymentModeLoading ? (
+                      <div style={{ padding: '14px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(224,176,74,0.15)', color: 'var(--muted)', fontSize: '12.5px', textAlign: 'center' }}>
+                        ⏳ Checking storefront payment configuration...
+                      </div>
+                    ) : paymentModeError || !paymentMode || !['online', 'offline'].includes(paymentMode) ? (
+                      <div style={{ padding: '14px', borderRadius: '8px', background: 'rgba(255, 95, 138, 0.1)', border: '1px solid rgba(255, 95, 138, 0.3)', color: '#ff8da9', fontSize: '12.5px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>⚠️ {paymentModeError || 'Payment configuration could not be loaded.'}</span>
+                          <button
+                            type="button"
+                            onClick={refreshPaymentMode}
+                            className="btn btn-ghost"
+                            style={{ padding: '4px 10px', fontSize: '11px' }}
                           >
-                            <input
-                              type="radio"
-                              name="paymentMethod"
-                              value="Offline / Direct UPI / Bank Transfer"
-                              checked={paymentMethod === 'Offline / Direct UPI / Bank Transfer'}
-                              onChange={() => setPaymentMethod('Offline / Direct UPI / Bank Transfer')}
-                            />
-                            <span>🏦 UPI / Bank Transfer</span>
-                          </label>
-
-                          <label
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '8px',
-                              padding: '12px 14px',
-                              borderRadius: '8px',
-                              border: paymentMethod === 'Cash on Delivery' ? '1px solid var(--gold)' : '1px solid rgba(224,176,74,0.15)',
-                              background: paymentMethod === 'Cash on Delivery' ? 'rgba(224,176,74,0.08)' : 'rgba(255,255,255,0.02)',
-                              cursor: 'pointer',
-                              fontSize: '12.5px',
-                              color: 'var(--cream)',
-                            }}
-                          >
-                            <input
-                              type="radio"
-                              name="paymentMethod"
-                              value="Cash on Delivery"
-                              checked={paymentMethod === 'Cash on Delivery'}
-                              onChange={() => setPaymentMethod('Cash on Delivery')}
-                            />
-                            <span>💵 Pay on Delivery</span>
-                          </label>
+                            🔄 Retry
+                          </button>
                         </div>
-                        <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: 'var(--muted)' }}>
-                          ℹ️ No online card gateway required. Order is saved with pending status; follow offline transfer instructions upon confirmation.
+                      </div>
+                    ) : paymentMode === 'offline' ? (
+                      <div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '12px 14px',
+                            borderRadius: '8px',
+                            border: '1px solid #25D366',
+                            background: 'rgba(37, 211, 102, 0.08)',
+                            fontSize: '13px',
+                            color: 'var(--cream)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '20px' }}>💬</span>
+                            <div>
+                              <div style={{ fontWeight: '700', color: '#86efac' }}>
+                                WhatsApp Checkout (Offline Mode)
+                              </div>
+                              <div style={{ fontSize: '11.5px', color: 'var(--muted)' }}>
+                                Direct devotee order verification &amp; offline transfer
+                              </div>
+                            </div>
+                          </div>
+                          <span style={{ fontSize: '11px', color: '#86efac', fontWeight: '700' }}>
+                            ✓ WhatsApp Order
+                          </span>
+                        </div>
+                        <p style={{ margin: '6px 0 0', fontSize: '11.5px', color: 'var(--muted)' }}>
+                          ℹ️ No online card gateway required. Order details will be sent directly to official WhatsApp ({businessWhatsappNumber ? `+${businessWhatsappNumber}` : '+91 96231 17545'}) with pending confirmation status.
                         </p>
                       </div>
                     ) : (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                        <label
+                      <div>
+                        <div
                           style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '8px',
+                            justifyContent: 'space-between',
                             padding: '12px 14px',
                             borderRadius: '8px',
-                            border: paymentMethod === 'Razorpay' ? '1px solid var(--gold)' : '1px solid rgba(224,176,74,0.15)',
-                            background: paymentMethod === 'Razorpay' ? 'rgba(224,176,74,0.08)' : 'rgba(255,255,255,0.02)',
-                            cursor: 'pointer',
+                            border: '1px solid var(--gold)',
+                            background: 'rgba(224, 176, 74, 0.08)',
                             fontSize: '13px',
                             color: 'var(--cream)',
                           }}
                         >
-                          <input
-                            type="radio"
-                            name="paymentMethod"
-                            value="Razorpay"
-                            checked={paymentMethod === 'Razorpay'}
-                            onChange={() => setPaymentMethod('Razorpay')}
-                          />
-                          <span>💳 Razorpay / UPI</span>
-                        </label>
-
-                        <label
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '12px 14px',
-                            borderRadius: '8px',
-                            border: paymentMethod === 'Cash on Delivery' ? '1px solid var(--gold)' : '1px solid rgba(224,176,74,0.15)',
-                            background: paymentMethod === 'Cash on Delivery' ? 'rgba(224,176,74,0.08)' : 'rgba(255,255,255,0.02)',
-                            cursor: 'pointer',
-                            fontSize: '13px',
-                            color: 'var(--cream)',
-                          }}
-                        >
-                          <input
-                            type="radio"
-                            name="paymentMethod"
-                            value="Cash on Delivery"
-                            checked={paymentMethod === 'Cash on Delivery'}
-                            onChange={() => setPaymentMethod('Cash on Delivery')}
-                          />
-                          <span>💵 Pay on Delivery</span>
-                        </label>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '20px' }}>💳</span>
+                            <div>
+                              <div style={{ fontWeight: '700', color: 'var(--gold-lt)' }}>
+                                Razorpay Secure Payment
+                              </div>
+                              <div style={{ fontSize: '11.5px', color: 'var(--muted)' }}>
+                                UPI (GPay, PhonePe, Paytm), Credit/Debit Cards, Net Banking
+                              </div>
+                            </div>
+                          </div>
+                          <span style={{ fontSize: '11px', color: 'var(--gold-lt)', fontWeight: '700' }}>
+                            ✓ 100% Encrypted
+                          </span>
+                        </div>
                       </div>
                     )}
                   </div>
                 </div>
 
+                <div style={{ marginTop: '12px', marginBottom: '4px' }}>
+                  <ReCaptcha
+                    id="recaptcha-checkout"
+                    ref={recaptchaRef}
+                    onChange={setCaptchaToken}
+                    onExpired={() => setCaptchaToken('')}
+                    onError={() => setCaptchaToken('')}
+                  />
+                </div>
+
                 <button
                   type="submit"
-                  className="btn btn-gold"
-                  disabled={checkoutLoading || cart.length === 0}
+                  className={paymentMode === 'offline' ? 'btn' : 'btn btn-gold'}
+                  disabled={
+                    checkoutLoading ||
+                    cart.length === 0 ||
+                    paymentModeLoading ||
+                    !paymentMode ||
+                    !['online', 'offline'].includes(paymentMode) ||
+                    !!paymentModeError
+                  }
                   style={{
                     width: '100%',
-                    marginTop: '24px',
+                    marginTop: '16px',
                     padding: '14px 22px',
                     fontSize: '14px',
                     fontWeight: '700',
@@ -558,16 +601,25 @@ export default function CheckoutModal() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
+                    background: paymentMode === 'offline'
+                      ? 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)'
+                      : undefined,
+                    color: paymentMode === 'offline' ? '#ffffff' : undefined,
+                    border: 'none',
+                    cursor: (checkoutLoading || cart.length === 0 || paymentModeLoading || !paymentMode || !!paymentModeError) ? 'not-allowed' : 'pointer',
+                    boxShadow: paymentMode === 'offline' ? '0 4px 14px rgba(37, 211, 102, 0.35)' : undefined,
                   }}
                 >
                   {checkoutLoading ? (
                     <span>Processing Sacred Order...</span>
+                  ) : paymentModeLoading ? (
+                    <span>Loading Checkout Mode...</span>
+                  ) : paymentModeError || !paymentMode || !['online', 'offline'].includes(paymentMode) ? (
+                    <span>⚠️ Checkout Mode Unavailable</span>
                   ) : paymentMode === 'offline' ? (
-                    <span>Confirm &amp; Place Order (Offline Payment) → ₹{serverCart.total_amount ? Number(serverCart.total_amount).toLocaleString('en-IN') : '0'}</span>
-                  ) : paymentMethod === 'Cash on Delivery' ? (
-                    <span>Confirm Order (Pay on Delivery) → ₹{serverCart.total_amount ? Number(serverCart.total_amount).toLocaleString('en-IN') : '0'}</span>
+                    <span>💬 Order via WhatsApp / व्हॉट्सॲपवर ऑर्डर करा → ₹{serverCart.total_amount ? Number(serverCart.total_amount).toLocaleString('en-IN') : '0'}</span>
                   ) : (
-                    <span>Pay with Razorpay / ऑनलाइन पे करा → ₹{serverCart.total_amount ? Number(serverCart.total_amount).toLocaleString('en-IN') : '0'}</span>
+                    <span>💳 Pay with Razorpay / ऑनलाइन पे करा → ₹{serverCart.total_amount ? Number(serverCart.total_amount).toLocaleString('en-IN') : '0'}</span>
                   )}
                 </button>
                 <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--muted)', marginTop: '8px' }}>

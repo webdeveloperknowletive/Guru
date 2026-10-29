@@ -2,7 +2,7 @@ export default function CheckoutSection() {
   const steps = [
     { n: '1', title: 'Cart', desc: 'तुमची निवडलेली उत्पादने पहा व verify करा.' },
     { n: '2', title: 'Address', desc: 'Delivery address आणि contact details भरा.' },
-    { n: '3', title: 'Payment', desc: 'UPI, Cards, Net Banking, Wallets किंवा COD.' },
+    { n: '3', title: 'Payment', desc: 'Secure Online Gateway किंवा Direct WhatsApp.' },
     { n: '4', title: 'Confirmation', desc: 'Order ID + WhatsApp + Email/SMS confirmation.' }
   ];
 
@@ -28,7 +28,6 @@ export default function CheckoutSection() {
           <span>💳 Cards</span>
           <span>🏦 Net Banking</span>
           <span>👛 Wallets</span>
-          <span>💵 COD</span>
         </div>
       </div>
     </section>

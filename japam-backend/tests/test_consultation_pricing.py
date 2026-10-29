@@ -17,6 +17,7 @@ def test_janma_kundali_hard_copy_pricing(client, app):
             "package_type": "hard-copy",
             "package_name": "Hard Copy — Printed Hard Copy with Kundali Consultation",
             "amount": 1001,
+            "recaptcha_token": "test-valid-recaptcha-token",
         }
         res = client.post(
             "/api/v1/services/request-consultation",
@@ -51,6 +52,7 @@ def test_janma_kundali_soft_copy_pricing(client, app):
             "package_type": "soft-copy",
             "package_name": "Soft Copy — Digital Kundali Report",
             "amount": 101,
+            "recaptcha_token": "test-valid-recaptcha-token",
         }
         res = client.post(
             "/api/v1/services/request-consultation",
@@ -94,6 +96,7 @@ def test_all_seven_other_services_diwali_offer(client, app):
                 "tob": "10:00 AM",
                 "pob": "Mumbai",
                 "amount": 101,
+            "recaptcha_token": "test-valid-recaptcha-token",
             }
             if sid == "marriage-matching":
                 payload["person1"] = {"name": "Groom A", "dob": "1990-01-01", "tob": "10:00 AM", "pob": "Mumbai"}
@@ -129,6 +132,7 @@ def test_backend_rejects_price_tampering(client, app):
             "pob": "Delhi",
             "package_type": "hard-copy",
             "amount": 1,  # Manipulated!
+            "recaptcha_token": "test-valid-recaptcha-token",
         }
         res = client.post(
             "/api/v1/services/request-consultation",
@@ -151,6 +155,7 @@ def test_backend_rejects_invalid_janma_package(client, app):
             "dob": "1995-01-01",
             "pob": "Delhi",
             "package_type": "super-vip-copy",
+            "recaptcha_token": "test-valid-recaptcha-token",
         }
         res = client.post(
             "/api/v1/services/request-consultation",

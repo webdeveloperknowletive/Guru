@@ -1,5 +1,5 @@
 
-# AstroVeda storefront - production
+# Storefront - production
 FROM node:22-alpine AS base
 
 # Shared runtime compatibility

@@ -181,7 +181,7 @@ export default function CookieConsentModal() {
                   color: 'rgba(255, 255, 255, 0.85)',
                 }}
               >
-                AstroVeda uses necessary cookies and protects your personal data (including birth details for sacred Kundali consultations and shipping address) under India's <strong>Digital Personal Data Protection Act, 2023</strong>.
+                Swami Guruji uses necessary cookies and protects your personal data (including birth details for sacred Kundali consultations and shipping address) under India's <strong>Digital Personal Data Protection Act, 2023</strong>.
               </p>
             </div>
           </div>
@@ -362,7 +362,7 @@ export default function CookieConsentModal() {
                 <span style={{ fontSize: '22px' }}>⚖️</span>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#f7dc9a' }}>
-                    AstroVeda Compliance &amp; Policies
+                    Swami Guruji Compliance &amp; Policies
                   </h3>
                   <span style={{ fontSize: '11.5px', color: 'rgba(255, 255, 255, 0.65)' }}>
                     Digital Personal Data Protection (DPDP) Act, 2023 · India
@@ -485,7 +485,7 @@ export default function CookieConsentModal() {
                     1. Notice Under Digital Personal Data Protection (DPDP) Act, 2023
                   </h4>
                   <p>
-                    AstroVeda (&ldquo;Data Fiduciary&rdquo;), under the spiritual guidance of Nagesh Swami Guruji (Nashik, Maharashtra, India), values your digital privacy and the sacred trust you place in us. In compliance with the <strong>Digital Personal Data Protection Act, 2023 (Act No. 22 of 2023, India)</strong>, this policy explains how your personal data is collected, processed, and safeguarded.
+                    Swami Guruji (&ldquo;Data Fiduciary&rdquo;), under the spiritual guidance of Nagesh Swami Guruji (Nashik, Maharashtra, India), values your digital privacy and the sacred trust you place in us. In compliance with the <strong>Digital Personal Data Protection Act, 2023 (Act No. 22 of 2023, India)</strong>, this policy explains how your personal data is collected, processed, and safeguarded.
                   </p>
 
                   <h5 style={{ color: '#f7dc9a', margin: '18px 0 6px' }}>2. Sacred Data We Collect</h5>
@@ -497,7 +497,7 @@ export default function CookieConsentModal() {
                       <strong>Order &amp; Delivery Information:</strong> Full name, shipping postal address, pin code, email address, and WhatsApp mobile number for tracking updates.
                     </li>
                     <li>
-                      <strong>Payment Information:</strong> Processed securely via RBI-licensed and PCI-DSS compliant Indian payment gateways (UPI, NetBanking, Credit/Debit Cards). AstroVeda does <em>never</em> store complete card numbers or CVV.
+                      <strong>Payment Information:</strong> Processed securely via RBI-licensed and PCI-DSS compliant Indian payment gateways (UPI, NetBanking, Credit/Debit Cards). We do <em>never</em> store complete card numbers or CVV.
                     </li>
                   </ul>
 
@@ -536,8 +536,8 @@ export default function CookieConsentModal() {
                       Data Protection &amp; Grievance Redressal Officer (India)
                     </strong>
                     <div style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.85)' }}>
-                      AstroVeda Spiritual Centre · Panchavati, Nashik, Maharashtra - 422003, India<br />
-                      Direct WhatsApp: <strong>+91 96231 17545</strong> · Email: <strong>support@astroveda.com</strong><br />
+                      Swami Guruji Spiritual Centre · Panchavati, Nashik, Maharashtra - 422003, India<br />
+                      Direct WhatsApp: <strong>+91 96231 17545</strong> · Email: <strong>nagesh@gmail.com</strong><br />
                       Response SLA: Within 48 business hours as mandated by Indian law.
                     </div>
                   </div>
@@ -551,7 +551,7 @@ export default function CookieConsentModal() {
                     Sacred Product Return &amp; Refund Policy
                   </h4>
                   <p>
-                    At AstroVeda, every Rudraksha, Gemstone, Yantra, and Bracelet is handled with the utmost sanctity, accompanied by lab certification and authentic Vedic pran-pratishtha. We stand firmly behind the sanctity and physical perfection of our sacred offerings.
+                    At Swami Guruji Spiritual Seva, every Rudraksha, Gemstone, Yantra, and Bracelet is handled with the utmost sanctity, accompanied by lab certification and authentic Vedic pran-pratishtha. We stand firmly behind the sanctity and physical perfection of our sacred offerings.
                   </p>
 
                   <h5 style={{ color: '#f7dc9a', margin: '18px 0 6px' }}>1. 7-Day Hassle-Free Replacement Guarantee</h5>
@@ -596,7 +596,7 @@ export default function CookieConsentModal() {
                     Manage Granular Cookie Preferences (DPDP Act, 2023)
                   </h4>
                   <p>
-                    In accordance with India&rsquo;s DPDP Act, you have granular control over which categories of digital cookies and identifiers AstroVeda can store on your browser.
+                    In accordance with India&rsquo;s DPDP Act, you have granular control over which categories of digital cookies and identifiers Swami Guruji can store on your browser.
                   </p>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '16px' }}>

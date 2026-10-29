@@ -84,7 +84,7 @@ DEFAULT_SECTION_ORDER = [
     },
     {
         "key": "why",
-        "name": "Why Choose AstroVeda",
+        "name": "Why Choose Swami Guruji",
         "desc": "Three generations of tradition, authentic lineage, and trust",
         "icon": "🛡️",
         "enabled": True,

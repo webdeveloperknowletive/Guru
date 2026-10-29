@@ -104,7 +104,7 @@ export const BRACELETS = [
 ];
 
 /**
- * Adapter that seamlessly maps any backend JAPAM API product into the Astroveda UI component schema.
+ * Adapter that seamlessly maps any backend JAPAM API product into the storefront UI component schema.
  */
 export function adaptApiProduct(p) {
   if (!p) return null;

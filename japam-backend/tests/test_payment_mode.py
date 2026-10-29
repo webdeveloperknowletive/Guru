@@ -119,7 +119,8 @@ def test_offline_product_checkout_flow(client, app):
             {"product_id": prod_id, "quantity": 2}
         ],
         "idempotency_key": "test-idem-offline-checkout-101",
-        "payment_mode": "offline"
+        "payment_mode": "offline",
+        "recaptcha_token": "test-valid-recaptcha-token"
     }
 
     res = client.post("/api/v1/orders/checkout", json=checkout_payload)
@@ -175,7 +176,8 @@ def test_offline_puja_booking_flow(client, app):
         "customer_phone": "9988776655",
         "gotra": "Kashyap",
         "sankalp_text": "Health and prosperity for family",
-        "payment_mode": "offline"
+        "payment_mode": "offline",
+        "recaptcha_token": "test-valid-recaptcha-token"
     }
 
     res = client.post("/api/v1/services/book-puja", json=payload)
@@ -213,7 +215,8 @@ def test_offline_consultation_request_flow(client, app):
         "tob": "14:30",
         "pob": "Kolkata, WB",
         "topic": "Career & Vedic Astrology guidance",
-        "payment_mode": "offline"
+        "payment_mode": "offline",
+        "recaptcha_token": "test-valid-recaptcha-token"
     }
 
     res = client.post("/api/v1/services/request-consultation", json=payload)
@@ -253,7 +256,8 @@ def test_admin_offline_payment_verification(client, app):
         },
         "items": [{"product_id": prod_id, "quantity": 1}],
         "idempotency_key": "test-idem-verify-offline-1",
-        "payment_mode": "offline"
+        "payment_mode": "offline",
+        "recaptcha_token": "test-valid-recaptcha-token"
     }
     res = client.post("/api/v1/orders/checkout", json=checkout_payload)
     order_id = res.get_json()["order_id"]
@@ -335,7 +339,8 @@ def test_mode_switching_preserves_existing_records(client, app):
             "pincode": "110016"
         },
         "items": [{"product_id": prod_id, "quantity": 1}],
-        "idempotency_key": "test-idem-preserve-1"
+        "idempotency_key": "test-idem-preserve-1",
+        "recaptcha_token": "test-valid-recaptcha-token"
     })
     order_id = res.get_json()["order_id"]
 
@@ -350,3 +355,169 @@ def test_mode_switching_preserves_existing_records(client, app):
         assert order.payment_status == "offline_pending"
         assert order.payment_method == "Offline Payment"
         assert order.order_status == "pending"
+
+
+def test_offline_mode_blocks_online_payment_api(client, app):
+    """Confirm direct calls to Razorpay order creation and payment verification
+    are rejected with 400 while store is in Offline Mode."""
+    with app.app_context():
+        admin = AdminUser.query.filter_by(email="super@japam.in").first()
+        PaymentModeService.set_payment_mode("offline", admin_user=admin)
+        prod = Product.query.filter_by(sku="RM-001").first()
+        prod_id = prod.id
+
+    # Create an offline order
+    res = client.post("/api/v1/orders/checkout", json={
+        "customer_name": "Suresh Raina",
+        "customer_email": "suresh@example.com",
+        "customer_phone": "9811223344",
+        "shipping_address": "Flat 10, MG Road, Pune, 411001",
+        "items": [{"product_id": prod_id, "quantity": 1}],
+        "payment_mode": "offline",
+        "recaptcha_token": "test-valid-recaptcha-token"
+    })
+    assert res.status_code == 201
+    order_data = res.get_json()
+    order_num = order_data["order_number"]
+    token = order_data["access_token"]
+
+    # 1. Attempt to create Razorpay order directly while in Offline Mode -> must be rejected
+    create_res = client.post("/api/v1/payments/create-order", json={
+        "order_number": order_num,
+        "token": token,
+    })
+    assert create_res.status_code == 400
+    assert "offline payment mode" in create_res.get_json()["error"].lower()
+
+    # 2. Attempt to verify payment directly while in Offline Mode -> must be rejected
+    verify_res = client.post("/api/v1/payments/verify", json={
+        "order_number": order_num,
+        "token": token,
+        "razorpay_order_id": "order_fake_123",
+        "razorpay_payment_id": "pay_fake_123",
+        "razorpay_signature": "sig_fake_123",
+    })
+    assert verify_res.status_code == 400
+    assert "offline payment mode" in verify_res.get_json()["error"].lower()
+
+
+def test_cod_completely_rejected_in_all_modes(client, app):
+    """Verify Cash on Delivery (COD) is rejected in both Offline and Online modes."""
+    with app.app_context():
+        prod = Product.query.filter_by(sku="RM-001").first()
+        prod_id = prod.id
+
+    for mode in ("offline", "online"):
+        with app.app_context():
+            admin = AdminUser.query.filter_by(email="super@japam.in").first()
+            PaymentModeService.set_payment_mode(mode, admin_user=admin)
+
+        for cod_variant in ("Cash on Delivery", "Pay on Delivery", "COD"):
+            res = client.post("/api/v1/orders/checkout", json={
+                "customer_name": "Test Customer",
+                "customer_email": "test@example.com",
+                "customer_phone": "9876543210",
+                "shipping_address": "Test Street, Pune",
+                "items": [{"product_id": prod_id, "quantity": 1}],
+                "payment_mode": mode,
+                "payment_method": cod_variant,
+                "recaptcha_token": "test-valid-recaptcha-token",
+            })
+            assert res.status_code == 400
+            err_msg = res.get_json().get("error", "").lower()
+            assert "cash on delivery" in err_msg or "not available" in err_msg
+
+
+def test_mode_enforcement_stale_tab_rejection(client, app):
+    """Test backend enforcement when a client tab submits an out-of-sync payment mode."""
+    with app.app_context():
+        prod = Product.query.filter_by(sku="RM-001").first()
+        prod_id = prod.id
+
+    # 1. Backend is OFFLINE, client submits ONLINE
+    with app.app_context():
+        admin = AdminUser.query.filter_by(email="super@japam.in").first()
+        PaymentModeService.set_payment_mode("offline", admin_user=admin)
+
+    res1 = client.post("/api/v1/orders/checkout", json={
+        "customer_name": "Stale Tab User",
+        "customer_email": "stale@example.com",
+        "customer_phone": "9876543210",
+        "shipping_address": "Address 1, Pune",
+        "items": [{"product_id": prod_id, "quantity": 1}],
+        "payment_mode": "online",
+        "payment_method": "Razorpay",
+        "recaptcha_token": "test-valid-recaptcha-token",
+    })
+    assert res1.status_code == 400
+    assert "offline payment mode" in res1.get_json()["error"].lower()
+
+    # 2. Backend is ONLINE, client submits OFFLINE
+    with app.app_context():
+        admin = AdminUser.query.filter_by(email="super@japam.in").first()
+        PaymentModeService.set_payment_mode("online", admin_user=admin)
+
+    res2 = client.post("/api/v1/orders/checkout", json={
+        "customer_name": "Stale Tab User 2",
+        "customer_email": "stale2@example.com",
+        "customer_phone": "9876543210",
+        "shipping_address": "Address 2, Pune",
+        "items": [{"product_id": prod_id, "quantity": 1}],
+        "payment_mode": "offline",
+        "payment_method": "WhatsApp Order",
+        "recaptcha_token": "test-valid-recaptcha-token",
+    })
+    assert res2.status_code == 400
+    assert "online payment mode" in res2.get_json()["error"].lower()
+
+
+def test_online_razorpay_checkout_and_failure_flow(client, app):
+    """Test Online mode checkout creates order in pending status, generates Razorpay order,
+    and payment failure endpoint records failure without marking order paid."""
+    with app.app_context():
+        admin = AdminUser.query.filter_by(email="super@japam.in").first()
+        PaymentModeService.set_payment_mode("online", admin_user=admin)
+        prod = Product.query.filter_by(sku="RM-001").first()
+        prod_id = prod.id
+
+    res = client.post("/api/v1/orders/checkout", json={
+        "customer_name": "Online Devotee",
+        "customer_email": "online@example.com",
+        "customer_phone": "9812345678",
+        "shipping_address": "77 Heritage Hills, Pune 411038",
+        "items": [{"product_id": prod_id, "quantity": 1}],
+        "payment_mode": "online",
+        "payment_method": "Razorpay",
+        "recaptcha_token": "test-valid-recaptcha-token",
+    })
+    assert res.status_code == 201
+    data = res.get_json()
+    assert data["payment_mode"] == "online"
+    assert data["payment_status"] == "pending"
+    assert data["payment_method"] == "Razorpay"
+    assert data["offline_payment"] is False
+    order_id = data["order_id"]
+    order_number = data["order_number"]
+    access_token = data["access_token"]
+
+    # Verify order in DB
+    with app.app_context():
+        order = db.session.get(Order, order_id)
+        assert order.payment_status == "pending"
+        assert order.order_status == "pending"
+
+    # Simulate payment failure / cancellation callback
+    fail_res = client.post("/api/v1/payments/failure", json={
+        "order_number": order_number,
+        "token": access_token,
+        "error_code": "BAD_REQUEST_ERROR",
+        "error_description": "Payment was cancelled or card declined",
+    })
+    assert fail_res.status_code == 200
+
+    # Ensure order is STILL pending and NOT paid
+    with app.app_context():
+        order = db.session.get(Order, order_id)
+        assert order.payment_status == "pending"
+        assert order.order_status == "pending"
+        assert "Payment Attempt Failed" in (order.admin_notes or "")

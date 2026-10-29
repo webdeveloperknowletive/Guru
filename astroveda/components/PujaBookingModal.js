@@ -1,8 +1,9 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from '@/context/StoreContext';
 import { getPujaServices, bookPuja, getGurujiProfile, getAvailabilitySlots } from '@/lib/api';
+import ReCaptcha from '@/components/ReCaptcha';
 
 export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle }) {
   const { showToast } = useStore();
@@ -27,6 +28,8 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
     sankalp: '',
   });
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const recaptchaRef = useRef(null);
   const [confirmedBooking, setConfirmedBooking] = useState(null);
 
   useEffect(() => {
@@ -134,6 +137,11 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
       return;
     }
 
+    if (!captchaToken) {
+      showToast('Please complete the CAPTCHA verification (कृपया कॅप्चा पूर्ण करा).');
+      return;
+    }
+
     setLoading(true);
     try {
       const email = form.email.trim() || null;
@@ -153,6 +161,7 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
         nakshatra: form.nakshatra.trim() || null,
         rashi: form.rashi.trim() || null,
         sankalp_text: form.sankalp.trim() || null,
+        recaptcha_token: captchaToken,
       });
 
       if (!res || !res.booking_number) {
@@ -213,6 +222,8 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
       });
       showToast(`Puja Booking Submitted: ${res.booking_number}`);
     } catch (err) {
+      recaptchaRef.current?.reset();
+      setCaptchaToken('');
       showToast(err.message || 'Booking failed, please try again.');
     } finally {
       setLoading(false);
@@ -614,7 +625,16 @@ export default function PujaBookingModal({ isOpen, onClose, selectedPujaTitle })
                 </div>
               </div>
 
-              <div style={{ marginTop: '22px' }}>
+              {/* Google reCAPTCHA v2 Checkbox */}
+              <ReCaptcha
+                id="recaptcha-puja"
+                ref={recaptchaRef}
+                onChange={setCaptchaToken}
+                onExpired={() => setCaptchaToken('')}
+                onError={() => setCaptchaToken('')}
+              />
+
+              <div style={{ marginTop: '16px' }}>
                 <button
                   type="submit"
                   className="btn"

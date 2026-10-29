@@ -1,5 +1,5 @@
 /**
- * Storefront Analytics & Live Telemetry Client for AstroVeda
+ * Storefront Analytics & Live Telemetry Client for Swami Guruji
  * Handles visitor identification, session management, foreground engagement timing,
  * and reliable beacon transport.
  */

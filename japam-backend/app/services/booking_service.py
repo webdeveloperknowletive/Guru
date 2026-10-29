@@ -62,7 +62,7 @@ class BookingService:
         is_whatsapp = (booking_type and booking_type.lower() == "whatsapp") or (payment_mode and payment_mode.lower() == "whatsapp")
         if is_whatsapp:
             initial_status = status if status else "pending"
-            notes_text = "Mode: WHATSAPP | Method: WhatsApp Booking"
+            notes_text = f"Payment Mode: OFFLINE | Method: Offline Payment ({payment_method or 'WhatsApp Booking'})"
             booking_type = "whatsapp"
         else:
             initial_status = status if status else ("pending" if payment_mode == "offline" else "confirmed")

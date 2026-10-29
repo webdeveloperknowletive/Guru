@@ -5,6 +5,7 @@ import { useStore } from '@/context/StoreContext';
 import { requestConsultation, getConsultations, getAvailabilitySlots } from '@/lib/api';
 import { JYOTISH_SERVICES, JANMA_KUNDALI_PACKAGES, DIWALI_OFFER, getServiceById } from '@/config/jyotishServices';
 import OfflinePaymentBox from '@/components/OfflinePaymentBox';
+import ReCaptcha from '@/components/ReCaptcha';
 
 export default function JyotishSection({ sectionText }) {
   const kicker = sectionText?.kicker || 'Jyotish Consultation';
@@ -21,6 +22,8 @@ export default function JyotishSection({ sectionText }) {
   const [confirmedBooking, setConfirmedBooking] = useState(null);
   const [errors, setErrors] = useState({});
   const formRef = useRef(null);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const recaptchaRef = useRef(null);
 
   // Common customer & booking state
   const [availableSlots, setAvailableSlots] = useState([]);
@@ -318,10 +321,15 @@ export default function JyotishSection({ sectionText }) {
       return;
     }
 
+
+    if (!captchaToken) {
+      showToast('Please complete the CAPTCHA verification (कृपया कॅप्चा पूर्ण करा).');
+      return;
+    }
     setLoading(true);
 
     try {
-      const email = commonData.email.trim() || `${commonData.phone.replace(/[^\w]/g, '')}@astroveda.in`;
+      const email = commonData.email.trim() || `${commonData.phone.replace(/[^\w]/g, '')}@swamiguruji.in`;
 
       // Build service-specific payload
       const currentPayablePrice = selectedServiceId === 'janma-kundali'
@@ -443,6 +451,7 @@ export default function JyotishSection({ sectionText }) {
       }
 
       payload.payment_mode = paymentMode;
+      payload.recaptcha_token = captchaToken;
       payload.payment_method = paymentMode === 'offline' ? 'Offline Payment' : 'Online Video Consultation';
 
       const res = await requestConsultation(payload);
@@ -470,6 +479,8 @@ export default function JyotishSection({ sectionText }) {
         : `✓ Consultation नोंदणी यशस्वी: ${res.consultation_number}`
       );
     } catch (err) {
+      recaptchaRef.current?.reset();
+      setCaptchaToken('');
       showToast(err.message || 'त्रुटी आली, कृपया पुन्हा प्रयत्न करा.');
     } finally {
       setLoading(false);
@@ -479,6 +490,8 @@ export default function JyotishSection({ sectionText }) {
   const handleReset = () => {
     setConfirmedBooking(null);
     setErrors({});
+    recaptchaRef.current?.reset();
+    setCaptchaToken('');
   };
 
   return (
@@ -1700,6 +1713,15 @@ export default function JyotishSection({ sectionText }) {
                       />
                     </div>
                   </div>
+
+                  {/* Google reCAPTCHA v2 Checkbox */}
+                  <ReCaptcha
+                    id="recaptcha-jyotish"
+                    ref={recaptchaRef}
+                    onChange={setCaptchaToken}
+                    onExpired={() => setCaptchaToken('')}
+                    onError={() => setCaptchaToken('')}
+                  />
 
                   {/* Submission Action */}
                   <button

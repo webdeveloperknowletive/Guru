@@ -58,7 +58,7 @@ SECTION_LABELS = {
     "video-section": "Devotional Videos & Darshan",
     "testimonials-section": "Devotee Experiences & Reviews",
     "blog-section": "Spiritual Wisdom & Blog",
-    "why-section": "Why Choose AstroVeda",
+    "why-section": "Why Choose Swami Guruji",
     "about-section": "About Swami Guruji",
     "footer-section": "Footer Navigation & Contact",
     "cart-panel": "Cart & Basket Panel",
@@ -557,7 +557,7 @@ class AnalyticsService:
         writer = csv.writer(output)
 
         # Header
-        writer.writerow(["=== ASTROVEDA WEBSITE ANALYTICS & LIVE ACTIVITY REPORT ==="])
+        writer.writerow(["=== SWAMI GURUJI WEBSITE ANALYTICS & LIVE ACTIVITY REPORT ==="])
         writer.writerow(["Report Range:", range_label])
         writer.writerow(["Timezone:", "Asia/Kolkata (IST)"])
         writer.writerow(["Generated At:", datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S IST")])

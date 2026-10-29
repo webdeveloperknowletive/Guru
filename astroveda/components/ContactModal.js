@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import ReCaptcha from '@/components/ReCaptcha';
 import { useStore } from '@/context/StoreContext';
 import { submitContact } from '@/lib/api';
 
@@ -14,6 +15,8 @@ export default function ContactModal() {
   });
   const [loading, setLoading] = useState(false);
   const [submittedRef, setSubmittedRef] = useState(null);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const recaptchaRef = useRef(null);
 
   if (!contactModal?.show) return null;
 
@@ -29,6 +32,11 @@ export default function ContactModal() {
       return;
     }
 
+    if (!captchaToken) {
+      showToast('Please complete the CAPTCHA verification (कृपया कॅप्चा पूर्ण करा).');
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await submitContact({
@@ -37,6 +45,7 @@ export default function ContactModal() {
         phone: form.phone.trim(),
         subject: form.subject.trim(),
         message: form.message.trim(),
+        recaptcha_token: captchaToken,
       });
 
       setSubmittedRef(res.enquiry_number || res.enquiry_id || 'Submitted');
@@ -49,6 +58,8 @@ export default function ContactModal() {
         message: '',
       });
     } catch (err) {
+      recaptchaRef.current?.reset();
+      setCaptchaToken('');
       showToast(err.message || 'Error submitting enquiry. Please try again.');
     } finally {
       setLoading(false);
@@ -248,6 +259,14 @@ export default function ContactModal() {
                 }}
               />
             </div>
+
+            <ReCaptcha
+              id="recaptcha-contact"
+              ref={recaptchaRef}
+              onChange={setCaptchaToken}
+              onExpired={() => setCaptchaToken('')}
+              onError={() => setCaptchaToken('')}
+            />
 
             <button
               type="submit"

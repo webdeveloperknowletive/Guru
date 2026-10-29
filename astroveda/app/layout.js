@@ -23,7 +23,7 @@ export const viewport = {
 };
 
 export const metadata = {
-  title: 'AstroVeda — परंपरेतून मार्गदर्शन • श्रद्धेतून समाधान',
+  title: 'Swami Guruji — परंपरेतून मार्गदर्शन • श्रद्धेतून समाधान',
   description: 'Authentic Rudraksha, Gemstones, Yantra, Bracelets and Jyotish Consultation. 25+ years experience. Certified, energised and delivered across India.',
 };
 

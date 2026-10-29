@@ -22,7 +22,7 @@ export default function OfflinePaymentBox({
     accountName: 'Nagesh Vishwanath Shelgaonkar',
     accountNumber: '60044303280',
     ifscCode: 'MAHB0001169',
-    upiId: 'astroveda@sbi',
+    upiId: '9623117545@ybl',
     whatsapp: '+91 96231 17545',
   };
 
@@ -287,7 +287,7 @@ export default function OfflinePaymentBox({
 
               <a
                 href={qrCodeUrl}
-                download="phonepe-qr-astroveda.jpg"
+                download="phonepe-qr.jpg"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{

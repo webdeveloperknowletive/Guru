@@ -156,7 +156,7 @@ export default function Footer({ logo, footerText }) {
         </button>
       </div>
       <div className="foot-bottom" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-        <span>© 2026 AstroVeda · परंपरेतून मार्गदर्शन · श्रद्धेतून समाधान (DPDP Act, 2023 India Compliant)</span>
+        <span>© 2026 Swami Guruji · परंपरेतून मार्गदर्शन · श्रद्धेतून समाधान (DPDP Act, 2023 India Compliant)</span>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <button
             type="button"

@@ -20,7 +20,7 @@ DEFAULT_OFFLINE_INSTRUCTIONS = (
     "   Account Name: Nagesh Vishwanath Shelgaonkar\n"
     "   Account Number: 60044303280\n"
     "   IFSC Code: MAHB0001169\n"
-    "2. Direct UPI ID: astroveda@sbi (Scan PhonePe QR)\n"
+    "2. Direct UPI ID: 9623117545@ybl (Scan PhonePe QR)\n"
     "3. After payment, share reference / transaction screenshot with your Order ID on WhatsApp at +91 96231 17545.\n"
     "Our team will verify the payment and confirm dispatch/booking."
 )

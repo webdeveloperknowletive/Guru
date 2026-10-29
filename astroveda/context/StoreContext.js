@@ -109,33 +109,51 @@ export function StoreProvider({ children }) {
   const [checkoutError, setCheckoutError] = useState(null);
   const [lastOrder, setLastOrder] = useState(null);
 
-  // Store payment mode: 'online' or 'offline'
-  const [paymentMode, setPaymentMode] = useState('online');
+  // Store payment mode: 'online' or 'offline' (null until authoritatively loaded)
+  const [paymentMode, setPaymentMode] = useState(null);
+  const [paymentModeLoading, setPaymentModeLoading] = useState(true);
+  const [paymentModeError, setPaymentModeError] = useState(null);
+  const [businessWhatsappNumber, setBusinessWhatsappNumber] = useState(
+    process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '919623117545'
+  );
   const [offlineInstructions, setOfflineInstructions] = useState('');
   const [offlineQrCode, setOfflineQrCode] = useState('/phonepe-qr.jpg');
+
+  // Authoritatively fetch store payment mode from backend
+  const refreshPaymentMode = useCallback(async () => {
+    try {
+      setPaymentModeLoading(true);
+      const res = await getPaymentMode();
+      if (res && (res.payment_mode === 'online' || res.payment_mode === 'offline')) {
+        setPaymentMode(res.payment_mode);
+        if (res.offline_payment_instructions) setOfflineInstructions(res.offline_payment_instructions);
+        if (res.offline_qr_code) setOfflineQrCode(res.offline_qr_code);
+        if (res.whatsapp_number) setBusinessWhatsappNumber(res.whatsapp_number);
+        setPaymentModeError(null);
+      } else {
+        setPaymentMode(null);
+        setPaymentModeError('Invalid payment mode configuration received from server');
+      }
+    } catch (err) {
+      setPaymentMode(null);
+      setPaymentModeError('Unable to load payment configuration. Please reload the page.');
+    } finally {
+      setPaymentModeLoading(false);
+    }
+  }, []);
 
   // Fetch store payment mode on mount and periodically sync
   useEffect(() => {
     let isMounted = true;
-    const loadMode = () => {
-      getPaymentMode()
-        .then(res => {
-          if (isMounted && res) {
-            if (res.payment_mode) setPaymentMode(res.payment_mode);
-            if (res.offline_payment_instructions) setOfflineInstructions(res.offline_payment_instructions);
-            if (res.offline_qr_code) setOfflineQrCode(res.offline_qr_code);
-          }
-        })
-        .catch(() => {});
-    };
-
-    loadMode();
-    const interval = setInterval(loadMode, 30000);
+    refreshPaymentMode();
+    const interval = setInterval(() => {
+      if (isMounted) refreshPaymentMode();
+    }, 20000);
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, []);
+  }, [refreshPaymentMode]);
 
   // Sync cart to localStorage
   useEffect(() => {
@@ -466,16 +484,23 @@ export function StoreProvider({ children }) {
     setCheckoutError(null);
     setCheckoutStep('form');
     setCheckoutOpen(true);
-  }, []);
+    refreshPaymentMode();
+  }, [refreshPaymentMode]);
 
   const closeCheckout = useCallback(() => {
     setCheckoutOpen(false);
   }, []);
 
-  const submitCheckout = useCallback(async (customerData, paymentMethod = 'Razorpay') => {
+  const submitCheckout = useCallback(async (customerData) => {
     if (cart.length === 0) {
       setCheckoutError('Your cart is empty');
       return { success: false, error: 'Cart is empty' };
+    }
+
+    if (!paymentMode || !['online', 'offline'].includes(paymentMode) || paymentModeLoading || paymentModeError) {
+      const err = 'Storefront payment mode is unresolved. Please wait or reload the page.';
+      setCheckoutError(err);
+      return { success: false, error: err };
     }
 
     setCheckoutLoading(true);
@@ -484,8 +509,9 @@ export function StoreProvider({ children }) {
     // Generate random client-side idempotency key for network resilience
     const idempotencyKey = `idemp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-    const isOffline = paymentMode === 'offline' || paymentMethod === 'Offline / Direct UPI / Bank Transfer' || paymentMethod === 'Offline Payment';
-    const effectivePaymentMethod = isOffline ? 'Offline Payment' : (paymentMethod || 'Razorpay');
+    // Strictly enforce mode: Offline = WhatsApp Order, Online = Razorpay (COD removed completely)
+    const isOffline = paymentMode === 'offline';
+    const effectivePaymentMethod = isOffline ? 'WhatsApp Order' : 'Razorpay';
 
     const payload = {
       customer_name: customerData.name.trim(),
@@ -495,6 +521,7 @@ export function StoreProvider({ children }) {
       payment_method: effectivePaymentMethod,
       payment_mode: isOffline ? 'offline' : 'online',
       coupon_code: couponCode.trim(),
+      recaptcha_token: customerData.recaptcha_token || null,
       items: cart.map(item => ({
         product_id: item.id,
         quantity: item.qty,
@@ -515,13 +542,70 @@ export function StoreProvider({ children }) {
         }
       }
 
-      // Offline mode or Cash on Delivery: finish without Razorpay gateway
-      if (isOffline || result.offline_payment || effectivePaymentMethod === 'Cash on Delivery' || result.payment_status === 'offline_pending') {
-        setLastOrder(result);
+      // Offline mode: WhatsApp order registered as offline_pending
+      if (isOffline || result.offline_payment || result.payment_status === 'offline_pending') {
+        const cleanWa = (businessWhatsappNumber || '919623117545').replace(/[^0-9]/g, '');
+
+        const waMsgLines = [
+          '🕉️ *Swami Guruji — नवीन ऑर्डर (New Sacred Order)*',
+          '━━━━━━━━━━━━━━━━━━━━━',
+          `📋 *Order ID / संदर्भ क्रमांक:* ${result.order_number || 'Pending'}`,
+          `👤 *Devotee / ग्राहक:* ${customerData.name.trim()}`,
+          `📱 *Mobile:* ${customerData.phone.trim()}`,
+        ];
+        if (customerData.email && customerData.email.trim()) {
+          waMsgLines.push(`✉️ *Email:* ${customerData.email.trim()}`);
+        }
+        waMsgLines.push(`📍 *Delivery Address:* ${customerData.address.trim()}`);
+        waMsgLines.push('━━━━━━━━━━━━━━━━━━━━━');
+        waMsgLines.push('📦 *निवडलेली उत्पादने (Order Items):*');
+
+        cart.forEach((it, idx) => {
+          const qty = it.qty || 1;
+          const price = Number(it.price || 0);
+          waMsgLines.push(`${idx + 1}. ${it.title || it.name} × ${qty} — ₹${(price * qty).toLocaleString('en-IN')}`);
+        });
+
+        waMsgLines.push('━━━━━━━━━━━━━━━━━━━━━');
+        waMsgLines.push('💰 *पेमेंट तपशील (Order Summary):*');
+        waMsgLines.push(`Subtotal: ₹${Number(serverCart.subtotal || 0).toLocaleString('en-IN')}`);
+        if (serverCart.discount_amount > 0) {
+          waMsgLines.push(`Coupon Discount: -₹${Number(serverCart.discount_amount).toLocaleString('en-IN')}`);
+        }
+        waMsgLines.push(`GST (3%): ₹${Number(serverCart.tax_amount || 0).toLocaleString('en-IN')}`);
+        waMsgLines.push(`Shipping: ${serverCart.shipping_amount === 0 ? 'FREE' : `₹${serverCart.shipping_amount}`}`);
+        waMsgLines.push(`*Total Amount: ₹${Number(serverCart.total_amount || result.total_amount || 0).toLocaleString('en-IN')}*`);
+        waMsgLines.push('━━━━━━━━━━━━━━━━━━━━━');
+        waMsgLines.push('💳 *Payment Status:* Offline Payment Pending');
+        waMsgLines.push('🙏 *नमस्ते! मी वरील ऑर्डर नोंदवली आहे. कृपया पेमेंट पुष्टीकरण आणि डिस्पॅच संदर्भात माहिती द्यावी.*');
+
+        const waUrl = `https://wa.me/${cleanWa}?text=${encodeURIComponent(waMsgLines.join('\n'))}`;
+
+        if (typeof window !== 'undefined') {
+          try {
+            window.open(waUrl, '_blank');
+          } catch (e) {
+            console.warn('Could not auto-open WhatsApp:', e);
+          }
+        }
+
+        const offlineOrder = {
+          ...result,
+          payment_mode: 'offline',
+          payment_status: 'offline_pending',
+          order_status: 'pending',
+          payment_method: 'WhatsApp Order',
+          customer_name: customerData.name.trim(),
+          customer_email: customerData.email.trim(),
+          customer_phone: customerData.phone.trim(),
+          shipping_address: customerData.address.trim(),
+          whatsapp_url: waUrl,
+        };
+        setLastOrder(offlineOrder);
         setCheckoutStep('confirmed');
         clearCart();
         setCheckoutLoading(false);
-        return { success: true, order: result };
+        return { success: true, order: offlineOrder, whatsapp_url: waUrl };
       }
 
       // Online Razorpay Payment Flow
@@ -552,7 +636,7 @@ export function StoreProvider({ children }) {
           key: rzpDetails.key_id,
           amount: rzpDetails.amount,
           currency: rzpDetails.currency || 'INR',
-          name: 'AstroVeda',
+          name: 'Swami Guruji',
           description: `Order ${result.order_number}`,
           order_id: rzpDetails.order_id,
           prefill: {
@@ -652,7 +736,7 @@ export function StoreProvider({ children }) {
       setCheckoutLoading(false);
       return { success: false, error: err.message };
     }
-  }, [cart, couponCode, clearCart, paymentMode]);
+  }, [cart, serverCart, couponCode, clearCart, paymentMode, paymentModeLoading, paymentModeError, businessWhatsappNumber]);
 
   const cartCount = cart.reduce((s, it) => s + it.qty, 0);
   const cartSubtotal = cart.reduce((s, it) => s + (Number(it.price) || 0) * it.qty, 0);
@@ -671,7 +755,7 @@ export function StoreProvider({ children }) {
       checkoutOpen, checkoutStep, checkoutLoading, checkoutError, lastOrder,
       openCheckout, closeCheckout, submitCheckout,
       // Payment Mode
-      paymentMode, setPaymentMode, offlineInstructions, offlineQrCode,
+      paymentMode, setPaymentMode, paymentModeLoading, paymentModeError, refreshPaymentMode, businessWhatsappNumber, offlineInstructions, offlineQrCode,
       // Connected Modals & Workflows
       trackingModal, openTracking, closeTracking,
       contactModal, openContact, closeContact,

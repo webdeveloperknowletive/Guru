@@ -41,7 +41,7 @@ export default function AnalyticsTracker() {
     getVisitorId();
     getSessionId();
 
-    const title = document.title || 'AstroVeda';
+    const title = document.title || 'Swami Guruji';
     recordEvent({
       type: 'pageview',
       path: pathname || '/',

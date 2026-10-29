@@ -4159,10 +4159,31 @@ footer {
 }
 
 .checkout-modal .checkout-form-col {
-  padding: clamp(22px, 3vw, 32px) clamp(18px, 2.5vw, 28px);
+  padding: clamp(18px, 2.5vw, 28px) clamp(16px, 2vw, 24px);
   max-height: min(90vh, 880px);
   overflow-y: auto;
+  overflow-x: hidden;
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(224, 176, 74, 0.45) rgba(0, 0, 0, 0.2);
+}
+
+.checkout-modal .checkout-form-col::-webkit-scrollbar {
+  width: 6px;
+}
+
+.checkout-modal .checkout-form-col::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 99px;
+}
+
+.checkout-modal .checkout-form-col::-webkit-scrollbar-thumb {
+  background: rgba(224, 176, 74, 0.45);
+  border-radius: 99px;
+}
+
+.checkout-modal .checkout-form-col::-webkit-scrollbar-thumb:hover {
+  background: rgba(224, 176, 74, 0.7);
 }
 
 .checkout-modal .checkout-summary-col {
@@ -4591,7 +4612,7 @@ footer {
 }
 
 /* ==========================================================================
-   ASTROVEDA POST-HERO PREMIUM COLOR SYSTEM & VISUAL REDESIGN
+   SWAMI GURUJI POST-HERO PREMIUM COLOR SYSTEM & VISUAL REDESIGN
    Protected Hero Boundary: All styles below strictly apply below the Hero.
    Primary Canvas: #FAEAD2 (rgb(250, 234, 210))
    ========================================================================== */

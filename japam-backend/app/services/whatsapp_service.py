@@ -66,7 +66,7 @@ class WhatsAppNotificationService:
         status_clean = str(payment_status).replace("_", " ").title()
 
         lines = [
-            "🕉️ *AstroVeda Store Alert*",
+            "🕉️ *Swami Guruji Store Alert*",
             f"*Module:* {module_name}",
             f"*Ref ID:* {reference_id}",
             f"*Customer:* {customer_name}",
