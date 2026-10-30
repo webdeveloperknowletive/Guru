@@ -1,3 +1,7 @@
+import re
+import hmac
+import secrets
+from urllib.parse import unquote
 from decimal import Decimal
 from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify, current_app, session
@@ -1722,9 +1726,8 @@ def _verify_order_ownership(order):
     Supports:
     1. Authenticated Admin User via Bearer JWT token in Authorization header.
     2. High-entropy order access_token (passed via X-Order-Token header, ?token= param, or JSON body).
-    3. For legacy or seed records without access_token: verified customer email.
+    3. Customer email verification (passed via X-Customer-Email header, ?email= param, JSON body, or session).
     """
-    import hmac
     # Check Admin authorization
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
@@ -1745,25 +1748,22 @@ def _verify_order_ownership(order):
         or req_json.get("token")
     )
     if order.access_token and token_candidate:
-        if hmac.compare_digest(token_candidate.strip(), order.access_token.strip()):
+        if hmac.compare_digest(str(token_candidate).strip(), str(order.access_token).strip()):
             return True, None
 
-    # Check verified email verification (only for legacy orders without access_token, or verified session)
-    if not order.access_token or session.get("devotee_email"):
-        client_email = (
-            request.headers.get("X-Customer-Email")
-            or request.args.get("email")
-            or req_json.get("email")
-            or req_json.get("customer_email")
-            or session.get("devotee_email")
-        )
-        if client_email and client_email.strip().lower() == order.customer_email.strip().lower():
+    # Check customer email verification (for order tracking or devotee self-service)
+    client_email = (
+        request.headers.get("X-Customer-Email")
+        or request.args.get("email")
+        or req_json.get("email")
+        or req_json.get("customer_email")
+        or session.get("devotee_email")
+    )
+    if client_email and order.customer_email:
+        if str(client_email).strip().lower() == str(order.customer_email).strip().lower():
             return True, None
 
-    if not token_candidate:
-        return False, "You are not authorized to access this order (order token required)"
-
-    return False, "You are not authorized to access this order (invalid order token or email mismatch)"
+    return False, "You are not authorized to access this order (invalid order credentials or email mismatch)"
 
 
 
@@ -1771,13 +1771,18 @@ def _find_order(order_number):
     if not order_number:
         return None
     cleaned = str(order_number).strip()
+    if "%" in cleaned:
+        cleaned = unquote(cleaned).strip()
+        if "%" in cleaned:
+            cleaned = unquote(cleaned).strip()
+
     order = Order.query.filter_by(order_number=cleaned).first()
     if not order and not cleaned.startswith("#"):
         order = Order.query.filter_by(order_number=f"#{cleaned}").first()
     if not order and cleaned.startswith("#"):
         order = Order.query.filter_by(order_number=cleaned[1:]).first()
     if not order:
-        # If user passed only digits (e.g., '1090'), check for #ORD1090
+        # If user passed only digits (e.g., '1090' or '1112'), check for #ORD1090
         digits = re.sub(r'[^\d]', '', cleaned)
         if digits:
             order = Order.query.filter(
@@ -2395,28 +2400,30 @@ def get_order_tracking(order_number):
 
     return jsonify({
         "order_number": order.order_number,
-        "customer_name": order.customer_name,
-        "customer_email": order.customer_email,
-        "customer_phone": order.customer_phone,
-        "shipping_address": order.shipping_address,
-        "order_status": order.order_status,
-        "payment_status": order.payment_status,
-        "payment_method": order.payment_method,
+        "customer_name": order.customer_name or "",
+        "customer_email": order.customer_email or "",
+        "customer_phone": order.customer_phone or "",
+        "shipping_address": order.shipping_address or "",
+        "order_status": order.order_status or "pending",
+        "payment_status": order.payment_status or "pending",
+        "payment_method": order.payment_method or "Online",
+        "tracking_number": order.tracking_number or "",
+        "courier_partner": order.courier_partner or "",
         "placed_at": order.placed_at.isoformat() if order.placed_at else None,
-        "subtotal": float(order.subtotal),
-        "discount_amount": float(order.discount_amount),
-        "tax_amount": float(order.tax_amount),
-        "total_amount": float(order.total_amount),
+        "subtotal": float(order.subtotal or 0),
+        "discount_amount": float(order.discount_amount or 0),
+        "tax_amount": float(order.tax_amount or 0),
+        "total_amount": float(order.total_amount or 0),
         "items": [
             {
                 "product_id": item.product_id,
-                "product_name": item.product_name,
-                "sku": item.sku,
-                "unit_price": float(item.unit_price),
-                "quantity": item.quantity,
-                "total_price": float(item.total_price),
+                "product_name": item.product_name or "",
+                "sku": item.sku or "",
+                "unit_price": float(item.unit_price or 0),
+                "quantity": item.quantity or 1,
+                "total_price": float(item.total_price or 0),
             }
-            for item in order.items
+            for item in (order.items or [])
         ],
     }), 200
 
