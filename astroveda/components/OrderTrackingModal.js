@@ -68,7 +68,13 @@ export default function OrderTrackingModal() {
       setError(null);
     } catch (err) {
       setOrderData(null);
-      setError(err.message || 'Order not found. Please verify your order number and email.');
+      if (err.status === 403) {
+        setError('Email address does not match this order. Please enter the email used during checkout.');
+      } else if (err.status === 404) {
+        setError(`Order "${cleanNum}" was not found in the temple records. Please check the order number.`);
+      } else {
+        setError(err.message || 'Order not found. Please verify your order number and email.');
+      }
     } finally {
       setLoading(false);
     }

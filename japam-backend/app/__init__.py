@@ -124,6 +124,44 @@ def create_app(config_name=None) -> Flask:
                     if db.engine.dialect.name == "postgresql":
                         conn.execute(text("ALTER TABLE puja_bookings ALTER COLUMN customer_email DROP NOT NULL"))
                     conn.commit()
+
+            if "orders" in inspector.get_table_names():
+                o_cols = [c["name"] for c in inspector.get_columns("orders")]
+                with db.engine.connect() as conn:
+                    if "access_token" not in o_cols:
+                        conn.execute(text("ALTER TABLE orders ADD COLUMN access_token VARCHAR(128)"))
+                    if "idempotency_key" not in o_cols:
+                        conn.execute(text("ALTER TABLE orders ADD COLUMN idempotency_key VARCHAR(128)"))
+                    if "policy_accepted_at" not in o_cols:
+                        conn.execute(text("ALTER TABLE orders ADD COLUMN policy_accepted_at TIMESTAMP"))
+                    if "policy_version" not in o_cols:
+                        conn.execute(text("ALTER TABLE orders ADD COLUMN policy_version VARCHAR(50)"))
+                    if "cod_status" not in o_cols:
+                        conn.execute(text("ALTER TABLE orders ADD COLUMN cod_status VARCHAR(50)"))
+                    conn.commit()
+
+            if "payment_transactions" in inspector.get_table_names():
+                pt_cols = [c["name"] for c in inspector.get_columns("payment_transactions")]
+                with db.engine.connect() as conn:
+                    if "consultation_id" not in pt_cols:
+                        conn.execute(text("ALTER TABLE payment_transactions ADD COLUMN consultation_id INTEGER"))
+                    if "customer_phone" not in pt_cols:
+                        conn.execute(text("ALTER TABLE payment_transactions ADD COLUMN customer_phone VARCHAR(30)"))
+                    if "item_summary" not in pt_cols:
+                        conn.execute(text("ALTER TABLE payment_transactions ADD COLUMN item_summary VARCHAR(255)"))
+                    if "source_form" not in pt_cols:
+                        conn.execute(text("ALTER TABLE payment_transactions ADD COLUMN source_form VARCHAR(100) DEFAULT 'Store Checkout'"))
+                    if "form_submission_id" not in pt_cols:
+                        conn.execute(text("ALTER TABLE payment_transactions ADD COLUMN form_submission_id VARCHAR(100)"))
+                    if "payment_method" not in pt_cols:
+                        conn.execute(text("ALTER TABLE payment_transactions ADD COLUMN payment_method VARCHAR(50) DEFAULT 'Razorpay'"))
+                    if "refund_status" not in pt_cols:
+                        conn.execute(text("ALTER TABLE payment_transactions ADD COLUMN refund_status VARCHAR(50) DEFAULT 'none'"))
+                    if "refund_amount" not in pt_cols:
+                        conn.execute(text("ALTER TABLE payment_transactions ADD COLUMN refund_amount NUMERIC(12, 2) DEFAULT 0.00"))
+                    if "updated_at" not in pt_cols:
+                        conn.execute(text("ALTER TABLE payment_transactions ADD COLUMN updated_at TIMESTAMP"))
+                    conn.commit()
         except Exception:
             pass
 
@@ -358,15 +396,24 @@ def create_app(config_name=None) -> Flask:
     # Error Handlers
     @app.errorhandler(403)
     def forbidden(e):
+        from flask import jsonify
+        if request.path.startswith("/api/"):
+            return jsonify({"error": "Forbidden", "message": str(e)}), 403
         return render_template("errors/403.html"), 403
 
     @app.errorhandler(404)
     def not_found(e):
+        from flask import jsonify
+        if request.path.startswith("/api/"):
+            return jsonify({"error": "Resource not found"}), 404
         return render_template("errors/404.html"), 404
 
     @app.errorhandler(500)
     def internal_error(e):
         db.session.rollback()
+        from flask import jsonify
+        if request.path.startswith("/api/"):
+            return jsonify({"error": "Internal Server Error", "message": "An unexpected error occurred during processing"}), 500
         return render_template("errors/500.html"), 500
 
     return app

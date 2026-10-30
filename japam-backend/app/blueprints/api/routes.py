@@ -1776,18 +1776,29 @@ def _find_order(order_number):
         if "%" in cleaned:
             cleaned = unquote(cleaned).strip()
 
+    # Exact match
     order = Order.query.filter_by(order_number=cleaned).first()
+    # Try with # prefix
     if not order and not cleaned.startswith("#"):
         order = Order.query.filter_by(order_number=f"#{cleaned}").first()
+    # Try without # prefix
     if not order and cleaned.startswith("#"):
-        order = Order.query.filter_by(order_number=cleaned[1:]).first()
+        order = Order.query.filter_by(order_number=cleaned.lstrip("#")).first()
+    # Case-insensitive match
     if not order:
-        # If user passed only digits (e.g., '1090' or '1112'), check for #ORD1090
+        order = Order.query.filter(
+            (db.func.lower(Order.order_number) == cleaned.lower()) |
+            (db.func.lower(Order.order_number) == f"#{cleaned.lower()}")
+        ).first()
+    # Digits fallback (e.g. 1112 -> #ORD1112 or ORD1112)
+    if not order:
         digits = re.sub(r'[^\d]', '', cleaned)
         if digits:
             order = Order.query.filter(
                 (Order.order_number == f"#ORD{digits}") |
-                (Order.order_number == f"ORD{digits}")
+                (Order.order_number == f"ORD{digits}") |
+                (db.func.lower(Order.order_number) == f"#ord{digits}") |
+                (db.func.lower(Order.order_number) == f"ord{digits}")
             ).first()
     return order
 

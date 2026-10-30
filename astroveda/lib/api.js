@@ -266,8 +266,12 @@ export async function getOrderTracking(orderNumber, token = '', email = '') {
   if (email) {
     headers['X-Customer-Email'] = email;
   }
-  const query = token ? `?token=${encodeURIComponent(token)}` : (email ? `?email=${encodeURIComponent(email)}` : '');
-  return request(`/orders/${encodeURIComponent(orderNumber)}${query}`, {
+  const cleanNum = (orderNumber || '').trim().replace(/^#+/, '');
+  const params = new URLSearchParams();
+  if (token) params.set('token', token);
+  if (email) params.set('email', email);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return request(`/orders/${encodeURIComponent(cleanNum)}${qs}`, {
     method: 'GET',
     headers,
   });
@@ -277,7 +281,8 @@ export async function getOrderTracking(orderNumber, token = '', email = '') {
  * POST /api/v1/orders/<order_number>/cancel
  */
 export async function cancelOrder(orderNumber, token = '', email = '') {
-  return request(`/orders/${encodeURIComponent(orderNumber)}/cancel`, {
+  const cleanNum = (orderNumber || '').trim().replace(/^#+/, '');
+  return request(`/orders/${encodeURIComponent(cleanNum)}/cancel`, {
     method: 'POST',
     body: JSON.stringify({
       token,
@@ -290,7 +295,8 @@ export async function cancelOrder(orderNumber, token = '', email = '') {
  * POST /api/v1/orders/<order_number>/return
  */
 export async function returnOrder(orderNumber, reason, token = '', email = '') {
-  return request(`/orders/${encodeURIComponent(orderNumber)}/return`, {
+  const cleanNum = (orderNumber || '').trim().replace(/^#+/, '');
+  return request(`/orders/${encodeURIComponent(cleanNum)}/return`, {
     method: 'POST',
     body: JSON.stringify({
       reason,
