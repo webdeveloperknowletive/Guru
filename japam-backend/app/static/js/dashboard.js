@@ -1,4 +1,7 @@
-// Dashboard Chart.js Integration
+// Dashboard Chart.js Integration & Dynamic Live Updates
+
+let revenueChartInstance = null;
+let orderStatusChartInstance = null;
 
 function initDashboardCharts(chartLabels, chartValues, statusCounts) {
   // 1. Revenue Overview Area Chart
@@ -11,7 +14,11 @@ function initDashboardCharts(chartLabels, chartValues, statusCounts) {
     gradient.addColorStop(0, "rgba(230, 106, 31, 0.35)");
     gradient.addColorStop(1, "rgba(230, 106, 31, 0.0)");
 
-    new Chart(ctx, {
+    if (revenueChartInstance) {
+      revenueChartInstance.destroy();
+    }
+
+    revenueChartInstance = new Chart(ctx, {
       type: "line",
       data: {
         labels: chartLabels,
@@ -45,7 +52,7 @@ function initDashboardCharts(chartLabels, chartValues, statusCounts) {
             cornerRadius: 8,
             callbacks: {
               label: function(context) {
-                return "₹ " + Number(context.raw).toLocaleString("en-IN");
+                return "₹ " + Number(context.raw).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
               }
             }
           }
@@ -82,7 +89,12 @@ function initDashboardCharts(chartLabels, chartValues, statusCounts) {
   const statusCanvas = document.getElementById("orderStatusChart");
   if (statusCanvas) {
     const ctxStatus = statusCanvas.getContext("2d");
-    new Chart(ctxStatus, {
+
+    if (orderStatusChartInstance) {
+      orderStatusChartInstance.destroy();
+    }
+
+    orderStatusChartInstance = new Chart(ctxStatus, {
       type: "doughnut",
       data: {
         labels: ["Delivered", "Processing", "Shipped", "Cancelled", "Pending"],
@@ -124,3 +136,80 @@ function initDashboardCharts(chartLabels, chartValues, statusCounts) {
     });
   }
 }
+
+// Dynamic Timeframe Selector for Revenue Chart
+async function onRevenueTimeframeChange(timeframe) {
+  if (!revenueChartInstance) return;
+  try {
+    const res = await fetch(`/admin/dashboard/chart-data?type=revenue&timeframe=${encodeURIComponent(timeframe)}`);
+    if (!res.ok) throw new Error("Failed to load revenue chart data");
+    const data = await res.json();
+    if (data.success && data.labels && data.values) {
+      revenueChartInstance.data.labels = data.labels;
+      revenueChartInstance.data.datasets[0].data = data.values;
+      revenueChartInstance.update();
+    }
+  } catch (err) {
+    console.error("Error updating revenue chart:", err);
+  }
+}
+
+// Dynamic Timeframe Selector for Order Status Chart & Legend
+async function onOrderStatusTimeframeChange(timeframe) {
+  if (!orderStatusChartInstance) return;
+  try {
+    const res = await fetch(`/admin/dashboard/chart-data?type=status&timeframe=${encodeURIComponent(timeframe)}`);
+    if (!res.ok) throw new Error("Failed to load order status data");
+    const data = await res.json();
+    if (data.success && data.counts) {
+      const counts = data.counts;
+      const percentages = data.percentages || {};
+      const total = data.total || 0;
+
+      orderStatusChartInstance.data.datasets[0].data = [
+        counts.delivered || 0,
+        counts.processing || 0,
+        counts.shipped || 0,
+        counts.cancelled || 0,
+        counts.pending || 0,
+      ];
+      orderStatusChartInstance.update();
+
+      const numEl = document.getElementById("donutCenterNumber");
+      if (numEl) numEl.textContent = total;
+
+      const delEl = document.getElementById("legendCountDelivered");
+      if (delEl) delEl.textContent = `${counts.delivered || 0} (${percentages.delivered || 0}%)`;
+
+      const procEl = document.getElementById("legendCountProcessing");
+      if (procEl) procEl.textContent = `${counts.processing || 0} (${percentages.processing || 0}%)`;
+
+      const shipEl = document.getElementById("legendCountShipped");
+      if (shipEl) shipEl.textContent = `${counts.shipped || 0} (${percentages.shipped || 0}%)`;
+
+      const cancEl = document.getElementById("legendCountCancelled");
+      if (cancEl) cancEl.textContent = `${counts.cancelled || 0} (${percentages.cancelled || 0}%)`;
+
+      const pendEl = document.getElementById("legendCountPending");
+      if (pendEl) pendEl.textContent = `${counts.pending || 0} (${percentages.pending || 0}%)`;
+    }
+  } catch (err) {
+    console.error("Error updating order status chart:", err);
+  }
+}
+
+// Interactive Date Range Dropdown Toggle
+function toggleDateRangeMenu() {
+  const menu = document.getElementById("dateRangeDropdown");
+  if (!menu) return;
+  const isShown = menu.style.display === "block";
+  menu.style.display = isShown ? "none" : "block";
+}
+
+document.addEventListener("click", (e) => {
+  const btn = document.getElementById("dateRangePickerBtn");
+  const menu = document.getElementById("dateRangeDropdown");
+  if (menu && btn && !btn.contains(e.target) && !menu.contains(e.target)) {
+    menu.style.display = "none";
+  }
+});

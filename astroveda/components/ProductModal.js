@@ -324,6 +324,15 @@ export default function ProductModal() {
             </span>
           </div>
 
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', margin: '8px 0 12px' }}>
+            <span style={{ fontSize: '11px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+              ✓ Cash on Delivery (COD) Available
+            </span>
+            <span style={{ fontSize: '11px', background: 'rgba(224, 176, 74, 0.1)', color: 'var(--gold-lt)', border: '1px solid rgba(224, 176, 74, 0.3)', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+              ✓ Online UPI / Cards / Net Banking
+            </span>
+          </div>
+
           <p className="pd-lead">{liveDetails?.description || product.desc}</p>
 
           {rows.length > 0 && (
@@ -471,12 +480,15 @@ export default function ProductModal() {
             </div>
           ) : null}
 
-          {shipping ? (
-            <div className="pd-section">
-              <h5>Shipping &amp; Returns</h5>
-              <p>{shipping}</p>
-            </div>
-          ) : null}
+          <div className="pd-section">
+            <h5>Shipping, Payment &amp; Return Policy</h5>
+            <p style={{ margin: '0 0 6px', fontSize: '12.5px', color: 'var(--cream)' }}>
+              <strong>Payment Options:</strong> Online Payment (Razorpay, UPI, Credit/Debit Cards, Net Banking) and Cash on Delivery (COD) available across India.
+            </p>
+            <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--muted)', lineHeight: '1.5' }}>
+              <strong>Return Policy:</strong> Products listed on this website are offered under the applicable payment options, including Cash on Delivery wherever available. Products are generally non-returnable and non-exchangeable once purchased. However, customers should contact customer support regarding products that are delivered damaged, defective, incorrect, counterfeit, or materially different from their advertised description. Any refunds, replacements, or other remedies will be handled in accordance with applicable consumer protection laws and the published product policy.
+            </p>
+          </div>
 
           <div className="pd-actions">
             <button

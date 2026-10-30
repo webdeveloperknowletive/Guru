@@ -16,25 +16,23 @@
   </div>
 </div>
 
-<!-- Filter Bar -->
-<div class="dashboard-card" style="margin-bottom: 1.5rem; padding: 1rem 1.25rem;">
-  <form method="GET" action="{{ url_for('commerce.orders_list') }}" style="display:flex; gap:1rem; flex-wrap:wrap; align-items:center;">
-    <div style="flex:1; min-width:200px;">
-      <input type="text" name="q" class="form-control" placeholder="Search by Order # (#ORD1086) or customer name..." value="{{ search_query or '' }}">
-    </div>
-    <div style="min-width:160px;">
-      <select name="status" class="form-control" onchange="this.form.submit()">
-        <option value="">All Order Statuses</option>
-        <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Pending</option>
-        <option value="processing" {% if selected_status == 'processing' %}selected{% endif %}>Processing</option>
-        <option value="shipped" {% if selected_status == 'shipped' %}selected{% endif %}>Shipped</option>
-        <option value="delivered" {% if selected_status == 'delivered' %}selected{% endif %}>Delivered</option>
-        <option value="cancelled" {% if selected_status == 'cancelled' %}selected{% endif %}>Cancelled</option>
-      </select>
-    </div>
-    <button type="submit" class="btn-secondary">Filter</button>
-  </form>
-</div>
+<!-- Filter Bar with Date, Time, Day, and Month -->
+{% set extra_filter_slot %}
+  <div style="min-width: 170px;">
+    <select name="status" class="form-control" style="font-size: 0.82rem; padding: 0.45rem 0.65rem;">
+      <option value="">All Order Statuses</option>
+      <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Pending</option>
+      <option value="processing" {% if selected_status == 'processing' %}selected{% endif %}>Processing</option>
+      <option value="shipped" {% if selected_status == 'shipped' %}selected{% endif %}>Shipped</option>
+      <option value="delivered" {% if selected_status == 'delivered' %}selected{% endif %}>Delivered</option>
+      <option value="cancelled" {% if selected_status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+    </select>
+  </div>
+{% endset %}
+
+{% with filter_action_url=url_for('commerce.orders_list'), custom_search_placeholder="Search by Order # (#ORD1086) or customer name...", extra_filter_slot=extra_filter_slot %}
+  {% include "components/date_time_filter_bar.html" %}
+{% endwith %}
 
 <!-- Orders Table -->
 <div class="dashboard-card">

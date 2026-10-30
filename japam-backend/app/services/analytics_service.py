@@ -115,6 +115,28 @@ class AnalyticsService:
             prev_end_ist = start_ist
             label = "Last 30 Days"
 
+        elif range_type in ("month", "this_month"):
+            start_ist = today_start_ist.replace(day=1)
+            end_ist = now_ist
+            last_month_end = start_ist - timedelta(days=1)
+            prev_start_ist = last_month_end.replace(day=1)
+            prev_end_ist = last_month_end
+            label = "This Month"
+
+        elif range_type in ("year", "this_year"):
+            start_ist = today_start_ist.replace(month=1, day=1)
+            end_ist = now_ist
+            prev_start_ist = start_ist.replace(year=start_ist.year - 1)
+            prev_end_ist = start_ist - timedelta(days=1)
+            label = "This Year"
+
+        elif range_type in ("all", "all_time"):
+            start_ist = datetime(2020, 1, 1, 0, 0, 0, tzinfo=IST)
+            end_ist = now_ist
+            prev_start_ist = start_ist
+            prev_end_ist = end_ist
+            label = "All Time"
+
         elif range_type == "custom" and custom_start and custom_end:
             try:
                 cs_dt = datetime.strptime(custom_start, "%Y-%m-%d")

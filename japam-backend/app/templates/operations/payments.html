@@ -1,77 +1,396 @@
 {% extends "base.html" %}
 
-{% block title %}Payments & Transactions{% endblock %}
+{% block title %}Payments & Transactions — Japam Admin{% endblock %}
 
 {% block content %}
-<div class="page-header-row">
+<div class="page-header-row" style="margin-bottom:1.25rem;">
   <div>
-    <h1 class="page-title">Payments & Gateway Transactions</h1>
-    <p class="page-subtitle">Real-time payment logs from Razorpay, Stripe, and manual bank verifications.</p>
+    <h1 class="page-title">Payments &amp; Gateway Transactions</h1>
+    <p class="page-subtitle">Centralized transaction tracking across Website Storefront, Puja Seva, and Jyotish Consultations.</p>
   </div>
-  <div class="page-header-actions">
-    <div style="display:flex; gap:0.5rem;">
-      <a href="{{ url_for('operations.payments_list') }}" class="btn-secondary">All</a>
-      <a href="{{ url_for('operations.payments_list', status='captured') }}" class="btn-secondary">Captured</a>
-      <a href="{{ url_for('operations.payments_list', status='pending') }}" class="btn-secondary" style="color:var(--status-amber-text);">Pending Review</a>
-      <a href="{{ url_for('operations.payments_list', status='refunded') }}" class="btn-secondary" style="color:var(--status-red-text);">Refunded</a>
-    </div>
+  <div class="page-header-actions" style="display:flex; gap:0.6rem; align-items:center;">
+    <a href="{{ url_for('operations.payments_export', q=search_query, status=selected_status, source_form=selected_source_form, payment_method=selected_payment_method) }}" 
+       class="btn-secondary" 
+       style="display:inline-flex; align-items:center; gap:6px; background:#fff; border:1px solid #e2e8f0; font-weight:600; color:#334155;">
+      📥 Export CSV
+    </a>
   </div>
 </div>
 
-<div class="dashboard-card">
+<!-- Status Summary Chips -->
+<div style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:1.25rem;">
+  <a href="{{ url_for('operations.payments_list', source_form=selected_source_form, payment_method=selected_payment_method, q=search_query) }}"
+     class="btn-secondary {{ 'active' if selected_status == 'all' or not selected_status else '' }}"
+     style="font-size:0.8rem; padding:6px 14px; border-radius:999px; {{ 'background:var(--primary); color:#fff; border-color:var(--primary); font-weight:700;' if (selected_status == 'all' or not selected_status) else '' }}">
+    All Transactions ({{ counts.all }})
+  </a>
+  <a href="{{ url_for('operations.payments_list', status='captured', source_form=selected_source_form, payment_method=selected_payment_method, q=search_query) }}"
+     class="btn-secondary {{ 'active' if selected_status == 'captured' else '' }}"
+     style="font-size:0.8rem; padding:6px 14px; border-radius:999px; {{ 'background:#15803d; color:#fff; border-color:#15803d; font-weight:700;' if selected_status == 'captured' else 'color:#15803d;' }}">
+    ✓ Captured ({{ counts.captured }})
+  </a>
+  <a href="{{ url_for('operations.payments_list', status='pending', source_form=selected_source_form, payment_method=selected_payment_method, q=search_query) }}"
+     class="btn-secondary {{ 'active' if selected_status == 'pending' else '' }}"
+     style="font-size:0.8rem; padding:6px 14px; border-radius:999px; {{ 'background:#b45309; color:#fff; border-color:#b45309; font-weight:700;' if selected_status == 'pending' else 'color:#b45309;' }}">
+    ⏳ Pending Review ({{ counts.pending }})
+  </a>
+  <a href="{{ url_for('operations.payments_list', status='cod_pending', source_form=selected_source_form, payment_method=selected_payment_method, q=search_query) }}"
+     class="btn-secondary {{ 'active' if selected_status == 'cod_pending' else '' }}"
+     style="font-size:0.8rem; padding:6px 14px; border-radius:999px; {{ 'background:#6366f1; color:#fff; border-color:#6366f1; font-weight:700;' if selected_status == 'cod_pending' else 'color:#6366f1;' }}">
+    📦 COD Pending ({{ counts.cod_pending }})
+  </a>
+  <a href="{{ url_for('operations.payments_list', status='refunded', source_form=selected_source_form, payment_method=selected_payment_method, q=search_query) }}"
+     class="btn-secondary {{ 'active' if selected_status == 'refunded' else '' }}"
+     style="font-size:0.8rem; padding:6px 14px; border-radius:999px; {{ 'background:#b91c1c; color:#fff; border-color:#b91c1c; font-weight:700;' if selected_status == 'refunded' else 'color:#b91c1c;' }}">
+    ↩ Refunded ({{ counts.refunded }})
+  </a>
+</div>
+
+<!-- Search & Module/Method Filters Bar -->
+<div class="dashboard-card" style="padding:14px 18px; margin-bottom:1.25rem;">
+  <form method="GET" action="{{ url_for('operations.payments_list') }}" style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
+    <div style="flex:1; min-width:240px; position:relative;">
+      <input type="text" name="q" value="{{ search_query }}" 
+             placeholder="🔍 Search by Transaction #, Submission ID, Name, Phone, Email, Gateway ID..."
+             style="width:100%; padding:8px 12px; border-radius:6px; border:1px solid #cbd5e1; font-size:0.85rem; background:#f8fafc;" />
+    </div>
+
+    <div>
+      <select name="source_form" style="padding:8px 12px; border-radius:6px; border:1px solid #cbd5e1; font-size:0.85rem; background:#fff;">
+        <option value="all" {{ 'selected' if selected_source_form == 'all' or not selected_source_form }}>All Source Forms</option>
+        <option value="Store Checkout" {{ 'selected' if selected_source_form == 'Store Checkout' }}>🛍️ Store Checkout</option>
+        <option value="Puja Booking" {{ 'selected' if selected_source_form == 'Puja Booking' }}>🪔 Puja Booking</option>
+        <option value="Consultation Booking" {{ 'selected' if selected_source_form == 'Consultation Booking' }}>🔮 Consultation Booking</option>
+      </select>
+    </div>
+
+    <div>
+      <select name="payment_method" style="padding:8px 12px; border-radius:6px; border:1px solid #cbd5e1; font-size:0.85rem; background:#fff;">
+        <option value="all" {{ 'selected' if selected_payment_method == 'all' or not selected_payment_method }}>All Payment Methods</option>
+        <option value="Razorpay" {{ 'selected' if selected_payment_method == 'Razorpay' }}>💳 Razorpay (Online)</option>
+        <option value="COD" {{ 'selected' if selected_payment_method == 'COD' }}>📦 Cash on Delivery (COD)</option>
+        <option value="Offline Payment" {{ 'selected' if selected_payment_method == 'Offline Payment' }}>💬 Offline / WhatsApp</option>
+      </select>
+    </div>
+
+    <div>
+      <select name="status" style="padding:8px 12px; border-radius:6px; border:1px solid #cbd5e1; font-size:0.85rem; background:#fff;">
+        <option value="all" {{ 'selected' if selected_status == 'all' or not selected_status }}>All Statuses</option>
+        <option value="captured" {{ 'selected' if selected_status == 'captured' }}>Captured</option>
+        <option value="pending" {{ 'selected' if selected_status == 'pending' }}>Pending</option>
+        <option value="initiated" {{ 'selected' if selected_status == 'initiated' }}>Initiated</option>
+        <option value="cod_pending" {{ 'selected' if selected_status == 'cod_pending' }}>COD Pending</option>
+        <option value="cod_collected" {{ 'selected' if selected_status == 'cod_collected' }}>COD Collected</option>
+        <option value="refunded" {{ 'selected' if selected_status == 'refunded' }}>Refunded</option>
+        <option value="failed" {{ 'selected' if selected_status == 'failed' }}>Failed</option>
+      </select>
+    </div>
+
+    <div style="display:flex; gap:6px;">
+      <button type="submit" class="btn-primary" style="padding:8px 16px; font-size:0.85rem;">Filter</button>
+      <a href="{{ url_for('operations.payments_list') }}" class="btn-secondary" style="padding:8px 12px; font-size:0.85rem;">Reset</a>
+    </div>
+  </form>
+</div>
+
+<!-- Date-Time Filter Bar Component -->
+{% with filter_action_url=url_for('operations.payments_list') %}
+  {% include "components/date_time_filter_bar.html" %}
+{% endwith %}
+
+<!-- Payments Transactions Table -->
+<div class="dashboard-card" style="padding:0; overflow:hidden;">
   <div class="table-responsive">
     <table class="spiritual-table">
       <thead>
         <tr>
-          <th style="width:48px;">#</th>
-          <th>Transaction #</th>
-          <th>Gateway</th>
+          <th style="width:40px;">#</th>
+          <th>Transaction &amp; Gateway ID</th>
+          <th>Source Form &amp; Ref ID</th>
+          <th>Customer Details</th>
+          <th>Item / Service</th>
           <th>Amount</th>
-          <th>Devotee Name</th>
-          <th>Payment Date, Day &amp; Time</th>
+          <th>Gateway &amp; Method</th>
+          <th>Date &amp; Time</th>
           <th>Status</th>
-          <th>Actions</th>
+          <th style="text-align:right;">Actions</th>
         </tr>
       </thead>
       <tbody>
         {% for txn in transactions %}
         <tr>
           <td style="font-weight:700; color:var(--text-muted); font-size:0.8rem;">{{ loop.index }}</td>
-          <td style="font-family:monospace; font-weight:700; white-space:nowrap;">{{ txn.transaction_number }}</td>
           <td>
-            <span class="badge badge-type-puja" style="font-size:0.7rem;">{{ txn.gateway }}</span>
-          </td>
-          <td style="font-weight:700; color:var(--text-primary);">{{ format_currency(txn.amount) }}</td>
-          <td>{{ txn.customer_name or '-' }}</td>
-          <td style="white-space:nowrap;">
-            <div style="font-weight:600; color:var(--text-primary); font-size:0.82rem;">{{ format_date(txn.created_at, "%A, %d %b %Y") }}</div>
-            <div style="font-size:0.74rem; color:var(--text-muted); font-family:monospace; margin-top:2px;">🕒 {{ format_date(txn.created_at, "%I:%M %p") }}</div>
-          </td>
-          <td>
-            <span class="badge badge-{{ 'delivered' if txn.status == 'captured' else ('cancelled' if txn.status == 'refunded' else 'pending') }}">
-              {{ txn.status|title }}
-            </span>
-          </td>
-          <td>
-            {% if txn.status == 'pending' %}
-              <form action="{{ url_for('operations.payment_verify', txn_id=txn.id) }}" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <button type="submit" class="btn-restock" style="background-color:var(--status-green-bg); color:var(--status-green-text); border-color:#86efac;">
-                  Verify & Capture
-                </button>
-              </form>
-            {% else %}
-              <span style="font-size:0.75rem; color:var(--text-muted);">Verified</span>
+            <div style="font-family:monospace; font-weight:700; font-size:0.84rem; color:var(--text-primary);">
+              {{ txn.transaction_number }}
+            </div>
+            {% if txn.gateway_payment_id %}
+              <div style="font-family:monospace; font-size:0.72rem; color:var(--text-muted); margin-top:2px;">
+                🆔 {{ txn.gateway_payment_id }}
+              </div>
             {% endif %}
+          </td>
+          <td>
+            <div>
+              <span class="badge" style="font-size:0.7rem; font-weight:600; {{ 'background:#ede9fe; color:#5b21b6;' if txn.source_form == 'Consultation Booking' else ('background:#fef3c7; color:#92400e;' if txn.source_form == 'Puja Booking' else 'background:#e0f2fe; color:#0369a1;') }}">
+                {{ txn.source_form or 'Direct' }}
+              </span>
+            </div>
+            <div style="font-family:monospace; font-weight:600; font-size:0.78rem; margin-top:3px; color:var(--text-primary);">
+              {{ txn.form_submission_id or (txn.order.order_number if txn.order else (txn.booking.booking_number if txn.booking else (txn.consultation.consultation_number if txn.consultation else '-'))) }}
+            </div>
+          </td>
+          <td>
+            <div style="font-weight:600; font-size:0.84rem; color:var(--text-primary);">{{ txn.customer_name or '-' }}</div>
+            {% if txn.customer_phone %}
+              <div style="font-size:0.75rem; color:var(--text-muted); font-family:monospace; margin-top:2px;">
+                📞 {{ txn.customer_phone }}
+              </div>
+            {% endif %}
+            {% if txn.customer_email %}
+              <div style="font-size:0.72rem; color:var(--text-muted); max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                ✉️ {{ txn.customer_email }}
+              </div>
+            {% endif %}
+          </td>
+          <td>
+            <div style="font-size:0.82rem; color:var(--text-primary); max-width:200px; line-height:1.3;" title="{{ txn.item_summary }}">
+              {{ txn.item_summary or '-' }}
+            </div>
+          </td>
+          <td>
+            <div style="font-weight:700; font-size:0.9rem; color:var(--text-primary); white-space:nowrap;">
+              {{ format_currency(txn.amount) }}
+            </div>
+            {% if txn.refund_status == 'refunded' and txn.refund_amount %}
+              <div style="font-size:0.72rem; color:#b91c1c; font-weight:600;">
+                ↩ Refund: {{ format_currency(txn.refund_amount) }}
+              </div>
+            {% endif %}
+          </td>
+          <td>
+            <div style="font-weight:600; font-size:0.78rem; color:var(--text-primary);">{{ txn.gateway or 'Razorpay' }}</div>
+            <div style="font-size:0.72rem; color:var(--text-muted);">{{ txn.payment_method or 'Online' }}</div>
+          </td>
+          <td style="white-space:nowrap;">
+            <div style="font-weight:600; color:var(--text-primary); font-size:0.8rem;">
+              {{ format_date(txn.created_at, "%d %b %Y") }}
+            </div>
+            <div style="font-size:0.72rem; color:var(--text-muted); font-family:monospace; margin-top:2px;">
+              🕒 {{ format_date(txn.created_at, "%I:%M %p") }}
+            </div>
+          </td>
+          <td>
+            {% if txn.status in ('captured', 'paid', 'cod_collected') %}
+              <span class="badge badge-delivered" style="font-size:0.72rem;">
+                {{ 'COD Collected' if txn.status == 'cod_collected' else 'Captured' }}
+              </span>
+            {% elif txn.status == 'cod_pending' %}
+              <span class="badge" style="background:#ede9fe; color:#6366f1; border:1px solid #c7d2fe; font-size:0.72rem;">
+                COD Pending
+              </span>
+            {% elif txn.status == 'refunded' %}
+              <span class="badge badge-cancelled" style="font-size:0.72rem;">
+                Refunded
+              </span>
+            {% elif txn.status == 'failed' or txn.status == 'cod_failed_returned' %}
+              <span class="badge badge-cancelled" style="font-size:0.72rem;">
+                {{ 'COD Returned' if txn.status == 'cod_failed_returned' else 'Failed' }}
+              </span>
+            {% else %}
+              <span class="badge badge-pending" style="font-size:0.72rem;">
+                {{ txn.status|title }}
+              </span>
+            {% endif %}
+          </td>
+          <td style="text-align:right; white-space:nowrap;">
+            <div style="display:inline-flex; gap:4px; align-items:center;">
+              <button type="button" 
+                      class="btn-secondary" 
+                      onclick="openTxnDetail({{ txn.id }})" 
+                      style="padding:4px 8px; font-size:0.75rem;" 
+                      title="View Details">
+                🔍 Details
+              </button>
+
+              {% if txn.status in ('pending', 'initiated') %}
+                <form action="{{ url_for('operations.payment_verify', txn_id=txn.id) }}" method="POST" style="margin:0;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit" class="btn-restock" style="padding:4px 8px; font-size:0.75rem; background-color:var(--status-green-bg); color:var(--status-green-text); border-color:#86efac;" title="Verify & Capture">
+                    ✓ Capture
+                  </button>
+                </form>
+              {% elif txn.status == 'cod_pending' %}
+                <form action="{{ url_for('operations.payment_cod_status_update', txn_id=txn.id) }}" method="POST" style="margin:0;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="hidden" name="cod_status" value="cod_collected">
+                  <button type="submit" class="btn-restock" style="padding:4px 8px; font-size:0.75rem; background-color:#dcfce7; color:#15803d; border-color:#86efac;" title="Mark COD as Collected">
+                    💵 Collect COD
+                  </button>
+                </form>
+              {% endif %}
+            </div>
           </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">No payment transactions found.</td>
+          <td colspan="10" style="text-align:center; padding:36px; color:var(--text-muted);">
+            No transactions matching the selected filters were found.
+          </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+
+<!-- Modal: Comprehensive Transaction Details & Actions -->
+<div id="txnModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:1050; align-items:center; justify-content:center; padding:16px;">
+  <div style="background:#fff; border-radius:12px; width:100%; max-width:680px; max-height:90vh; overflow-y:auto; box-shadow:0 20px 25px -5px rgba(0,0,0,0.2); position:relative; padding:24px;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:1px solid #e2e8f0; padding-bottom:14px; margin-bottom:16px;">
+      <div>
+        <h3 id="modalTxnNumber" style="font-size:1.15rem; font-weight:700; margin:0; color:#0f172a; font-family:monospace;"></h3>
+        <p style="margin:2px 0 0; font-size:0.8rem; color:#64748b;">Transaction &amp; Form Submission Audit</p>
+      </div>
+      <button type="button" onclick="closeTxnModal()" style="background:none; border:none; font-size:1.25rem; cursor:pointer; color:#94a3b8; line-height:1;">✕</button>
+    </div>
+
+    <div id="modalLoading" style="text-align:center; padding:30px; color:#64748b;">
+      ⏳ Loading transaction details...
+    </div>
+
+    <div id="modalBody" style="display:none;">
+      <!-- Grid Details -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:0.85rem; margin-bottom:18px;">
+        <div style="background:#f8fafc; padding:10px 12px; border-radius:8px;">
+          <div style="color:#64748b; font-size:0.75rem;">Source Form &amp; Module</div>
+          <div id="modalSourceForm" style="font-weight:700; color:#0f172a; margin-top:2px;"></div>
+        </div>
+        <div style="background:#f8fafc; padding:10px 12px; border-radius:8px;">
+          <div style="color:#64748b; font-size:0.75rem;">Form Submission ID</div>
+          <div id="modalSubmissionId" style="font-weight:700; font-family:monospace; color:#0f172a; margin-top:2px;"></div>
+        </div>
+        <div style="background:#f8fafc; padding:10px 12px; border-radius:8px;">
+          <div style="color:#64748b; font-size:0.75rem;">Devotee Name &amp; Contact</div>
+          <div id="modalCustomerInfo" style="font-weight:600; color:#0f172a; margin-top:2px;"></div>
+        </div>
+        <div style="background:#f8fafc; padding:10px 12px; border-radius:8px;">
+          <div style="color:#64748b; font-size:0.75rem;">Total Amount &amp; Status</div>
+          <div id="modalAmountStatus" style="font-weight:700; color:#0f172a; margin-top:2px;"></div>
+        </div>
+        <div style="background:#f8fafc; padding:10px 12px; border-radius:8px;">
+          <div style="color:#64748b; font-size:0.75rem;">Gateway &amp; Payment Method</div>
+          <div id="modalGatewayMethod" style="font-weight:600; color:#0f172a; margin-top:2px;"></div>
+        </div>
+        <div style="background:#f8fafc; padding:10px 12px; border-radius:8px;">
+          <div style="color:#64748b; font-size:0.75rem;">Gateway Reference ID</div>
+          <div id="modalGatewayRef" style="font-family:monospace; font-size:0.78rem; color:#0f172a; margin-top:2px; word-break:break-all;"></div>
+        </div>
+      </div>
+
+      <!-- Item / Service Particulars -->
+      <div style="background:#f1f5f9; padding:12px; border-radius:8px; margin-bottom:18px; font-size:0.85rem;">
+        <div style="font-weight:600; color:#334155; margin-bottom:4px;">Item / Service Summary:</div>
+        <div id="modalItemSummary" style="color:#0f172a;"></div>
+        <div id="modalPolicyNotice" style="margin-top:6px; font-size:0.75rem; color:#64748b;"></div>
+      </div>
+
+      <!-- Refund Actions Section -->
+      <div id="modalRefundSection" style="border-top:1px solid #e2e8f0; padding-top:16px;">
+        <h4 style="font-size:0.9rem; font-weight:700; margin:0 0 10px; color:#0f172a;">Transaction Actions</h4>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+          <form id="modalRefundForm" method="POST" style="display:flex; gap:6px; align-items:center; margin:0;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="number" step="0.01" name="refund_amount" id="modalRefundAmountInput" placeholder="Refund Amount (₹)" style="padding:6px 10px; font-size:0.8rem; border:1px solid #cbd5e1; border-radius:6px; width:140px;" />
+            <button type="submit" class="btn-secondary" style="background:#fee2e2; color:#b91c1c; border-color:#fca5a5; font-size:0.8rem; padding:6px 12px; font-weight:600;">
+              ↩ Issue Refund
+            </button>
+          </form>
+
+          <form id="modalCodCollectedForm" method="POST" style="margin:0; display:none;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="cod_status" value="cod_collected">
+            <button type="submit" class="btn-primary" style="background:#16a34a; border-color:#16a34a; font-size:0.8rem; padding:6px 12px;">
+              ✓ Mark COD Collected
+            </button>
+          </form>
+
+          <form id="modalCodFailedForm" method="POST" style="margin:0; display:none;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="cod_status" value="cod_failed_returned">
+            <button type="submit" class="btn-secondary" style="background:#fef2f2; color:#dc2626; border-color:#fecaca; font-size:0.8rem; padding:6px 12px;">
+              ✕ COD Returned/Failed
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function openTxnDetail(txnId) {
+  const modal = document.getElementById('txnModal');
+  const loading = document.getElementById('modalLoading');
+  const body = document.getElementById('modalBody');
+  modal.style.display = 'flex';
+  loading.style.display = 'block';
+  body.style.display = 'none';
+
+  fetch('/admin/operations/payments/' + txnId + '/detail')
+    .then(r => r.json())
+    .then(data => {
+      loading.style.display = 'none';
+      body.style.display = 'block';
+
+      document.getElementById('modalTxnNumber').textContent = data.transaction_number;
+      document.getElementById('modalSourceForm').textContent = data.source_form || 'Direct Transaction';
+      document.getElementById('modalSubmissionId').textContent = data.form_submission_id || 'N/A';
+      document.getElementById('modalCustomerInfo').innerHTML = 
+        (data.customer_name || 'N/A') + '<br>' +
+        '<span style="font-family:monospace; font-size:0.75rem; color:#64748b;">' + (data.customer_phone || '') + ' ' + (data.customer_email || '') + '</span>';
+
+      document.getElementById('modalAmountStatus').innerHTML = 
+        '₹' + data.amount.toLocaleString('en-IN', {minimumFractionDigits:2}) + 
+        ' <span class="badge" style="margin-left:6px; font-size:0.72rem;">' + data.status.toUpperCase() + '</span>';
+
+      document.getElementById('modalGatewayMethod').textContent = (data.gateway || 'Razorpay') + ' (' + (data.payment_method || 'Online') + ')';
+      document.getElementById('modalGatewayRef').textContent = data.gateway_payment_id || data.gateway_order_id || 'Pending / N/A';
+      document.getElementById('modalItemSummary').textContent = data.item_summary || 'Standard Offering';
+
+      let policyInfo = '';
+      if (data.order && data.order.policy_version) {
+        policyInfo = '📜 Policy Accepted: ' + data.order.policy_version + ' (' + (data.order.policy_accepted_at || 'Recorded at checkout') + ')';
+      }
+      document.getElementById('modalPolicyNotice').textContent = policyInfo;
+
+      // Update action forms
+      document.getElementById('modalRefundForm').action = '/admin/operations/payments/' + txnId + '/refund';
+      document.getElementById('modalRefundAmountInput').value = data.amount;
+
+      const codCollectedForm = document.getElementById('modalCodCollectedForm');
+      const codFailedForm = document.getElementById('modalCodFailedForm');
+      if (data.status === 'cod_pending' || (data.order && data.order.cod_status === 'cod_pending')) {
+        codCollectedForm.action = '/admin/operations/payments/' + txnId + '/cod-status';
+        codFailedForm.action = '/admin/operations/payments/' + txnId + '/cod-status';
+        codCollectedForm.style.display = 'inline-block';
+        codFailedForm.style.display = 'inline-block';
+      } else {
+        codCollectedForm.style.display = 'none';
+        codFailedForm.style.display = 'none';
+      }
+    })
+    .catch(err => {
+      loading.textContent = 'Failed to load transaction details: ' + err.message;
+    });
+}
+
+function closeTxnModal() {
+  document.getElementById('txnModal').style.display = 'none';
+}
+
+window.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeTxnModal();
+});
+</script>
 {% endblock %}

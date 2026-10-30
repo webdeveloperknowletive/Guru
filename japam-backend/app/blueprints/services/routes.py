@@ -6,6 +6,7 @@ from app.models.service import PujaService, PujaBooking, JyotishConsultation, Av
 from app.services.booking_service import BookingService
 from app.services.rbac_service import login_required, permission_required, get_current_admin
 from app.services.audit_service import AuditService
+from app.utils.date_filter import apply_date_time_filters, extract_date_filter_context
 
 services_bp = Blueprint("services", __name__, url_prefix="/admin/services")
 
@@ -288,6 +289,8 @@ def puja_bookings_list():
     elif status:
         q = q.filter_by(status=status)
 
+    q = apply_date_time_filters(q, PujaBooking.booking_date, request.args, extra_time_col=PujaBooking.time_slot, date_is_date_only=True)
+    date_filter = extract_date_filter_context(request.args)
     bookings = q.order_by(PujaBooking.booking_date.desc(), PujaBooking.id.desc()).all()
     puja_services = PujaService.query.filter_by(is_active=True).all()
     return render_template(
@@ -297,6 +300,7 @@ def puja_bookings_list():
         services=puja_services,
         selected_status=status,
         active_page="puja_bookings",
+        date_filter=date_filter,
     )
 
 
@@ -331,6 +335,8 @@ def consultations_list():
     if status:
         q = q.filter_by(status=status)
 
+    q = apply_date_time_filters(q, JyotishConsultation.created_at, request.args)
+    date_filter = extract_date_filter_context(request.args)
     consultations = q.order_by(JyotishConsultation.created_at.desc()).all()
     can_view_notes = user.has_permission("consultations", "notes") or (user.role and user.role.code == "super_admin")
 
@@ -341,6 +347,7 @@ def consultations_list():
         can_view_notes=can_view_notes,
         selected_status=status,
         active_page="consultations",
+        date_filter=date_filter,
     )
 
 
@@ -453,8 +460,11 @@ def consultation_delete(consultation_id):
 @permission_required("availability", "view")
 def availability_list():
     user = get_current_admin()
-    slots = AvailabilitySlot.query.order_by(AvailabilitySlot.slot_date.asc(), AvailabilitySlot.start_time.asc()).all()
-    return render_template("services/availability.html", current_user=user, slots=slots, active_page="availability")
+    q = AvailabilitySlot.query
+    q = apply_date_time_filters(q, AvailabilitySlot.slot_date, request.args, extra_time_col=AvailabilitySlot.start_time, date_is_date_only=True)
+    date_filter = extract_date_filter_context(request.args)
+    slots = q.order_by(AvailabilitySlot.slot_date.asc(), AvailabilitySlot.start_time.asc()).all()
+    return render_template("services/availability.html", current_user=user, slots=slots, active_page="availability", date_filter=date_filter)
 
 
 @services_bp.route("/availability/create", methods=["POST"])

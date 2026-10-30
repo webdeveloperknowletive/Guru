@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useStore } from '@/context/StoreContext';
-import { requestConsultation, getConsultations, getAvailabilitySlots } from '@/lib/api';
+import { useStore, loadRazorpayScript } from '@/context/StoreContext';
+import { requestConsultation, getConsultations, getAvailabilitySlots, verifyPayment } from '@/lib/api';
 import { JYOTISH_SERVICES, JANMA_KUNDALI_PACKAGES, DIWALI_OFFER, getServiceById } from '@/config/jyotishServices';
 import OfflinePaymentBox from '@/components/OfflinePaymentBox';
 import ReCaptcha from '@/components/ReCaptcha';
@@ -455,6 +455,50 @@ export default function JyotishSection({ sectionText }) {
       payload.payment_method = paymentMode === 'offline' ? 'Offline Payment' : 'Online Video Consultation';
 
       const res = await requestConsultation(payload);
+
+      if (paymentMode === 'online' && res.razorpay) {
+        const isLoaded = await loadRazorpayScript();
+        if (isLoaded && window.Razorpay) {
+          const rzp = new window.Razorpay({
+            key: res.razorpay.key_id,
+            amount: res.razorpay.amount,
+            currency: res.razorpay.currency || 'INR',
+            name: 'Swami Guruji Jyotish Seva',
+            description: `Consultation ${res.consultation_number} (${activeService.title})`,
+            order_id: res.razorpay.order_id,
+            prefill: {
+              name: commonData.name.trim(),
+              email: commonData.email.trim() || '',
+              contact: commonData.phone.trim(),
+            },
+            theme: { color: '#d97706' },
+            handler: async function (response) {
+              try {
+                const verifyRes = await verifyPayment({
+                  consultation_number: res.consultation_number,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                });
+                setConfirmedBooking(prev => ({
+                  ...prev,
+                  status: 'confirmed',
+                  transaction_number: verifyRes.transaction_number,
+                }));
+                showToast(`✓ Consultation Payment Verified: ${res.consultation_number}`);
+              } catch (vErr) {
+                console.warn('Payment verification issue:', vErr);
+              }
+            },
+            modal: {
+              ondismiss: function () {
+                showToast('Payment window closed. Consultation registered.');
+              }
+            }
+          });
+          rzp.open();
+        }
+      }
 
       setConfirmedBooking({
         number: res.consultation_number,

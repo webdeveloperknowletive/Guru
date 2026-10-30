@@ -456,6 +456,33 @@ def book_puja():
                 status="pending" if effective_booking_type == "whatsapp" else None,
             )
 
+        # Create or update initial PaymentTransaction for Puja Booking
+        svc_price = booking.service.price if booking.service else Decimal("0.00")
+        txn_number = f"TXN-PUJ-{booking.id}"
+        existing_p_txn = PaymentTransaction.query.filter_by(transaction_number=txn_number).first()
+        is_p_offline = current_payment_mode == "offline" or booking.booking_type == "whatsapp"
+        if not existing_p_txn:
+            p_txn = PaymentTransaction(
+                transaction_number=txn_number,
+                booking_id=booking.id,
+                amount=svc_price,
+                currency="INR",
+                gateway="WhatsApp / Offline" if is_p_offline else "Razorpay",
+                payment_method="WhatsApp Booking" if is_p_offline else "Razorpay",
+                status="pending" if is_p_offline else "initiated",
+                customer_name=booking.customer_name,
+                customer_email=booking.customer_email,
+                customer_phone=booking.customer_phone,
+                item_summary=booking.service.name if booking.service else "Vedic Puja Seva",
+                source_form="Puja Booking",
+                form_submission_id=booking.booking_number,
+                created_at=datetime.now(timezone.utc),
+            )
+            db.session.add(p_txn)
+            db.session.commit()
+        else:
+            p_txn = existing_p_txn
+
         # Trigger admin WhatsApp alert safely
         wa_result = WhatsAppNotificationService.send_admin_alert(
             module_name="Puja Booking (WhatsApp)" if booking.booking_type == "whatsapp" else "Puja Booking",
@@ -771,6 +798,32 @@ def request_consultation():
         elif (sid == "marriage-matching" or data.get("person2")) and groom_name and bride_name:
             wa_extra = f"Topic: Marriage Kundali Matching | Contact Person: {consultation.customer_name} | Groom: {groom_name} | Bride: {bride_name} | Diwali Offer Fee: ₹{payable_amount:,.0f}"
 
+        # Create or update initial PaymentTransaction for Consultation
+        txn_number = f"TXN-CNS-{consultation.id}"
+        existing_c_txn = PaymentTransaction.query.filter_by(transaction_number=txn_number).first()
+        is_c_offline = current_payment_mode == "offline"
+        if not existing_c_txn:
+            c_txn = PaymentTransaction(
+                transaction_number=txn_number,
+                consultation_id=consultation.id,
+                amount=payable_amount,
+                currency="INR",
+                gateway="WhatsApp / Offline" if is_c_offline else "Razorpay",
+                payment_method="Offline Payment" if is_c_offline else "Razorpay",
+                status="pending" if is_c_offline else "initiated",
+                customer_name=consultation.customer_name,
+                customer_email=consultation.customer_email,
+                customer_phone=consultation.customer_phone,
+                item_summary=consultation.topic or "Jyotish Consultation",
+                source_form="Consultation Booking",
+                form_submission_id=consultation.consultation_number,
+                created_at=datetime.now(timezone.utc),
+            )
+            db.session.add(c_txn)
+            db.session.commit()
+        else:
+            c_txn = existing_c_txn
+
         wa_result = WhatsAppNotificationService.send_admin_alert(
             module_name="Jyotish Consultation",
             reference_id=consultation.consultation_number,
@@ -797,6 +850,35 @@ def request_consultation():
             "package_name": package_name if sid == "janma-kundali" else None,
             "whatsapp_notification_status": wa_result.get("status"),
         }
+
+        # Auto-create Razorpay order for online consultation flow
+        if current_payment_mode == "online" and payable_amount > 0:
+            try:
+                from app.services.razorpay_service import RazorpayService
+                amount_paise = int(payable_amount * 100)
+                clean_receipt = f"cns_{consultation.consultation_number.replace('#', '').replace('-', '')}"[:40]
+                rzp_res = RazorpayService.create_order(
+                    amount_paise=amount_paise,
+                    receipt=clean_receipt,
+                    notes={
+                        "consultation_number": consultation.consultation_number,
+                        "consultation_id": str(consultation.id),
+                        "customer_email": consultation.customer_email,
+                        "topic": consultation.topic,
+                    }
+                )
+                if c_txn:
+                    c_txn.gateway_order_id = rzp_res["razorpay_order_id"]
+                    db.session.commit()
+                resp["razorpay"] = {
+                    "order_id": rzp_res["razorpay_order_id"],
+                    "amount": rzp_res["amount"],
+                    "currency": rzp_res["currency"],
+                    "key_id": rzp_res["key_id"],
+                }
+            except Exception as e:
+                current_app.logger.warning(f"Could not auto-generate Razorpay order on consultation: {e}")
+
         if current_payment_mode == "offline":
             resp["offline_payment_instructions"] = PaymentModeService.get_offline_payment_instructions()
             resp["offline_qr_code"] = PaymentModeService.get_offline_qr_code()
@@ -1013,7 +1095,13 @@ def api_checkout():
     customer_email = data.get("customer_email", "").strip().lower()
     customer_phone = data.get("customer_phone", "").strip()
     raw_shipping_addr = data.get("shipping_address", "")
+    cust_city = str(data.get("city") or "").strip()
+    cust_state = str(data.get("state") or "").strip()
+    cust_pincode = str(data.get("pincode") or data.get("postal_code") or "").strip()
     if isinstance(raw_shipping_addr, dict):
+        cust_city = cust_city or str(raw_shipping_addr.get("city") or "").strip()
+        cust_state = cust_state or str(raw_shipping_addr.get("state") or "").strip()
+        cust_pincode = cust_pincode or str(raw_shipping_addr.get("pincode") or raw_shipping_addr.get("postal_code") or "").strip()
         parts = [
             raw_shipping_addr.get("address_line1"),
             raw_shipping_addr.get("address_line2"),
@@ -1035,29 +1123,39 @@ def api_checkout():
     if not raw_items:
         return jsonify({"error": "Cart cannot be empty"}), 400
 
-    # Strict COD removal: Reject Cash on Delivery completely from storefront checkout
-    raw_method_check = str(data.get("payment_method") or "").strip().lower()
-    if raw_method_check in ("cash on delivery", "cod", "pay on delivery"):
-        return jsonify({"error": "Cash on Delivery is not available for this checkout."}), 400
+    # Mandatory Return & Cancellation Policy acceptance enforcement
+    policy_accepted = data.get("policy_accepted")
+    if policy_accepted not in (True, "true", "True", 1, "1"):
+        return jsonify({"error": "Please review and accept the Return, Refund, and Cancellation policy to proceed with checkout."}), 400
+    policy_version = str(data.get("policy_version") or "v1.0-2026").strip()
 
     from app.services.payment_mode_service import PaymentModeService
     from app.services.whatsapp_service import WhatsAppNotificationService
 
     current_payment_mode = PaymentModeService.get_payment_mode()
     client_payment_mode = str(data.get("payment_mode") or "").strip().lower()
+    raw_method_check = str(data.get("payment_method") or "").strip().lower()
+    is_cod = raw_method_check in ("cash on delivery", "cod", "pay on delivery")
 
-    # Strict mode enforcement: prevent stale tabs from bypassing active mode
-    if current_payment_mode == "offline":
+    # Payment mode & method resolution
+    if is_cod:
+        order_payment_method = "COD"
+        order_payment_status = "cod_pending"
+        order_cod_status = "cod_pending"
+        notes_record = "Payment Mode: CASH ON DELIVERY (COD Pending Verification)"
+    elif current_payment_mode == "offline":
         if client_payment_mode == "online" or raw_method_check in ("razorpay", "online", "card"):
             return jsonify({"error": "Store is currently in Offline Payment Mode. Online checkout is disabled."}), 400
         order_payment_method = "Offline Payment"
         order_payment_status = "offline_pending"
+        order_cod_status = None
         notes_record = "Payment Mode: OFFLINE PAYMENT (WhatsApp / Direct Devotee Confirmation)"
     else:
         if client_payment_mode == "offline" or raw_method_check in ("offline payment", "whatsapp order", "whatsapp checkout", "offline / direct upi / bank transfer"):
             return jsonify({"error": "Store is currently in Online Payment Mode. Offline checkout is disabled."}), 400
         order_payment_method = "Razorpay"
         order_payment_status = "pending"
+        order_cod_status = None
         notes_record = "Payment Mode: ONLINE GATEWAY (Awaiting Verification/Capture)"
 
     # Idempotency check: if client sent an idempotency key and order exists, return existing order
@@ -1138,6 +1236,9 @@ def api_checkout():
                 full_name=customer_name,
                 email=customer_email,
                 phone=customer_phone,
+                city=cust_city or None,
+                state=cust_state or None,
+                pincode=cust_pincode or None,
                 address=shipping_address,
                 total_orders=1,
                 total_spent=total_amount,
@@ -1150,6 +1251,14 @@ def api_checkout():
             customer.total_spent += total_amount
             if customer_phone:
                 customer.phone = customer_phone
+            if cust_city:
+                customer.city = cust_city
+            if cust_state:
+                customer.state = cust_state
+            if cust_pincode:
+                customer.pincode = cust_pincode
+            if shipping_address:
+                customer.address = shipping_address
 
         # Concurrency-safe sequential serial order number generation (#ORD1091, #ORD1092, ...)
         import re
@@ -1192,6 +1301,9 @@ def api_checkout():
             order_status="pending",
             payment_status=order_payment_status,
             payment_method=order_payment_method,
+            cod_status=order_cod_status,
+            policy_accepted_at=datetime.now(timezone.utc),
+            policy_version=policy_version,
             admin_notes=notes_record,
             access_token=order_access_token,
             idempotency_key=idempotency_key if idempotency_key else None,
@@ -1214,9 +1326,37 @@ def api_checkout():
 
         db.session.commit()
 
+        # Create or update PaymentTransaction record for comprehensive admin tracking
+        line_summary = ", ".join([f"{it['product_name']} x{it['quantity']}" for it in line_items_to_create[:3]])
+        txn_number = f"TXN-{order.order_number.replace('#', '')}"
+        existing_txn = PaymentTransaction.query.filter_by(transaction_number=txn_number).first()
+        if not existing_txn:
+            initial_status = "cod_pending" if order_payment_method == "COD" else ("pending" if current_payment_mode == "offline" else "initiated")
+            initial_gateway = "COD" if order_payment_method == "COD" else ("WhatsApp / Offline" if current_payment_mode == "offline" else "Razorpay")
+            txn = PaymentTransaction(
+                transaction_number=txn_number,
+                order_id=order.id,
+                amount=order.total_amount,
+                currency="INR",
+                gateway=initial_gateway,
+                payment_method=order_payment_method,
+                status=initial_status,
+                customer_name=order.customer_name,
+                customer_email=order.customer_email,
+                customer_phone=order.customer_phone,
+                item_summary=line_summary,
+                source_form="Store Checkout",
+                form_submission_id=order.order_number,
+                created_at=datetime.now(timezone.utc),
+            )
+            db.session.add(txn)
+            db.session.commit()
+        else:
+            txn = existing_txn
+
         # Trigger admin WhatsApp alert safely without rollback
         wa_result = WhatsAppNotificationService.send_admin_alert(
-            module_name="Product Order",
+            module_name="Product Order (COD)" if order.payment_method == "COD" else "Product Order",
             reference_id=order.order_number,
             customer_name=order.customer_name,
             customer_phone=order.customer_phone,
@@ -1285,9 +1425,9 @@ def api_checkout():
 @api_v1_bp.route("/payments/webhook", methods=["POST"])
 def payment_webhook():
     """
-    Payment Gateway Webhook (Razorpay / Stripe) with HMAC-SHA256 signature verification,
-    idempotency checking, amount mismatch rejection, and order status transition.
-    Fails closed if PAYMENT_WEBHOOK_SECRET is not configured.
+    Payment Gateway Webhook (Razorpay) with HMAC-SHA256 signature verification,
+    idempotency checking, amount mismatch rejection, and order/puja/consultation status transition.
+    Supports events: payment.captured, order.paid, payment.failed, refund.processed, refund.created.
     """
     import hmac
     import hashlib
@@ -1295,7 +1435,7 @@ def payment_webhook():
 
     raw_payload = request.get_data(as_text=True)
     signature = request.headers.get("X-Razorpay-Signature") or request.headers.get("X-Webhook-Signature")
-    webhook_secret = current_app.config.get("PAYMENT_WEBHOOK_SECRET")
+    webhook_secret = current_app.config.get("PAYMENT_WEBHOOK_SECRET") or current_app.config.get("RAZORPAY_KEY_SECRET")
 
     # Fail closed: never process webhooks without configured secret
     if not webhook_secret:
@@ -1330,76 +1470,250 @@ def payment_webhook():
 
     payload = data.get("payload", {})
     payment_obj = payload.get("payment", {}).get("entity", {}) if "payment" in payload else data
+    refund_obj = payload.get("refund", {}).get("entity", {}) if "refund" in payload else {}
 
-    order_number = payment_obj.get("order_number") or payment_obj.get("notes", {}).get("order_number")
-    amount_in_paise = payment_obj.get("amount")  # in paise: e.g. 129900 for ₹1299.00
-    gateway_payment_id = payment_obj.get("id", f"pay_sim_{int(datetime.now(timezone.utc).timestamp())}")
+    notes = payment_obj.get("notes", {}) or {}
+    order_number = payment_obj.get("order_number") or notes.get("order_number")
+    booking_number = payment_obj.get("booking_number") or notes.get("booking_number")
+    consultation_number = payment_obj.get("consultation_number") or notes.get("consultation_number")
+    receipt = payment_obj.get("receipt", "")
 
-    if not order_number:
-        return jsonify({"error": "Missing order_number in payment notes or entity"}), 400
+    # Fallback receipt parsing
+    if not order_number and not booking_number and not consultation_number and receipt:
+        if receipt.startswith("rcpt_ORD"):
+            order_number = f"#{receipt[5:]}"
+        elif receipt.startswith("puj_PUJ"):
+            booking_number = f"#PUJ-{receipt[7:]}"
+        elif receipt.startswith("cns_CNS"):
+            consultation_number = f"#CNS-{receipt[7:]}"
 
-    order = Order.query.filter_by(order_number=order_number).first()
-    if not order:
-        return jsonify({"error": f"Order '{order_number}' not found"}), 404
-
-    # Validate paid amount against order total (convert order.total_amount to paise)
-    if amount_in_paise is not None:
-        expected_paise = int(order.total_amount * 100)
-        if int(amount_in_paise) != expected_paise:
-            # Amount mismatch: reject and alert
-            return jsonify({
-                "error": "Payment amount mismatch",
-                "received_amount": amount_in_paise,
-                "expected_amount": expected_paise
-            }), 400
-
+    amount_in_paise = payment_obj.get("amount")  # in paise
+    gateway_payment_id = payment_obj.get("id", f"pay_wh_{int(datetime.now(timezone.utc).timestamp())}")
+    gateway_order_id = payment_obj.get("order_id")
     event_type = data.get("event")
+
+    # Handle refund event
+    if event_type in ("refund.processed", "refund.created") or refund_obj:
+        ref_payment_id = refund_obj.get("payment_id") or gateway_payment_id
+        ref_amount = Decimal(refund_obj.get("amount", 0)) / Decimal("100.0") if refund_obj.get("amount") else Decimal("0.00")
+        txn = PaymentTransaction.query.filter(
+            (PaymentTransaction.gateway_payment_id == ref_payment_id) |
+            (PaymentTransaction.gateway_order_id == gateway_order_id)
+        ).first()
+
+        if txn:
+            txn.refund_status = "refunded"
+            txn.refund_amount = ref_amount if ref_amount > 0 else txn.amount
+            txn.status = "refunded"
+            txn.updated_at = datetime.now(timezone.utc)
+            if txn.order:
+                txn.order.payment_status = "refunded"
+            db.session.commit()
+            return jsonify({"status": "refund_processed", "transaction_number": txn.transaction_number}), 200
+
+    # Handle payment failure event
     if event_type == "payment.failed":
+        fail_txn_num = f"TXN-FAIL-{gateway_payment_id}"
+        existing_fail = PaymentTransaction.query.filter_by(transaction_number=fail_txn_num).first()
+        if not existing_fail:
+            error_desc = payment_obj.get("error_description") or "Webhook: Payment failed"
+            txn = PaymentTransaction(
+                transaction_number=fail_txn_num,
+                amount=Decimal(amount_in_paise or 0) / Decimal("100.0") if amount_in_paise else Decimal("0.00"),
+                currency="INR",
+                gateway="Razorpay",
+                gateway_payment_id=gateway_payment_id,
+                gateway_order_id=gateway_order_id,
+                status="failed",
+                customer_name=payment_obj.get("notes", {}).get("customer_name") or "Devotee",
+                customer_email=payment_obj.get("email"),
+                customer_phone=payment_obj.get("contact"),
+                error_message=error_desc,
+                created_at=datetime.now(timezone.utc),
+            )
+            if order_number:
+                order = _find_order(order_number)
+                if order:
+                    txn.order_id = order.id
+                    txn.customer_name = order.customer_name
+                    txn.source_form = "Store Checkout"
+                    txn.form_submission_id = order.order_number
+            elif booking_number:
+                booking = PujaBooking.query.filter_by(booking_number=str(booking_number).strip()).first()
+                if booking:
+                    txn.booking_id = booking.id
+                    txn.customer_name = booking.customer_name
+                    txn.source_form = "Puja Booking"
+                    txn.form_submission_id = booking.booking_number
+            elif consultation_number:
+                cns = JyotishConsultation.query.filter_by(consultation_number=str(consultation_number).strip()).first()
+                if cns:
+                    txn.consultation_id = cns.id
+                    txn.customer_name = cns.customer_name
+                    txn.source_form = "Consultation Booking"
+                    txn.form_submission_id = cns.consultation_number
+
+            db.session.add(txn)
+            db.session.commit()
+        return jsonify({"status": "payment_failure_recorded", "gateway_payment_id": gateway_payment_id}), 200
+
+    # Successful payment capture: Order, PujaBooking, or Consultation
+    if order_number:
+        order = _find_order(order_number)
+        if not order:
+            return jsonify({"error": f"Order '{order_number}' not found"}), 404
+
+        if amount_in_paise is not None:
+            expected_paise = int(order.total_amount * 100)
+            if int(amount_in_paise) != expected_paise:
+                return jsonify({
+                    "error": "Payment amount mismatch",
+                    "received_amount": amount_in_paise,
+                    "expected_amount": expected_paise
+                }), 400
+
         if order.payment_status != "paid":
-            fail_txn_num = f"TXN-WH-FAIL-{order.order_number.replace('#', '')}-{gateway_payment_id}"
-            if not PaymentTransaction.query.filter_by(transaction_number=fail_txn_num).first():
-                error_desc = payment_obj.get("error_description") or "Webhook: Payment failed"
+            order.payment_status = "paid"
+            if order.order_status == "pending":
+                order.order_status = "processing"
+
+            txn_number = f"TXN-{order.order_number.replace('#', '')}-{gateway_payment_id}"
+            txn = PaymentTransaction.query.filter_by(transaction_number=txn_number).first()
+            if not txn:
+                base_txn = PaymentTransaction.query.filter_by(order_id=order.id).order_by(PaymentTransaction.id.desc()).first()
+                if base_txn and base_txn.status != "captured":
+                    txn = base_txn
+                    txn.transaction_number = txn_number
+                    txn.gateway_payment_id = gateway_payment_id
+                    txn.gateway_order_id = gateway_order_id
+                    txn.status = "captured"
+                    txn.payment_method = "Razorpay"
+                    txn.updated_at = datetime.now(timezone.utc)
+                else:
+                    txn = PaymentTransaction(
+                        transaction_number=txn_number,
+                        order_id=order.id,
+                        amount=order.total_amount,
+                        currency="INR",
+                        gateway="Razorpay",
+                        gateway_payment_id=gateway_payment_id,
+                        gateway_order_id=gateway_order_id,
+                        status="captured",
+                        payment_method="Razorpay",
+                        customer_name=order.customer_name,
+                        customer_email=order.customer_email,
+                        customer_phone=order.customer_phone,
+                        item_summary=f"Order {order.order_number}",
+                        source_form="Store Checkout",
+                        form_submission_id=order.order_number,
+                        created_at=datetime.now(timezone.utc),
+                    )
+                    db.session.add(txn)
+            else:
+                txn.status = "captured"
+                txn.updated_at = datetime.now(timezone.utc)
+
+            db.session.commit()
+
+        return jsonify({"status": "payment_processed", "order_number": order.order_number}), 200
+
+    elif booking_number:
+        booking = PujaBooking.query.filter_by(booking_number=str(booking_number).strip()).first()
+        if not booking:
+            return jsonify({"error": f"Booking '{booking_number}' not found"}), 404
+
+        svc_price = booking.service.price if booking.service else Decimal("0.00")
+        booking.status = "confirmed"
+        booking.amount_paid = svc_price
+
+        txn_number = f"TXN-PUJ-{booking.id}-{gateway_payment_id}"
+        txn = PaymentTransaction.query.filter_by(transaction_number=txn_number).first()
+        if not txn:
+            base_p = PaymentTransaction.query.filter_by(booking_id=booking.id).order_by(PaymentTransaction.id.desc()).first()
+            if base_p and base_p.status != "captured":
+                txn = base_p
+                txn.transaction_number = txn_number
+                txn.gateway_payment_id = gateway_payment_id
+                txn.gateway_order_id = gateway_order_id
+                txn.status = "captured"
+                txn.payment_method = "Razorpay"
+                txn.updated_at = datetime.now(timezone.utc)
+            else:
                 txn = PaymentTransaction(
-                    transaction_number=fail_txn_num,
-                    order_id=order.id,
-                    amount=order.total_amount,
+                    transaction_number=txn_number,
+                    booking_id=booking.id,
+                    amount=svc_price,
                     currency="INR",
                     gateway="Razorpay",
                     gateway_payment_id=gateway_payment_id,
-                    gateway_order_id=payment_obj.get("order_id"),
-                    status="failed",
-                    customer_name=order.customer_name,
-                    customer_email=order.customer_email,
-                    error_message=error_desc,
+                    gateway_order_id=gateway_order_id,
+                    status="captured",
+                    payment_method="Razorpay",
+                    customer_name=booking.customer_name,
+                    customer_email=booking.customer_email,
+                    customer_phone=booking.customer_phone,
+                    item_summary=booking.service.name if booking.service else "Vedic Puja Seva",
+                    source_form="Puja Booking",
+                    form_submission_id=booking.booking_number,
                     created_at=datetime.now(timezone.utc),
                 )
                 db.session.add(txn)
-                db.session.commit()
-        return jsonify({"status": "payment_failure_processed", "order_number": order.order_number}), 200
+        else:
+            txn.status = "captured"
+            txn.updated_at = datetime.now(timezone.utc)
 
-    # Successful payment: transition order and create transaction
-    if order.payment_status != "paid":
-        order.payment_status = "paid"
-        if order.order_status == "pending":
-            order.order_status = "processing"
-
-        txn = PaymentTransaction(
-            transaction_number=f"TXN-{order.order_number.replace('#', '')}-{gateway_payment_id}",
-            order_id=order.id,
-            amount=order.total_amount,
-            currency="INR",
-            gateway="Razorpay",
-            gateway_payment_id=gateway_payment_id,
-            gateway_order_id=payment_obj.get("order_id"),
-            status="captured",
-            customer_name=order.customer_name,
-            customer_email=order.customer_email,
-            created_at=datetime.now(timezone.utc),
-        )
-        db.session.add(txn)
         db.session.commit()
+        return jsonify({"status": "booking_payment_processed", "booking_number": booking.booking_number}), 200
 
-    return jsonify({"status": "payment_processed", "order_number": order.order_number}), 200
+    elif consultation_number:
+        cns = JyotishConsultation.query.filter_by(consultation_number=str(consultation_number).strip()).first()
+        if not cns:
+            return jsonify({"error": f"Consultation '{consultation_number}' not found"}), 404
+
+        cns_amount = cns.amount_paid if cns.amount_paid > 0 else Decimal("101.00")
+        cns.status = "confirmed"
+        cns.amount_paid = cns_amount
+
+        txn_number = f"TXN-CNS-{cns.id}-{gateway_payment_id}"
+        txn = PaymentTransaction.query.filter_by(transaction_number=txn_number).first()
+        if not txn:
+            base_c = PaymentTransaction.query.filter_by(consultation_id=cns.id).order_by(PaymentTransaction.id.desc()).first()
+            if base_c and base_c.status != "captured":
+                txn = base_c
+                txn.transaction_number = txn_number
+                txn.gateway_payment_id = gateway_payment_id
+                txn.gateway_order_id = gateway_order_id
+                txn.status = "captured"
+                txn.payment_method = "Razorpay"
+                txn.updated_at = datetime.now(timezone.utc)
+            else:
+                txn = PaymentTransaction(
+                    transaction_number=txn_number,
+                    consultation_id=cns.id,
+                    amount=cns_amount,
+                    currency="INR",
+                    gateway="Razorpay",
+                    gateway_payment_id=gateway_payment_id,
+                    gateway_order_id=gateway_order_id,
+                    status="captured",
+                    payment_method="Razorpay",
+                    customer_name=cns.customer_name,
+                    customer_email=cns.customer_email,
+                    customer_phone=cns.customer_phone,
+                    item_summary=cns.topic or "Jyotish Consultation",
+                    source_form="Consultation Booking",
+                    form_submission_id=cns.consultation_number,
+                    created_at=datetime.now(timezone.utc),
+                )
+                db.session.add(txn)
+        else:
+            txn.status = "captured"
+            txn.updated_at = datetime.now(timezone.utc)
+
+        db.session.commit()
+        return jsonify({"status": "consultation_payment_processed", "consultation_number": cns.consultation_number}), 200
+
+    return jsonify({"error": "Missing order_number, booking_number, or consultation_number"}), 400
 
 
 def _verify_order_ownership(order):
@@ -1486,9 +1800,10 @@ def payment_create_order():
     data = request.get_json() or {}
     order_number = data.get("order_number") or data.get("order_id")
     booking_number = data.get("booking_number") or data.get("booking_id")
+    consultation_number = data.get("consultation_number") or data.get("consultation_id")
 
-    if not order_number and not booking_number:
-        return jsonify({"error": "order_number or booking_number is required"}), 400
+    if not order_number and not booking_number and not consultation_number:
+        return jsonify({"error": "order_number, booking_number, or consultation_number is required"}), 400
 
     from app.services.razorpay_service import RazorpayService
     from app.services.payment_mode_service import PaymentModeService
@@ -1587,6 +1902,71 @@ def payment_create_order():
             current_app.logger.error(f"Razorpay order creation failed for booking: {e}")
             return jsonify({"error": f"Failed to initialize booking payment: {str(e)}"}), 500
 
+    elif consultation_number:
+        consultation = JyotishConsultation.query.filter_by(consultation_number=str(consultation_number).strip()).first()
+        if not consultation:
+            return jsonify({"error": f"Consultation '{consultation_number}' not found"}), 404
+
+        if consultation.status in ("confirmed", "completed") and consultation.amount_paid > 0:
+            return jsonify({"error": "Consultation is already confirmed and paid"}), 400
+
+        c_amount = consultation.amount_paid if consultation.amount_paid > 0 else Decimal("101.00")
+        amount_paise = int(c_amount * 100)
+        clean_receipt = f"cns_{consultation.consultation_number.replace('#', '').replace('-', '')}"[:40]
+        notes = {
+            "consultation_number": consultation.consultation_number,
+            "consultation_id": str(consultation.id),
+            "customer_email": consultation.customer_email,
+            "topic": consultation.topic,
+            "type": "consultation_booking",
+        }
+
+        try:
+            rzp_res = RazorpayService.create_order(
+                amount_paise=amount_paise,
+                receipt=clean_receipt,
+                notes=notes,
+            )
+            c_txn = PaymentTransaction.query.filter_by(consultation_id=consultation.id).order_by(PaymentTransaction.id.desc()).first()
+            if not c_txn:
+                c_txn = PaymentTransaction(
+                    transaction_number=f"TXN-CNS-{consultation.id}",
+                    consultation_id=consultation.id,
+                    amount=c_amount,
+                    currency="INR",
+                    gateway="Razorpay",
+                    gateway_order_id=rzp_res["razorpay_order_id"],
+                    status="initiated",
+                    customer_name=consultation.customer_name,
+                    customer_email=consultation.customer_email,
+                    customer_phone=consultation.customer_phone,
+                    item_summary=consultation.topic,
+                    source_form="Consultation Booking",
+                    form_submission_id=consultation.consultation_number,
+                    created_at=datetime.now(timezone.utc),
+                )
+                db.session.add(c_txn)
+            else:
+                c_txn.gateway_order_id = rzp_res["razorpay_order_id"]
+                c_txn.status = "initiated"
+            db.session.commit()
+
+            return jsonify({
+                "success": True,
+                "consultation_number": consultation.consultation_number,
+                "consultation_id": consultation.id,
+                "amount": rzp_res["amount"],
+                "currency": rzp_res["currency"],
+                "razorpay_order_id": rzp_res["razorpay_order_id"],
+                "key_id": rzp_res["key_id"],
+                "customer_name": consultation.customer_name,
+                "customer_email": consultation.customer_email,
+                "customer_phone": consultation.customer_phone or "",
+            }), 200
+        except Exception as e:
+            current_app.logger.error(f"Razorpay consultation order creation failed: {e}")
+            return jsonify({"error": f"Failed to initialize payment: {str(e)}"}), 500
+
 
 @api_v1_bp.route("/payments/verify", methods=["POST"])
 def payment_verify():
@@ -1598,6 +1978,7 @@ def payment_verify():
     data = request.get_json() or {}
     order_number = data.get("order_number")
     booking_number = data.get("booking_number")
+    consultation_number = data.get("consultation_number")
     razorpay_order_id = data.get("razorpay_order_id")
     razorpay_payment_id = data.get("razorpay_payment_id")
     razorpay_signature = data.get("razorpay_signature")
@@ -1727,21 +2108,40 @@ def payment_verify():
         booking.amount_paid = booking_price
 
         txn_number = f"TXN-PUJ-{booking.id}-{razorpay_payment_id}"
-        if not PaymentTransaction.query.filter_by(transaction_number=txn_number).first():
-            txn = PaymentTransaction(
-                transaction_number=txn_number,
-                booking_id=booking.id,
-                amount=booking_price,
-                currency="INR",
-                gateway="Razorpay",
-                gateway_payment_id=razorpay_payment_id,
-                gateway_order_id=razorpay_order_id,
-                status="captured",
-                customer_name=booking.customer_name,
-                customer_email=booking.customer_email,
-                created_at=datetime.now(timezone.utc),
-            )
-            db.session.add(txn)
+        existing_p = PaymentTransaction.query.filter_by(transaction_number=txn_number).first()
+        if not existing_p:
+            base_p = PaymentTransaction.query.filter_by(booking_id=booking.id).order_by(PaymentTransaction.id.desc()).first()
+            if base_p and base_p.status != "captured":
+                txn = base_p
+                txn.transaction_number = txn_number
+                txn.gateway_payment_id = razorpay_payment_id
+                txn.gateway_order_id = razorpay_order_id
+                txn.status = "captured"
+                txn.payment_method = "Razorpay"
+                txn.updated_at = datetime.now(timezone.utc)
+            else:
+                txn = PaymentTransaction(
+                    transaction_number=txn_number,
+                    booking_id=booking.id,
+                    amount=booking_price,
+                    currency="INR",
+                    gateway="Razorpay",
+                    gateway_payment_id=razorpay_payment_id,
+                    gateway_order_id=razorpay_order_id,
+                    status="captured",
+                    payment_method="Razorpay",
+                    customer_name=booking.customer_name,
+                    customer_email=booking.customer_email,
+                    customer_phone=booking.customer_phone,
+                    item_summary=booking.service.name if booking.service else "Vedic Puja Seva",
+                    source_form="Puja Booking",
+                    form_submission_id=booking.booking_number,
+                    created_at=datetime.now(timezone.utc),
+                )
+                db.session.add(txn)
+        else:
+            existing_p.status = "captured"
+            existing_p.updated_at = datetime.now(timezone.utc)
 
         db.session.commit()
 
@@ -1765,6 +2165,77 @@ def payment_verify():
             "booking_status": booking.status,
             "amount_paid": float(booking.amount_paid),
             "transaction_number": txn_number,
+            "gateway_payment_id": razorpay_payment_id,
+        }), 200
+
+    elif consultation_number:
+        consultation = JyotishConsultation.query.filter_by(consultation_number=str(consultation_number).strip()).first()
+        if not consultation:
+            return jsonify({"error": f"Consultation '{consultation_number}' not found"}), 404
+
+        consult_fee = consultation.amount_paid if consultation.amount_paid > 0 else Decimal("101.00")
+        consultation.status = "confirmed"
+        consultation.amount_paid = consult_fee
+
+        txn_number = f"TXN-CNS-{consultation.id}-{razorpay_payment_id}"
+        existing_c = PaymentTransaction.query.filter_by(transaction_number=txn_number).first()
+        if not existing_c:
+            base_c = PaymentTransaction.query.filter_by(consultation_id=consultation.id).order_by(PaymentTransaction.id.desc()).first()
+            if base_c and base_c.status != "captured":
+                txn = base_c
+                txn.transaction_number = txn_number
+                txn.gateway_payment_id = razorpay_payment_id
+                txn.gateway_order_id = razorpay_order_id
+                txn.status = "captured"
+                txn.payment_method = "Razorpay"
+                txn.updated_at = datetime.now(timezone.utc)
+            else:
+                txn = PaymentTransaction(
+                    transaction_number=txn_number,
+                    consultation_id=consultation.id,
+                    amount=consult_fee,
+                    currency="INR",
+                    gateway="Razorpay",
+                    gateway_payment_id=razorpay_payment_id,
+                    gateway_order_id=razorpay_order_id,
+                    status="captured",
+                    payment_method="Razorpay",
+                    customer_name=consultation.customer_name,
+                    customer_email=consultation.customer_email,
+                    customer_phone=consultation.customer_phone,
+                    item_summary=consultation.topic or "Jyotish Consultation",
+                    source_form="Consultation Booking",
+                    form_submission_id=consultation.consultation_number,
+                    created_at=datetime.now(timezone.utc),
+                )
+                db.session.add(txn)
+        else:
+            existing_c.status = "captured"
+            existing_c.updated_at = datetime.now(timezone.utc)
+
+        db.session.commit()
+
+        AuditService.log(
+            action="CONSULTATION_PAYMENT_CAPTURED",
+            module="services",
+            actor_email=consultation.customer_email,
+            entity_type="JyotishConsultation",
+            entity_id=str(consultation.id),
+            details={
+                "consultation_number": consultation.consultation_number,
+                "amount": str(consult_fee),
+                "gateway_payment_id": razorpay_payment_id,
+            },
+        )
+
+        return jsonify({
+            "status": "success",
+            "message": "Consultation payment verified and confirmed",
+            "consultation_number": consultation.consultation_number,
+            "status": "confirmed",
+            "amount_paid": float(consultation.amount_paid),
+            "transaction_number": txn_number,
+            "gateway_payment_id": razorpay_payment_id,
         }), 200
 
 
@@ -1839,13 +2310,36 @@ def payment_failure():
         if not booking:
             return jsonify({"error": f"Booking '{booking_number}' not found"}), 404
 
+        p_txn = PaymentTransaction.query.filter_by(booking_id=booking.id).order_by(PaymentTransaction.id.desc()).first()
+        if p_txn:
+            p_txn.status = "failed"
+            p_txn.error_message = f"[{error_code}] {error_description}"
+            db.session.commit()
+
         return jsonify({
             "status": "failure_recorded",
             "booking_number": booking.booking_number,
             "booking_status": booking.status,
         }), 200
 
-    return jsonify({"error": "order_number or booking_number is required"}), 400
+    elif consultation_number:
+        consultation = JyotishConsultation.query.filter_by(consultation_number=str(consultation_number).strip()).first()
+        if not consultation:
+            return jsonify({"error": f"Consultation '{consultation_number}' not found"}), 404
+
+        c_txn = PaymentTransaction.query.filter_by(consultation_id=consultation.id).order_by(PaymentTransaction.id.desc()).first()
+        if c_txn:
+            c_txn.status = "failed"
+            c_txn.error_message = f"[{error_code}] {error_description}"
+            db.session.commit()
+
+        return jsonify({
+            "status": "failure_recorded",
+            "consultation_number": consultation.consultation_number,
+            "consultation_status": consultation.status,
+        }), 200
+
+    return jsonify({"error": "order_number, booking_number, or consultation_number is required"}), 400
 
 
 @api_v1_bp.route("/payments/status/<order_number>", methods=["GET"])

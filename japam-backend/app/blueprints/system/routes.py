@@ -5,6 +5,7 @@ from app.models.operations import SystemSetting
 from app.services.rbac_service import login_required, permission_required, get_current_admin
 from app.services.report_service import ReportService
 from app.services.audit_service import AuditService
+from app.utils.date_filter import apply_date_time_filters, extract_date_filter_context
 
 system_bp = Blueprint("system", __name__, url_prefix="/admin/system")
 
@@ -152,8 +153,10 @@ def audit_logs_list():
     if module:
         q = q.filter_by(module=module)
 
+    q = apply_date_time_filters(q, AuditLog.created_at, request.args)
+    date_filter = extract_date_filter_context(request.args)
     logs = q.order_by(AuditLog.created_at.desc()).limit(100).all()
-    return render_template("system/audit_logs.html", current_user=user, logs=logs, selected_action=action, selected_module=module, active_page="audit_logs")
+    return render_template("system/audit_logs.html", current_user=user, logs=logs, selected_action=action, selected_module=module, active_page="audit_logs", date_filter=date_filter)
 
 
 # -------------------------------------------------------------

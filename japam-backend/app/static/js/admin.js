@@ -236,3 +236,40 @@ function closeModal(modalId) {
   const el = document.getElementById(modalId);
   if (el) el.classList.remove("active");
 }
+
+// Date-Time Filter Bar Interactions
+document.addEventListener("DOMContentLoaded", () => {
+  const filterForms = document.querySelectorAll(".date-time-filter-form");
+  filterForms.forEach((form) => {
+    const presetSelect = form.querySelector("select[name='date_preset']");
+    const dateInput = form.querySelector("input[name='filter_date']");
+    const monthInput = form.querySelector("input[name='filter_month']");
+
+    if (presetSelect && (dateInput || monthInput)) {
+      presetSelect.addEventListener("change", () => {
+        if (presetSelect.value && presetSelect.value !== "all") {
+          if (dateInput) dateInput.value = "";
+          if (monthInput) monthInput.value = "";
+        }
+      });
+    }
+
+    if (dateInput && presetSelect) {
+      dateInput.addEventListener("change", () => {
+        if (dateInput.value) {
+          presetSelect.value = "";
+          if (monthInput) monthInput.value = "";
+        }
+      });
+    }
+
+    if (monthInput && presetSelect) {
+      monthInput.addEventListener("change", () => {
+        if (monthInput.value) {
+          presetSelect.value = "";
+          if (dateInput) dateInput.value = "";
+        }
+      });
+    }
+  });
+});

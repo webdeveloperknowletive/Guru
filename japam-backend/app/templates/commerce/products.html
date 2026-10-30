@@ -35,37 +35,35 @@
   </a>
 </div>
 
-<!-- Filters Bar -->
-<div class="dashboard-card" style="margin-bottom: 1.5rem; padding: 1rem 1.25rem;">
-  <form method="GET" action="{{ url_for('commerce.products_list') }}" style="display:flex; gap:1rem; flex-wrap:wrap; align-items:center;">
-    <div style="flex:1; min-width:200px;">
-      <input type="text" name="q" class="form-control" placeholder="Search by product name or SKU..." value="{{ search_query or '' }}">
-    </div>
-    <div style="min-width:160px;">
-      <select name="category_id" class="form-control" onchange="this.form.submit()">
-        <option value="">All Categories</option>
-        {% for cat in categories %}
-          <option value="{{ cat.id }}" {% if selected_category == cat.id or selected_category == cat.id|string or (selected_category|string|lower == cat.name|lower) or (selected_category|string|lower == cat.slug|lower) %}selected{% endif %}>{{ cat.name }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div style="min-width:150px;">
-      <select name="archive_status" class="form-control" onchange="this.form.submit()">
-        <option value="all" {% if not archive_status or archive_status == 'all' %}selected{% endif %}>Filter: All ({{ count_all }})</option>
-        <option value="active" {% if archive_status == 'active' %}selected{% endif %}>Filter: Active ({{ count_active }})</option>
-        <option value="archived" {% if archive_status == 'archived' %}selected{% endif %}>Filter: Archived ({{ count_archived }})</option>
-      </select>
-    </div>
-    <div style="min-width:140px;">
-      <select name="status" class="form-control" onchange="this.form.submit()">
-        <option value="">All Publication States</option>
-        <option value="published" {% if selected_status == 'published' %}selected{% endif %}>Published</option>
-        <option value="draft" {% if selected_status == 'draft' %}selected{% endif %}>Draft</option>
-      </select>
-    </div>
-    <button type="submit" class="btn-secondary">Filter</button>
-  </form>
-</div>
+<!-- Filters Bar with Date, Time, Day, Month, Category, Status -->
+{% set extra_filter_slot %}
+  <div style="min-width:150px;">
+    <select name="category_id" class="form-control" style="font-size:0.82rem; padding:0.45rem 0.65rem;">
+      <option value="">All Categories</option>
+      {% for cat in categories %}
+        <option value="{{ cat.id }}" {% if selected_category == cat.id or selected_category == cat.id|string or (selected_category|string|lower == cat.name|lower) or (selected_category|string|lower == cat.slug|lower) %}selected{% endif %}>{{ cat.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div style="min-width:140px;">
+    <select name="archive_status" class="form-control" style="font-size:0.82rem; padding:0.45rem 0.65rem;">
+      <option value="all" {% if not archive_status or archive_status == 'all' %}selected{% endif %}>Filter: All ({{ count_all }})</option>
+      <option value="active" {% if archive_status == 'active' %}selected{% endif %}>Filter: Active ({{ count_active }})</option>
+      <option value="archived" {% if archive_status == 'archived' %}selected{% endif %}>Filter: Archived ({{ count_archived }})</option>
+    </select>
+  </div>
+  <div style="min-width:140px;">
+    <select name="status" class="form-control" style="font-size:0.82rem; padding:0.45rem 0.65rem;">
+      <option value="">All Publication States</option>
+      <option value="published" {% if selected_status == 'published' %}selected{% endif %}>Published</option>
+      <option value="draft" {% if selected_status == 'draft' %}selected{% endif %}>Draft</option>
+    </select>
+  </div>
+{% endset %}
+
+{% with filter_action_url=url_for('commerce.products_list'), custom_search_placeholder="Search by product name or SKU...", extra_filter_slot=extra_filter_slot %}
+  {% include "components/date_time_filter_bar.html" %}
+{% endwith %}
 
 <!-- Products Table Card -->
 <div class="dashboard-card">

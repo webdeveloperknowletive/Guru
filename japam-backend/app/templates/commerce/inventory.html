@@ -82,6 +82,10 @@
     <h2 class="card-title">Recent Inventory Adjustments</h2>
   </div>
 
+  {% with filter_action_url=url_for('commerce.inventory_list') %}
+    {% include "components/date_time_filter_bar.html" %}
+  {% endwith %}
+
   <div class="table-responsive">
     <table class="spiritual-table">
       <thead>

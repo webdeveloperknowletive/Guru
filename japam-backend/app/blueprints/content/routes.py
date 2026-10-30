@@ -10,6 +10,7 @@ from app.models.operations import Coupon
 from app.services.rbac_service import login_required, permission_required, get_current_admin
 from app.services.audit_service import AuditService
 from app.services.section_service import SectionService
+from app.utils.date_filter import apply_date_time_filters, extract_date_filter_context
 
 content_bp = Blueprint("content", __name__, url_prefix="/admin/content")
 
@@ -22,8 +23,11 @@ content_bp = Blueprint("content", __name__, url_prefix="/admin/content")
 @permission_required("content", "view")
 def blog_list():
     user = get_current_admin()
-    posts = BlogPost.query.order_by(BlogPost.created_at.desc()).all()
-    return render_template("content/blog.html", current_user=user, posts=posts, active_page="blog")
+    q = BlogPost.query
+    q = apply_date_time_filters(q, BlogPost.created_at, request.args)
+    date_filter = extract_date_filter_context(request.args)
+    posts = q.order_by(BlogPost.created_at.desc()).all()
+    return render_template("content/blog.html", current_user=user, posts=posts, active_page="blog", date_filter=date_filter)
 
 
 @content_bp.route("/blog/create", methods=["POST"])

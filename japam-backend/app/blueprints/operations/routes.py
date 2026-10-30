@@ -1,29 +1,173 @@
+import csv
+import io
 from datetime import datetime, timezone
 from decimal import Decimal
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, Response, jsonify
+from sqlalchemy import or_
 from app.extensions import db
 from app.models.operations import PaymentTransaction, Coupon, ReturnRequest, CustomerEnquiry
 from app.services.rbac_service import login_required, permission_required, get_current_admin
 from app.services.audit_service import AuditService
+from app.services.razorpay_service import RazorpayService
+from app.utils.date_filter import apply_date_time_filters, extract_date_filter_context
 
 operations_bp = Blueprint("operations", __name__, url_prefix="/admin/operations")
 
 
 # -------------------------------------------------------------
-# Payments
+# Payments & Transactions
 # -------------------------------------------------------------
 @operations_bp.route("/payments")
 @login_required
 @permission_required("operations", "view")
 def payments_list():
     user = get_current_admin()
-    status = request.args.get("status")
-    q = PaymentTransaction.query
-    if status:
-        q = q.filter_by(status=status)
+    status = request.args.get("status", "").strip()
+    source_form = request.args.get("source_form", "").strip()
+    payment_method = request.args.get("payment_method", "").strip()
+    search_query = request.args.get("q", "").strip()
 
+    q = PaymentTransaction.query
+
+    if status and status != "all":
+        q = q.filter(PaymentTransaction.status == status)
+
+    if source_form and source_form != "all":
+        q = q.filter(PaymentTransaction.source_form == source_form)
+
+    if payment_method and payment_method != "all":
+        q = q.filter(PaymentTransaction.payment_method == payment_method)
+
+    if search_query:
+        search_pattern = f"%{search_query}%"
+        q = q.filter(
+            or_(
+                PaymentTransaction.transaction_number.ilike(search_pattern),
+                PaymentTransaction.customer_name.ilike(search_pattern),
+                PaymentTransaction.customer_email.ilike(search_pattern),
+                PaymentTransaction.customer_phone.ilike(search_pattern),
+                PaymentTransaction.form_submission_id.ilike(search_pattern),
+                PaymentTransaction.gateway_payment_id.ilike(search_pattern),
+                PaymentTransaction.gateway_order_id.ilike(search_pattern),
+                PaymentTransaction.item_summary.ilike(search_pattern),
+            )
+        )
+
+    q = apply_date_time_filters(q, PaymentTransaction.created_at, request.args)
+    date_filter = extract_date_filter_context(request.args)
     transactions = q.order_by(PaymentTransaction.created_at.desc()).all()
-    return render_template("operations/payments.html", current_user=user, transactions=transactions, selected_status=status, active_page="payments")
+
+    # Dynamic counts for summary chips
+    total_count = PaymentTransaction.query.count()
+    captured_count = PaymentTransaction.query.filter(PaymentTransaction.status.in_(["captured", "paid"])).count()
+    pending_count = PaymentTransaction.query.filter(PaymentTransaction.status.in_(["pending", "initiated"])).count()
+    cod_pending_count = PaymentTransaction.query.filter(PaymentTransaction.status == "cod_pending").count()
+    refunded_count = PaymentTransaction.query.filter(or_(PaymentTransaction.status == "refunded", PaymentTransaction.refund_status.isnot(None))).count()
+
+    counts = {
+        "all": total_count,
+        "captured": captured_count,
+        "pending": pending_count,
+        "cod_pending": cod_pending_count,
+        "refunded": refunded_count,
+    }
+
+    return render_template(
+        "operations/payments.html",
+        current_user=user,
+        transactions=transactions,
+        selected_status=status or "all",
+        selected_source_form=source_form or "all",
+        selected_payment_method=payment_method or "all",
+        search_query=search_query,
+        counts=counts,
+        active_page="payments",
+        date_filter=date_filter,
+    )
+
+
+@operations_bp.route("/payments/export", methods=["GET"])
+@login_required
+@permission_required("operations", "view")
+def payments_export():
+    """Exports payment transactions to CSV matching current search/filter parameters."""
+    status = request.args.get("status", "").strip()
+    source_form = request.args.get("source_form", "").strip()
+    payment_method = request.args.get("payment_method", "").strip()
+    search_query = request.args.get("q", "").strip()
+
+    q = PaymentTransaction.query
+    if status and status != "all":
+        q = q.filter(PaymentTransaction.status == status)
+    if source_form and source_form != "all":
+        q = q.filter(PaymentTransaction.source_form == source_form)
+    if payment_method and payment_method != "all":
+        q = q.filter(PaymentTransaction.payment_method == payment_method)
+    if search_query:
+        search_pattern = f"%{search_query}%"
+        q = q.filter(
+            or_(
+                PaymentTransaction.transaction_number.ilike(search_pattern),
+                PaymentTransaction.customer_name.ilike(search_pattern),
+                PaymentTransaction.customer_email.ilike(search_pattern),
+                PaymentTransaction.customer_phone.ilike(search_pattern),
+                PaymentTransaction.form_submission_id.ilike(search_pattern),
+                PaymentTransaction.gateway_payment_id.ilike(search_pattern),
+            )
+        )
+    q = apply_date_time_filters(q, PaymentTransaction.created_at, request.args)
+    transactions = q.order_by(PaymentTransaction.created_at.desc()).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Transaction Number",
+        "Form Submission ID",
+        "Source Form",
+        "Customer Name",
+        "Customer Email",
+        "Customer Phone",
+        "Item / Service Summary",
+        "Amount (INR)",
+        "Currency",
+        "Gateway",
+        "Payment Method",
+        "Status",
+        "Gateway Order ID",
+        "Gateway Payment ID",
+        "Refund Status",
+        "Refund Amount (INR)",
+        "Created At",
+    ])
+
+    for t in transactions:
+        writer.writerow([
+            t.transaction_number,
+            t.form_submission_id or (t.order.order_number if t.order else (t.booking.booking_number if t.booking else (t.consultation.consultation_number if t.consultation else ""))),
+            t.source_form or ("Store Checkout" if t.order_id else ("Puja Booking" if t.booking_id else ("Consultation Booking" if t.consultation_id else "Direct"))),
+            t.customer_name or "",
+            t.customer_email or "",
+            t.customer_phone or "",
+            t.item_summary or "",
+            f"{float(t.amount):.2f}" if t.amount else "0.00",
+            t.currency or "INR",
+            t.gateway or "",
+            t.payment_method or "",
+            t.status or "",
+            t.gateway_order_id or "",
+            t.gateway_payment_id or "",
+            t.refund_status or "None",
+            f"{float(t.refund_amount):.2f}" if t.refund_amount else "0.00",
+            t.created_at.strftime("%Y-%m-%d %H:%M:%S UTC") if t.created_at else "",
+        ])
+
+    csv_data = output.getvalue()
+    filename = f"payment_transactions_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
+    return Response(
+        csv_data,
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 @operations_bp.route("/payments/<int:txn_id>/verify", methods=["POST"])
@@ -33,6 +177,16 @@ def payment_verify(txn_id):
     user = get_current_admin()
     txn = PaymentTransaction.query.get_or_404(txn_id)
     txn.status = "captured"
+    txn.updated_at = datetime.now(timezone.utc)
+    if txn.order:
+        txn.order.payment_status = "paid"
+        if txn.order.order_status == "pending":
+            txn.order.order_status = "processing"
+    elif txn.booking:
+        txn.booking.status = "confirmed"
+    elif txn.consultation:
+        txn.consultation.status = "confirmed"
+
     db.session.commit()
 
     AuditService.log(
@@ -44,8 +198,164 @@ def payment_verify(txn_id):
         entity_id=str(txn.id),
         details={"transaction_number": txn.transaction_number, "amount": str(txn.amount)},
     )
-    flash("Payment transaction verified successfully.", "success")
+    flash(f"Transaction {txn.transaction_number} marked as Captured & Verified.", "success")
     return redirect(url_for("operations.payments_list"))
+
+
+@operations_bp.route("/payments/<int:txn_id>/cod-status", methods=["POST"])
+@login_required
+@permission_required("operations", "edit")
+def payment_cod_status_update(txn_id):
+    user = get_current_admin()
+    txn = PaymentTransaction.query.get_or_404(txn_id)
+    new_cod_status = request.form.get("cod_status", "cod_collected").strip()
+
+    if new_cod_status == "cod_collected":
+        txn.status = "cod_collected"
+        txn.updated_at = datetime.now(timezone.utc)
+        if txn.order:
+            txn.order.payment_status = "paid"
+            txn.order.cod_status = "cod_collected"
+            if txn.order.order_status == "delivered":
+                txn.order.order_status = "completed"
+        flash(f"Transaction {txn.transaction_number} COD collected and order marked Paid.", "success")
+    elif new_cod_status == "cod_failed_returned":
+        txn.status = "cod_failed_returned"
+        txn.updated_at = datetime.now(timezone.utc)
+        if txn.order:
+            txn.order.payment_status = "failed"
+            txn.order.cod_status = "cod_failed_returned"
+            txn.order.order_status = "cancelled"
+        flash(f"Transaction {txn.transaction_number} marked COD Returned/Failed.", "warning")
+
+    db.session.commit()
+
+    AuditService.log(
+        action="COD_STATUS_UPDATE",
+        module="operations",
+        actor_email=user.email,
+        actor_user_id=user.id,
+        entity_type="PaymentTransaction",
+        entity_id=str(txn.id),
+        details={"cod_status": new_cod_status, "transaction_number": txn.transaction_number},
+    )
+    return redirect(url_for("operations.payments_list"))
+
+
+@operations_bp.route("/payments/<int:txn_id>/refund", methods=["POST"])
+@login_required
+@permission_required("operations", "edit")
+def payment_refund(txn_id):
+    user = get_current_admin()
+    txn = PaymentTransaction.query.get_or_404(txn_id)
+    refund_amount_raw = request.form.get("refund_amount")
+    notes = request.form.get("notes", "Customer requested refund via admin panel").strip()
+
+    try:
+        ref_amt = Decimal(refund_amount_raw) if refund_amount_raw else txn.amount
+    except Exception:
+        ref_amt = txn.amount
+
+    # If transaction has a Razorpay payment ID, initiate through Gateway API
+    if txn.gateway == "Razorpay" and txn.gateway_payment_id and not txn.gateway_payment_id.startswith("pay_sim_"):
+        try:
+            amount_paise = int(ref_amt * 100) if ref_amt else None
+            rzp_refund = RazorpayService.create_refund(
+                payment_id=txn.gateway_payment_id,
+                amount_paise=amount_paise,
+                notes={"admin_user": user.email, "reason": notes, "transaction_number": txn.transaction_number}
+            )
+            txn.refund_status = "refunded"
+            txn.refund_amount = ref_amt
+            txn.status = "refunded"
+            txn.updated_at = datetime.now(timezone.utc)
+            if txn.order:
+                txn.order.payment_status = "refunded"
+            db.session.commit()
+            flash(f"Refund of ₹{ref_amt:.2f} processed successfully via Razorpay (Refund ID: {rzp_refund.get('id', 'N/A')}).", "success")
+        except Exception as e:
+            flash(f"Razorpay refund API call failed: {str(e)}. Recording manual refund.", "warning")
+            txn.refund_status = "refunded"
+            txn.refund_amount = ref_amt
+            txn.status = "refunded"
+            txn.updated_at = datetime.now(timezone.utc)
+            if txn.order:
+                txn.order.payment_status = "refunded"
+            db.session.commit()
+    else:
+        # Offline or simulation refund
+        txn.refund_status = "refunded"
+        txn.refund_amount = ref_amt
+        txn.status = "refunded"
+        txn.updated_at = datetime.now(timezone.utc)
+        if txn.order:
+            txn.order.payment_status = "refunded"
+        db.session.commit()
+        flash(f"Transaction {txn.transaction_number} marked as Refunded (₹{ref_amt:.2f}).", "success")
+
+    AuditService.log(
+        action="PAYMENT_REFUND",
+        module="operations",
+        actor_email=user.email,
+        actor_user_id=user.id,
+        entity_type="PaymentTransaction",
+        entity_id=str(txn.id),
+        details={"amount": str(ref_amt), "notes": notes},
+    )
+    return redirect(url_for("operations.payments_list"))
+
+
+@operations_bp.route("/payments/<int:txn_id>/detail", methods=["GET"])
+@login_required
+@permission_required("operations", "view")
+def payment_detail_json(txn_id):
+    txn = PaymentTransaction.query.get_or_404(txn_id)
+    payload = {
+        "id": txn.id,
+        "transaction_number": txn.transaction_number,
+        "amount": float(txn.amount) if txn.amount else 0.0,
+        "currency": txn.currency,
+        "gateway": txn.gateway,
+        "payment_method": txn.payment_method,
+        "status": txn.status,
+        "customer_name": txn.customer_name,
+        "customer_email": txn.customer_email,
+        "customer_phone": txn.customer_phone,
+        "item_summary": txn.item_summary,
+        "source_form": txn.source_form,
+        "form_submission_id": txn.form_submission_id,
+        "gateway_order_id": txn.gateway_order_id,
+        "gateway_payment_id": txn.gateway_payment_id,
+        "refund_status": txn.refund_status,
+        "refund_amount": float(txn.refund_amount) if txn.refund_amount else 0.0,
+        "created_at": txn.created_at.strftime("%d %b %Y, %I:%M %p") if txn.created_at else "",
+        "updated_at": txn.updated_at.strftime("%d %b %Y, %I:%M %p") if txn.updated_at else "",
+        "error_message": txn.error_message,
+        "order": {
+            "order_number": txn.order.order_number,
+            "total_amount": float(txn.order.total_amount),
+            "payment_status": txn.order.payment_status,
+            "order_status": txn.order.order_status,
+            "cod_status": txn.order.cod_status,
+            "shipping_address": txn.order.shipping_address,
+            "policy_version": txn.order.policy_version,
+            "policy_accepted_at": txn.order.policy_accepted_at.strftime("%d %b %Y, %I:%M %p") if txn.order.policy_accepted_at else None,
+        } if txn.order else None,
+        "booking": {
+            "booking_number": txn.booking.booking_number,
+            "service_name": txn.booking.service.name if txn.booking.service else "",
+            "booking_date": str(txn.booking.booking_date),
+            "time_slot": txn.booking.time_slot,
+            "status": txn.booking.status,
+        } if txn.booking else None,
+        "consultation": {
+            "consultation_number": txn.consultation.consultation_number,
+            "topic": txn.consultation.topic,
+            "status": txn.consultation.status,
+            "consultation_type": txn.consultation.consultation_type,
+        } if txn.consultation else None,
+    }
+    return jsonify(payload), 200
 
 
 # -------------------------------------------------------------
@@ -56,8 +366,11 @@ def payment_verify(txn_id):
 @permission_required("operations", "view")
 def coupons_list():
     user = get_current_admin()
-    coupons = Coupon.query.order_by(Coupon.created_at.desc()).all()
-    return render_template("operations/coupons.html", current_user=user, coupons=coupons, active_page="coupons")
+    q = Coupon.query
+    q = apply_date_time_filters(q, Coupon.created_at, request.args)
+    date_filter = extract_date_filter_context(request.args)
+    coupons = q.order_by(Coupon.created_at.desc()).all()
+    return render_template("operations/coupons.html", current_user=user, coupons=coupons, active_page="coupons", date_filter=date_filter)
 
 
 @operations_bp.route("/coupons/create", methods=["POST"])
@@ -174,8 +487,11 @@ def coupon_delete(coupon_id):
 @permission_required("operations", "view")
 def shipping_list():
     user = get_current_admin()
-    returns = ReturnRequest.query.order_by(ReturnRequest.created_at.desc()).all()
-    return render_template("operations/shipping.html", current_user=user, returns=returns, active_page="shipping")
+    q = ReturnRequest.query
+    q = apply_date_time_filters(q, ReturnRequest.created_at, request.args)
+    date_filter = extract_date_filter_context(request.args)
+    returns = q.order_by(ReturnRequest.created_at.desc()).all()
+    return render_template("operations/shipping.html", current_user=user, returns=returns, active_page="shipping", date_filter=date_filter)
 
 
 @operations_bp.route("/returns/<int:ret_id>/status", methods=["POST"])
@@ -224,6 +540,8 @@ def enquiries_list():
         "closed": CustomerEnquiry.query.filter_by(status="closed").count(),
     }
 
+    q = apply_date_time_filters(q, CustomerEnquiry.created_at, request.args)
+    date_filter = extract_date_filter_context(request.args)
     enquiries = q.order_by(CustomerEnquiry.created_at.desc()).all()
     return render_template(
         "operations/enquiries.html",
@@ -231,7 +549,8 @@ def enquiries_list():
         enquiries=enquiries,
         selected_status=status or "all",
         counts=counts,
-        active_page="enquiries"
+        active_page="enquiries",
+        date_filter=date_filter,
     )
 
 

@@ -10,6 +10,7 @@ class PaymentTransaction(db.Model):
     transaction_number = db.Column(db.String(64), unique=True, nullable=False, index=True)
     order_id = db.Column(db.Integer, db.ForeignKey("orders.id", ondelete="SET NULL"), nullable=True, index=True)
     booking_id = db.Column(db.Integer, db.ForeignKey("puja_bookings.id", ondelete="SET NULL"), nullable=True, index=True)
+    consultation_id = db.Column(db.Integer, db.ForeignKey("jyotish_consultations.id", ondelete="SET NULL"), nullable=True, index=True)
 
     amount = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     currency = db.Column(db.String(10), default="INR", nullable=False)
@@ -17,12 +18,25 @@ class PaymentTransaction(db.Model):
     gateway_payment_id = db.Column(db.String(120), nullable=True, index=True)
     gateway_order_id = db.Column(db.String(120), nullable=True, index=True)
 
-    # captured, pending, failed, refunded
-    status = db.Column(db.String(50), default="captured", nullable=False, index=True)
+    # pending, initiated, successful, captured, failed, cancelled, refund_initiated, refunded, partially_refunded, cod_pending, cod_collected, cod_failed_returned
+    status = db.Column(db.String(50), default="initiated", nullable=False, index=True)
     customer_name = db.Column(db.String(150), nullable=True)
     customer_email = db.Column(db.String(255), nullable=True)
+    customer_phone = db.Column(db.String(30), nullable=True)
+    item_summary = db.Column(db.String(255), nullable=True)
+    source_form = db.Column(db.String(100), default="Store Checkout", nullable=False, index=True)  # Store Checkout, Puja Booking, Consultation Booking
+    form_submission_id = db.Column(db.String(100), nullable=True, index=True)
+    payment_method = db.Column(db.String(50), default="Razorpay", nullable=True)
+    refund_status = db.Column(db.String(50), default="none", nullable=True)
+    refund_amount = db.Column(db.Numeric(12, 2), default=Decimal("0.00"), nullable=True)
     error_message = db.Column(db.Text, nullable=True)
+
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+    order = db.relationship("Order", backref=db.backref("transactions", lazy=True))
+    booking = db.relationship("PujaBooking", backref=db.backref("transactions", lazy=True))
+    consultation = db.relationship("JyotishConsultation", backref=db.backref("transactions", lazy=True))
 
     def __repr__(self):
         return f"<PaymentTransaction {self.transaction_number} {self.amount} {self.status}>"

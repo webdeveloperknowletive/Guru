@@ -18,6 +18,10 @@
   </div>
 </div>
 
+{% with filter_action_url=url_for('services.puja_bookings_list') %}
+  {% include "components/date_time_filter_bar.html" %}
+{% endwith %}
+
 <div class="dashboard-card">
   <div class="table-responsive">
     <table class="spiritual-table">

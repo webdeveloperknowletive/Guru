@@ -39,6 +39,8 @@ export default function CheckoutModal() {
   });
 
   const [couponInput, setCouponInput] = useState(couponCode || '');
+  const [paymentMethodChoice, setPaymentMethodChoice] = useState('online'); // 'online' or 'cod'
+  const [policyAccepted, setPolicyAccepted] = useState(false);
   const [localValidationErr, setLocalValidationErr] = useState('');
 
   const confirmedScrollRef = useRef(null);
@@ -122,6 +124,11 @@ export default function CheckoutModal() {
       return;
     }
 
+    if (!policyAccepted) {
+      setLocalValidationErr('कृपया पुढे जाण्यासाठी रिटर्न व रिफंड पॉलिसी मान्य करा (Please accept the Return and Refund policy to proceed).');
+      return;
+    }
+
     if (!captchaToken) {
       setLocalValidationErr('Please complete the CAPTCHA verification (कृपया कॅप्चा पूर्ण करा).');
       setTimeout(() => {
@@ -133,11 +140,16 @@ export default function CheckoutModal() {
       return;
     }
 
+    const selectedMethod = paymentMode === 'offline' ? 'WhatsApp Order' : (paymentMethodChoice === 'cod' ? 'COD' : 'Razorpay');
+
     const res = await submitCheckout({
       name: form.name,
       email: form.email,
       phone: form.phone,
       address: fullAddress,
+      payment_method: selectedMethod,
+      policy_accepted: true,
+      policy_version: 'v1.0-2026',
       recaptcha_token: captchaToken,
     });
     if (!res || !res.success) {
@@ -269,7 +281,7 @@ export default function CheckoutModal() {
                   fontWeight: '700',
                   fontSize: '13px'
                 }}>
-                  {lastOrder.payment_status === 'paid' ? '✓ Paid via Razorpay' : (lastOrder.payment_status === 'offline_pending' ? 'Offline Payment Pending' : (lastOrder.payment_status || 'Pending'))}
+                  {lastOrder.payment_status === 'paid' ? '✓ Paid via Razorpay' : (lastOrder.payment_status === 'cod_pending' ? '📦 Cash on Delivery (COD Pending)' : (lastOrder.payment_status === 'offline_pending' ? 'Offline Payment Pending' : (lastOrder.payment_status || 'Pending')))}
                 </span>
               </div>
               {lastOrder.transaction_number && (
@@ -291,6 +303,13 @@ export default function CheckoutModal() {
                 <span style={{ color: 'var(--gold-lt)', fontSize: '13.5px' }}>Within 24 to 48 Hours</span>
               </div>
             </div>
+
+            {lastOrder.payment_method === 'COD' && (
+              <div style={{ maxWidth: '520px', margin: '0 auto 20px', padding: '14px 18px', background: 'rgba(99, 102, 241, 0.12)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: '10px', fontSize: '13px', color: '#c7d2fe', textAlign: 'left', lineHeight: '1.5' }}>
+                📦 <strong>Cash on Delivery (COD) Instructions:</strong><br />
+                Please keep exact cash of <strong>₹{Number(lastOrder.total_amount).toLocaleString('en-IN')}</strong> ready at the time of delivery. Our courier partner will deliver your consecrated sacred items within 2 to 4 business days.
+              </div>
+            )}
 
             {(lastOrder.payment_mode === 'offline' || lastOrder.payment_status === 'offline_pending') && (
               <OfflinePaymentBox
@@ -534,25 +553,35 @@ export default function CheckoutModal() {
                         </p>
                       </div>
                     ) : (
-                      <div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {/* Option 1: Razorpay Online */}
                         <div
+                          onClick={() => setPaymentMethodChoice('online')}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             padding: '12px 14px',
                             borderRadius: '8px',
-                            border: '1px solid var(--gold)',
-                            background: 'rgba(224, 176, 74, 0.08)',
+                            border: paymentMethodChoice === 'online' ? '2px solid var(--gold)' : '1px solid rgba(224, 176, 74, 0.25)',
+                            background: paymentMethodChoice === 'online' ? 'rgba(224, 176, 74, 0.12)' : 'rgba(255, 255, 255, 0.02)',
                             fontSize: '13px',
                             color: 'var(--cream)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span style={{ fontSize: '20px' }}>💳</span>
+                            <input
+                              type="radio"
+                              name="pay_choice"
+                              checked={paymentMethodChoice === 'online'}
+                              onChange={() => setPaymentMethodChoice('online')}
+                              style={{ accentColor: 'var(--gold)', cursor: 'pointer' }}
+                            />
                             <div>
                               <div style={{ fontWeight: '700', color: 'var(--gold-lt)' }}>
-                                Razorpay Secure Payment
+                                💳 Razorpay Secure Payment
                               </div>
                               <div style={{ fontSize: '11.5px', color: 'var(--muted)' }}>
                                 UPI (GPay, PhonePe, Paytm), Credit/Debit Cards, Net Banking
@@ -560,12 +589,91 @@ export default function CheckoutModal() {
                             </div>
                           </div>
                           <span style={{ fontSize: '11px', color: 'var(--gold-lt)', fontWeight: '700' }}>
-                            ✓ 100% Encrypted
+                            ✓ Instant
+                          </span>
+                        </div>
+
+                        {/* Option 2: Cash on Delivery (COD) */}
+                        <div
+                          onClick={() => setPaymentMethodChoice('cod')}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '12px 14px',
+                            borderRadius: '8px',
+                            border: paymentMethodChoice === 'cod' ? '2px solid var(--gold)' : '1px solid rgba(224, 176, 74, 0.25)',
+                            background: paymentMethodChoice === 'cod' ? 'rgba(224, 176, 74, 0.12)' : 'rgba(255, 255, 255, 0.02)',
+                            fontSize: '13px',
+                            color: 'var(--cream)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <input
+                              type="radio"
+                              name="pay_choice"
+                              checked={paymentMethodChoice === 'cod'}
+                              onChange={() => setPaymentMethodChoice('cod')}
+                              style={{ accentColor: 'var(--gold)', cursor: 'pointer' }}
+                            />
+                            <div>
+                              <div style={{ fontWeight: '700', color: 'var(--cream)' }}>
+                                📦 Cash on Delivery (COD)
+                              </div>
+                              <div style={{ fontSize: '11.5px', color: 'var(--muted)' }}>
+                                Pay in cash upon doorstep delivery · COD Available
+                              </div>
+                            </div>
+                          </div>
+                          <span style={{ fontSize: '11px', color: '#10b981', fontWeight: '700' }}>
+                            ✓ Available
                           </span>
                         </div>
                       </div>
                     )}
                   </div>
+                </div>
+
+                {/* Mandatory Return Policy & Consecrated Goods Notice */}
+                <div
+                  style={{
+                    marginTop: '14px',
+                    marginBottom: '12px',
+                    padding: '12px 14px',
+                    borderRadius: '8px',
+                    background: 'rgba(224, 176, 74, 0.05)',
+                    border: '1px solid rgba(224, 176, 74, 0.2)',
+                    fontSize: '11.5px',
+                    color: 'var(--muted)',
+                    lineHeight: '1.5',
+                  }}
+                >
+                  <strong style={{ color: 'var(--gold-lt)', display: 'block', marginBottom: '4px' }}>
+                    📜 Return &amp; Product Policy:
+                  </strong>
+                  Products listed on this website are offered under the applicable payment options, including Cash on Delivery wherever available. Products are generally non-returnable and non-exchangeable once purchased. However, customers should contact customer support regarding products that are delivered damaged, defective, incorrect, counterfeit, or materially different from their advertised description. Any refunds, replacements, or other remedies will be handled in accordance with applicable consumer protection laws and the published product policy.
+                </div>
+
+                {/* Explicit Unchecked Policy Acceptance Checkbox */}
+                <div style={{ marginBottom: '14px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                  <input
+                    type="checkbox"
+                    id="chk-policy-accept"
+                    checked={policyAccepted}
+                    onChange={(e) => {
+                      setPolicyAccepted(e.target.checked);
+                      setLocalValidationErr('');
+                    }}
+                    style={{ marginTop: '3px', accentColor: 'var(--gold)', cursor: 'pointer', width: '16px', height: '16px', flexShrink: 0 }}
+                  />
+                  <label
+                    htmlFor="chk-policy-accept"
+                    style={{ fontSize: '12px', color: 'var(--cream)', lineHeight: '1.4', cursor: 'pointer' }}
+                  >
+                    I have read and agree to the <strong>Return Policy</strong>, <strong>Terms of Service</strong>, and understand that sacred consecrated products are non-returnable except for damaged, defective, or incorrect deliveries.
+                  </label>
                 </div>
 
                 <div style={{ marginTop: '12px', marginBottom: '4px' }}>
@@ -618,6 +726,8 @@ export default function CheckoutModal() {
                     <span>⚠️ Checkout Mode Unavailable</span>
                   ) : paymentMode === 'offline' ? (
                     <span>💬 Order via WhatsApp / व्हॉट्सॲपवर ऑर्डर करा → ₹{serverCart.total_amount ? Number(serverCart.total_amount).toLocaleString('en-IN') : '0'}</span>
+                  ) : paymentMethodChoice === 'cod' ? (
+                    <span>📦 Confirm COD Order / कॅश ऑन डिलिव्हरी → ₹{serverCart.total_amount ? Number(serverCart.total_amount).toLocaleString('en-IN') : '0'}</span>
                   ) : (
                     <span>💳 Pay with Razorpay / ऑनलाइन पे करा → ₹{serverCart.total_amount ? Number(serverCart.total_amount).toLocaleString('en-IN') : '0'}</span>
                   )}
@@ -756,7 +866,7 @@ export default function CheckoutModal() {
 
               <div style={{ marginTop: '20px', padding: '12px', borderRadius: '8px', background: 'rgba(224,176,74,0.06)', border: '1px solid rgba(224,176,74,0.1)' }}>
                 <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted)', lineHeight: '1.5' }}>
-                  🌿 सर्व वस्तू शास्त्रोक्त पद्धतीने अभिमंत्रित करून वाराणसी/हरिद्वार आश्रमातून पाठवल्या जातात. 7-दिवसीय Easy Return Guarantee.
+                  🌿 सर्व वस्तू शास्त्रोक्त पद्धतीने अभिमंत्रित करून वाराणसी/हरिद्वार आश्रमातून पाठवल्या जातात. 100% Consecrated & Lab Certified Sacred Products.
                 </p>
               </div>
             </div>

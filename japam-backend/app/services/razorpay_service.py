@@ -4,21 +4,21 @@ import hashlib
 from typing import Tuple, Dict, Any, Optional
 from flask import current_app
 import razorpay
-from razorpay.errors import SignatureVerificationError, BadRequestError
+from razorpay.errors import SignatureVerificationError, BadRequestError, GatewayError
 
 
 class RazorpayService:
     """
     Spiritual Commerce Razorpay Service.
-    Enforces Test Mode guard, server-side amount calculation,
-    and cryptographic HMAC-SHA256 signature verification.
+    Enforces server-side amount calculation, cryptographic HMAC-SHA256 signature verification,
+    refund tracking, and webhook authentication.
     """
 
     @staticmethod
     def get_credentials() -> Tuple[str, str]:
         """
-        Load and validate Razorpay credentials.
-        Guarantees that live credentials cannot accidentally run in test mode.
+        Load and validate Razorpay credentials from secure environment configuration.
+        Accepts valid Razorpay API keys (rzp_live_* or rzp_test_*).
         """
         key_id = (
             (current_app.config.get("RAZORPAY_KEY_ID") if current_app else None)
@@ -32,12 +32,13 @@ class RazorpayService:
         key_id = str(key_id or "").strip().strip("'\"")
         key_secret = str(key_secret or "").strip().strip("'\"")
 
-        # Test Mode Guard: Failsafe against live credentials to prevent real monetary charges
-        if key_id.startswith("rzp_live_"):
+        if not key_id or not key_secret:
             raise ValueError(
-                "CRITICAL: Live Razorpay credentials (rzp_live_*) detected! "
-                "Only Razorpay Test Mode (rzp_test_*) is permitted in this environment."
+                "Razorpay credentials missing. Please configure RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in environment."
             )
+
+        if not key_id.startswith(("rzp_live_", "rzp_test_")):
+            raise ValueError("Invalid Razorpay Key ID format. Key ID must start with rzp_live_ or rzp_test_.")
 
         return key_id, key_secret
 
@@ -45,10 +46,6 @@ class RazorpayService:
     def get_client() -> razorpay.Client:
         """Initialize official Razorpay Client with validated credentials."""
         key_id, key_secret = RazorpayService.get_credentials()
-        if not key_id or not key_secret:
-            raise ValueError(
-                "Razorpay credentials missing. Please configure RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET."
-            )
         return razorpay.Client(auth=(key_id, key_secret))
 
     @staticmethod
@@ -59,7 +56,7 @@ class RazorpayService:
     ) -> Dict[str, Any]:
         """
         Creates an authoritative Razorpay order via the official Python SDK.
-        amount_paise: integer in paise (1 INR = 100 paise)
+        amount_paise: integer in paise (1 INR = 100 paise).
         """
         if amount_paise <= 0:
             raise ValueError("Payment amount must be greater than zero.")
@@ -131,3 +128,34 @@ class RazorpayService:
         ).hexdigest()
 
         return hmac.compare_digest(signature, expected_sig)
+
+    @staticmethod
+    def fetch_payment(payment_id: str) -> Dict[str, Any]:
+        """Fetch real-time authoritative payment status from Razorpay API."""
+        client = RazorpayService.get_client()
+        return client.payment.fetch(payment_id)
+
+    @staticmethod
+    def capture_payment(payment_id: str, amount_paise: int) -> Dict[str, Any]:
+        """Manually capture an authorized Razorpay payment."""
+        client = RazorpayService.get_client()
+        return client.payment.capture(payment_id, amount_paise)
+
+    @staticmethod
+    def create_refund(
+        payment_id: str,
+        amount_paise: Optional[int] = None,
+        notes: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Initiates a partial or full refund for a captured payment via Razorpay.
+        amount_paise: Optional amount in paise. If omitted, performs full refund.
+        """
+        client = RazorpayService.get_client()
+        data = {}
+        if amount_paise and amount_paise > 0:
+            data["amount"] = int(amount_paise)
+        if notes:
+            data["notes"] = {str(k): str(v) for k, v in notes.items()}
+
+        return client.payment.refund(payment_id, data)

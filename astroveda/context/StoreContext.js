@@ -5,7 +5,7 @@ import { calculateCart, checkoutOrder, createRazorpayOrder, verifyPayment, recor
 import { getTranslation } from '@/lib/translations';
 import { recordEvent } from '@/lib/analytics';
 
-function loadRazorpayScript() {
+export function loadRazorpayScript() {
   return new Promise((resolve) => {
     if (typeof window === 'undefined') return resolve(false);
     if (window.Razorpay) return resolve(true);
@@ -509,9 +509,11 @@ export function StoreProvider({ children }) {
     // Generate random client-side idempotency key for network resilience
     const idempotencyKey = `idemp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-    // Strictly enforce mode: Offline = WhatsApp Order, Online = Razorpay (COD removed completely)
+    // Support both Razorpay Online and Cash on Delivery (COD)
     const isOffline = paymentMode === 'offline';
-    const effectivePaymentMethod = isOffline ? 'WhatsApp Order' : 'Razorpay';
+    const effectivePaymentMethod = isOffline
+      ? 'WhatsApp Order'
+      : (customerData.payment_method === 'COD' ? 'COD' : 'Razorpay');
 
     const payload = {
       customer_name: customerData.name.trim(),
@@ -520,6 +522,8 @@ export function StoreProvider({ children }) {
       shipping_address: customerData.address.trim(),
       payment_method: effectivePaymentMethod,
       payment_mode: isOffline ? 'offline' : 'online',
+      policy_accepted: customerData.policy_accepted !== false,
+      policy_version: customerData.policy_version || 'v1.0-2026',
       coupon_code: couponCode.trim(),
       recaptcha_token: customerData.recaptcha_token || null,
       items: cart.map(item => ({
@@ -540,6 +544,27 @@ export function StoreProvider({ children }) {
         } catch (e) {
           console.warn('Could not save order token:', e);
         }
+      }
+
+      // Cash on Delivery (COD) direct order placement
+      if (effectivePaymentMethod === 'COD' || result.payment_method === 'COD' || result.cod_status === 'cod_pending' || result.payment_status === 'cod_pending') {
+        const codOrder = {
+          ...result,
+          payment_mode: 'online',
+          payment_status: 'cod_pending',
+          cod_status: 'cod_pending',
+          order_status: 'pending',
+          payment_method: 'COD',
+          customer_name: customerData.name.trim(),
+          customer_email: customerData.email.trim(),
+          customer_phone: customerData.phone.trim(),
+          shipping_address: customerData.address.trim(),
+        };
+        setLastOrder(codOrder);
+        setCheckoutStep('confirmed');
+        clearCart();
+        setCheckoutLoading(false);
+        return { success: true, order: codOrder };
       }
 
       // Offline mode: WhatsApp order registered as offline_pending

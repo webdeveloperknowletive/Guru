@@ -1,0 +1,120 @@
+{# Reusable Date, Time, Day, and Month Filter Component #}
+<div class="dashboard-card date-time-filter-card" style="margin-bottom: 1.25rem; padding: 1rem 1.25rem; border: 1px solid var(--border-color); background: var(--bg-card); border-radius: var(--radius-lg);">
+  <form method="GET" action="{{ filter_action_url or request.path }}" class="date-time-filter-form" style="display: flex; flex-direction: column; gap: 0.75rem;">
+    
+    {# Preserve existing non-date query parameters like search, status, category, etc. #}
+    {% for key, val in request.args.items() %}
+      {% if key not in ['date_preset', 'filter_date', 'date', 'filter_month', 'month', 'filter_day', 'day', 'day_of_week', 'filter_time', 'time', 'time_period', 'start_date', 'end_date', 'page'] %}
+        <input type="hidden" name="{{ key }}" value="{{ val }}">
+      {% endif %}
+    {% endfor %}
+
+    {# Top row: Search input or main contextual input if provided by caller #}
+    {% if custom_search_placeholder %}
+      <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
+        <div style="flex: 1; min-width: 240px; position: relative;">
+          <input type="text" name="q" class="form-control" placeholder="{{ custom_search_placeholder }}" value="{{ request.args.get('q', '') }}" style="padding-left: 2.2rem;">
+          <svg style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-muted); pointer-events: none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+        {% if extra_filter_slot %}
+          {{ extra_filter_slot|safe }}
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {# Main Filter Grid: Date Preset, Specific Date, Month, Day of Week, Time Period, Apply & Reset #}
+    <div style="display: flex; gap: 0.65rem; flex-wrap: wrap; align-items: center;">
+      
+      {# 1. Date Preset #}
+      <div style="min-width: 130px; flex: 1 1 130px;">
+        <label style="display: block; font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 2px;">
+          📅 Date Preset
+        </label>
+        <select name="date_preset" class="form-control" style="font-size: 0.82rem; padding: 0.45rem 0.65rem;">
+          <option value="">All Dates</option>
+          <option value="today" {% if date_filter and date_filter.date_preset == 'today' %}selected{% endif %}>Today</option>
+          <option value="yesterday" {% if date_filter and date_filter.date_preset == 'yesterday' %}selected{% endif %}>Yesterday</option>
+          <option value="this_week" {% if date_filter and date_filter.date_preset == 'this_week' %}selected{% endif %}>This Week</option>
+          <option value="this_month" {% if date_filter and date_filter.date_preset == 'this_month' %}selected{% endif %}>This Month</option>
+          <option value="last_month" {% if date_filter and date_filter.date_preset == 'last_month' %}selected{% endif %}>Last Month</option>
+        </select>
+      </div>
+
+      {# 2. Specific Date #}
+      <div style="min-width: 140px; flex: 1 1 140px;">
+        <label style="display: block; font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 2px;">
+          📆 Specific Date
+        </label>
+        <input type="date" name="filter_date" class="form-control" value="{{ date_filter.filter_date if date_filter else '' }}" style="font-size: 0.82rem; padding: 0.45rem 0.65rem;">
+      </div>
+
+      {# 3. Month Filter #}
+      <div style="min-width: 130px; flex: 1 1 130px;">
+        <label style="display: block; font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 2px;">
+          🗓 Month
+        </label>
+        <input type="month" name="filter_month" class="form-control" value="{{ date_filter.filter_month if date_filter else '' }}" style="font-size: 0.82rem; padding: 0.45rem 0.65rem;">
+      </div>
+
+      {# 4. Day of Week Filter #}
+      <div style="min-width: 130px; flex: 1 1 130px;">
+        <label style="display: block; font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 2px;">
+          ☸ Day of Week
+        </label>
+        <select name="filter_day" class="form-control" style="font-size: 0.82rem; padding: 0.45rem 0.65rem;">
+          <option value="">All Days</option>
+          <option value="monday" {% if date_filter and date_filter.filter_day in ['monday', 'mon', '1'] %}selected{% endif %}>Monday (सोमवार)</option>
+          <option value="tuesday" {% if date_filter and date_filter.filter_day in ['tuesday', 'tue', '2'] %}selected{% endif %}>Tuesday (मंगळवार)</option>
+          <option value="wednesday" {% if date_filter and date_filter.filter_day in ['wednesday', 'wed', '3'] %}selected{% endif %}>Wednesday (बुधवार)</option>
+          <option value="thursday" {% if date_filter and date_filter.filter_day in ['thursday', 'thu', '4'] %}selected{% endif %}>Thursday (गुरुवार)</option>
+          <option value="friday" {% if date_filter and date_filter.filter_day in ['friday', 'fri', '5'] %}selected{% endif %}>Friday (शुक्रवार)</option>
+          <option value="saturday" {% if date_filter and date_filter.filter_day in ['saturday', 'sat', '6'] %}selected{% endif %}>Saturday (शनिवार)</option>
+          <option value="sunday" {% if date_filter and date_filter.filter_day in ['sunday', 'sun', '0'] %}selected{% endif %}>Sunday (रविवार)</option>
+        </select>
+      </div>
+
+      {# 5. Time Period Filter #}
+      <div style="min-width: 140px; flex: 1 1 140px;">
+        <label style="display: block; font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 2px;">
+          🕒 Time Slot / Period
+        </label>
+        <select name="filter_time" class="form-control" style="font-size: 0.82rem; padding: 0.45rem 0.65rem;">
+          <option value="">All Times</option>
+          <option value="morning" {% if date_filter and date_filter.filter_time == 'morning' %}selected{% endif %}>Morning (6 AM - 12 PM)</option>
+          <option value="afternoon" {% if date_filter and date_filter.filter_time == 'afternoon' %}selected{% endif %}>Afternoon (12 PM - 5 PM)</option>
+          <option value="evening" {% if date_filter and date_filter.filter_time == 'evening' %}selected{% endif %}>Evening (5 PM - 9 PM)</option>
+          <option value="night" {% if date_filter and date_filter.filter_time == 'night' %}selected{% endif %}>Night (9 PM - 6 AM)</option>
+        </select>
+      </div>
+
+      {# Buttons: Apply Filter and Reset #}
+      <div style="display: flex; gap: 0.5rem; align-items: flex-end; margin-top: auto; padding-top: 14px;">
+        <button type="submit" class="btn-primary" style="padding: 0.48rem 0.95rem; font-size: 0.82rem; height: 35px; display: inline-flex; align-items: center; gap: 5px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          Filter
+        </button>
+        <a href="{{ filter_reset_url or filter_action_url or request.path }}" class="btn-secondary" style="padding: 0.48rem 0.85rem; font-size: 0.82rem; height: 35px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" title="Reset all date and time filters">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          Reset
+        </a>
+      </div>
+
+    </div>
+
+    {# Active filter pills row #}
+    {% if date_filter and date_filter.has_active_filters %}
+      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; padding-top: 0.5rem; border-top: 1px dashed var(--border-color); margin-top: 0.25rem;">
+        <span style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em;">Active Filters:</span>
+        {% for badge in date_filter.active_badges %}
+          <span class="badge" style="background: var(--saffron-50); color: var(--saffron-700); border: 1px solid var(--saffron-200); font-size: 0.74rem; font-weight: 600; padding: 2px 8px; border-radius: var(--radius-sm); display: inline-flex; align-items: center; gap: 4px;">
+            {{ badge.label }}
+          </span>
+        {% endfor %}
+        <a href="{{ filter_reset_url or filter_action_url or request.path }}" style="font-size: 0.72rem; color: var(--status-red-text); font-weight: 600; text-decoration: underline; margin-left: 4px;">
+          Clear All
+        </a>
+      </div>
+    {% endif %}
+
+  </form>
+</div>

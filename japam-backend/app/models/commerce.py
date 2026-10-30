@@ -151,6 +151,11 @@ class Order(db.Model):
     # Concurrency: Unique idempotency key to prevent double-submit and race conditions
     idempotency_key = db.Column(db.String(128), unique=True, nullable=True, index=True)
 
+    # Compliance & Policy acceptance audit
+    policy_accepted_at = db.Column(db.DateTime, nullable=True)
+    policy_version = db.Column(db.String(50), nullable=True)
+    cod_status = db.Column(db.String(50), nullable=True)  # cod_pending, cod_collected, cod_failed_returned
+
     placed_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 

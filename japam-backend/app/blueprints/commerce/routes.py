@@ -8,6 +8,7 @@ from app.models.commerce import Product, Category, InventoryAdjustment, Order, O
 from app.services.commerce_service import CommerceService
 from app.services.rbac_service import login_required, permission_required, get_current_admin
 from app.services.audit_service import AuditService
+from app.utils.date_filter import apply_date_time_filters, extract_date_filter_context
 
 commerce_bp = Blueprint("commerce", __name__, url_prefix="/admin/commerce")
 
@@ -69,6 +70,9 @@ def products_list():
     if query_str:
         q = q.filter((Product.name.ilike(f"%{query_str}%")) | (Product.sku.ilike(f"%{query_str}%")))
 
+    q = apply_date_time_filters(q, Product.created_at, request.args)
+    date_filter = extract_date_filter_context(request.args)
+
     products_pagination = q.order_by(Product.display_rank.asc(), Product.created_at.desc(), Product.id.asc()).paginate(page=page, per_page=15, error_out=False)
     categories = Category.query.filter_by(is_active=True).order_by(Category.name.asc()).all()
 
@@ -86,6 +90,7 @@ def products_list():
         count_archived=count_archived,
         search_query=query_str,
         active_page="products",
+        date_filter=date_filter,
     )
 
 
@@ -793,7 +798,10 @@ def inventory_list():
         q = q.filter(Product.stock_quantity <= Product.low_stock_threshold)
 
     products = q.order_by(Product.stock_quantity.asc()).all()
-    recent_adjustments = InventoryAdjustment.query.order_by(InventoryAdjustment.created_at.desc()).limit(15).all()
+    adj_q = InventoryAdjustment.query
+    adj_q = apply_date_time_filters(adj_q, InventoryAdjustment.created_at, request.args)
+    recent_adjustments = adj_q.order_by(InventoryAdjustment.created_at.desc()).limit(25).all()
+    date_filter = extract_date_filter_context(request.args)
 
     return render_template(
         "commerce/inventory.html",
@@ -802,6 +810,7 @@ def inventory_list():
         adjustments=recent_adjustments,
         low_stock_only=low_stock_only,
         active_page="inventory",
+        date_filter=date_filter,
     )
 
 
@@ -817,7 +826,7 @@ def inventory_adjust():
 
     if not product_id or change is None:
         flash("Product and quantity change are required.", "danger")
-        return redirect(url_for("commerce.inventory_list"))
+        return redirect(request.referrer or url_for("commerce.inventory_list"))
 
     try:
         product = CommerceService.adjust_inventory(product_id, change, reason, user, notes)
@@ -825,7 +834,7 @@ def inventory_adjust():
     except ValueError as e:
         flash(str(e), "danger")
 
-    return redirect(url_for("commerce.inventory_list"))
+    return redirect(request.referrer or url_for("commerce.inventory_list"))
 
 
 # -------------------------------------------------------------
@@ -852,6 +861,9 @@ def orders_list():
             (Order.customer_email.ilike(f"%{query_str}%"))
         )
 
+    q = apply_date_time_filters(q, Order.placed_at, request.args)
+    date_filter = extract_date_filter_context(request.args)
+
     orders_paginated = q.order_by(Order.placed_at.desc()).paginate(page=page, per_page=15, error_out=False)
     return render_template(
         "commerce/orders.html",
@@ -861,6 +873,7 @@ def orders_list():
         selected_status=status,
         search_query=query_str,
         active_page="orders",
+        date_filter=date_filter,
     )
 
 
@@ -946,8 +959,11 @@ def order_packing_slip(order_id):
 @permission_required("commerce", "view")
 def customers_list():
     user = get_current_admin()
-    customers = Customer.query.order_by(Customer.total_spent.desc()).limit(50).all()
-    return render_template("commerce/customers.html", current_user=user, customers=customers, active_page="customers")
+    q = Customer.query
+    q = apply_date_time_filters(q, Customer.created_at, request.args)
+    date_filter = extract_date_filter_context(request.args)
+    customers = q.order_by(Customer.total_spent.desc()).limit(50).all()
+    return render_template("commerce/customers.html", current_user=user, customers=customers, active_page="customers", date_filter=date_filter)
 
 
 @commerce_bp.route("/customers/<int:customer_id>/edit", methods=["POST"])
@@ -987,8 +1003,11 @@ def customer_update(customer_id):
 @permission_required("reviews", "view")
 def reviews_list():
     user = get_current_admin()
-    reviews = ProductReview.query.order_by(ProductReview.created_at.desc()).all()
-    return render_template("commerce/reviews.html", current_user=user, reviews=reviews, active_page="reviews")
+    q = ProductReview.query
+    q = apply_date_time_filters(q, ProductReview.created_at, request.args)
+    date_filter = extract_date_filter_context(request.args)
+    reviews = q.order_by(ProductReview.created_at.desc()).all()
+    return render_template("commerce/reviews.html", current_user=user, reviews=reviews, active_page="reviews", date_filter=date_filter)
 
 
 @commerce_bp.route("/reviews/<int:review_id>/moderate", methods=["POST"])

@@ -2,7 +2,12 @@
 import { useState } from 'react';
 import { useStore } from '@/context/StoreContext';
 
-export default function ProductCard({ product, showDesc = true }) {
+export default function ProductCard({
+  product,
+  showDesc = true,
+  isSelected = false,
+  className = '',
+}) {
   const { addToCart, toggleWishlist, isInWishlist, openProductModal } = useStore();
   const { title, catLabel, desc, price, priceOld, save, rating, reviews, badge, img, images = [] } = product;
   const priceNum = parseInt(String(price).replace(/[^\d]/g, ''), 10) || 0;
@@ -39,7 +44,7 @@ export default function ProductCard({ product, showDesc = true }) {
 
   return (
     <article
-      className="prod-card in"
+      className={`prod-card in${isSelected ? ' is-selected' : ''}${className ? ' ' + className : ''}`}
       role="button"
       tabIndex={0}
       onClick={handleCardClick}
@@ -52,6 +57,7 @@ export default function ProductCard({ product, showDesc = true }) {
       style={{ cursor: 'pointer' }}
     >
       <div className="prod-img">
+
         {badgeLabel && <span className={`prod-badge ${badgeMap[badge] || 'badge-lab'}`}>{badgeLabel}</span>}
         <button
           type="button"
@@ -98,7 +104,7 @@ export default function ProductCard({ product, showDesc = true }) {
             <img
               src={currentImg || ''}
               alt={`${title} - view ${safeIdx + 1}`}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '14px' }}
+              style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '14px' }}
               loading="lazy"
             />
           )}

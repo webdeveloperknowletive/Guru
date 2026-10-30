@@ -15,7 +15,19 @@ dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/admin")
 @permission_required("dashboard", "view")
 def overview():
     user = get_current_admin()
-    metrics = ReportService.get_dashboard_metrics()
+    range_type = request.args.get("range", "30d").strip().lower()
+    custom_start = request.args.get("start_date")
+    custom_end = request.args.get("end_date")
+    rev_timeframe = request.args.get("rev_range", "30d").strip().lower()
+    status_timeframe = request.args.get("status_range", "30d").strip().lower()
+
+    metrics = ReportService.get_dashboard_metrics(
+        range_type=range_type,
+        custom_start=custom_start,
+        custom_end=custom_end,
+        revenue_timeframe=rev_timeframe,
+        status_timeframe=status_timeframe,
+    )
     payment_mode = PaymentModeService.get_payment_mode()
     return render_template(
         "dashboard/overview.html",
@@ -23,7 +35,25 @@ def overview():
         metrics=metrics,
         active_page="overview",
         payment_mode=payment_mode,
+        selected_range=range_type,
+        custom_start=custom_start or "",
+        custom_end=custom_end or "",
     )
+
+
+@dashboard_bp.route("/dashboard/chart-data")
+@login_required
+@permission_required("dashboard", "view")
+def dashboard_chart_data():
+    chart_type = request.args.get("type", "revenue").strip().lower()
+    timeframe = request.args.get("timeframe", "30d").strip().lower()
+    if chart_type == "revenue":
+        data = ReportService.get_revenue_chart_data(timeframe)
+        return jsonify({"success": True, "type": "revenue", "timeframe": timeframe, **data})
+    elif chart_type == "status":
+        data = ReportService.get_order_status_chart_data(timeframe)
+        return jsonify({"success": True, "type": "status", "timeframe": timeframe, **data})
+    return jsonify({"error": "Invalid chart type"}), 400
 
 
 @dashboard_bp.route("/payment-mode/toggle", methods=["POST"])

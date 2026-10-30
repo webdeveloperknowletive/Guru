@@ -10,6 +10,10 @@
   </div>
 </div>
 
+{% with filter_action_url=url_for('commerce.reviews_list') %}
+  {% include "components/date_time_filter_bar.html" %}
+{% endwith %}
+
 <div class="dashboard-card">
   <div class="table-responsive">
     <table class="spiritual-table">

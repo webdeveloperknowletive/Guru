@@ -7401,3 +7401,434 @@ footer .foot-bottom span {
   color: #b45309;
   font-family: var(--serif);
 }
+
+
+/* ==========================================================================
+   RESPONSIVE RUDRAKSHA PRODUCT CAROUSEL WITH SYNCHRONIZED CATEGORY TABS
+   ========================================================================== */
+
+#rudraksha {
+  overflow-x: clip;
+  max-width: 100vw;
+}
+
+.rudraksha-carousel-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 8px 0 20px;
+}
+
+.rudraksha-carousel-track {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 20px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  padding: 10px 4px 18px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(173, 132, 65, 0.4) transparent;
+}
+
+.rudraksha-carousel-track:focus-visible {
+  outline: 2px solid var(--accent-gold, #AD8441);
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+
+.rudraksha-carousel-track::-webkit-scrollbar {
+  height: 6px;
+}
+
+.rudraksha-carousel-track::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 99px;
+}
+
+.rudraksha-carousel-track::-webkit-scrollbar-thumb {
+  background: rgba(173, 132, 65, 0.4);
+  border-radius: 99px;
+}
+
+.rudraksha-carousel-track::-webkit-scrollbar-thumb:hover {
+  background: rgba(173, 132, 65, 0.65);
+}
+
+/* ==========================================================================
+   IDENTICAL PRODUCT CARD UI - ALL BREAKPOINTS
+   ========================================================================== */
+
+.rudraksha-card-item {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  width: 270px;
+}
+
+#rudraksha .prod-card {
+  width: 100%;
+  height: 100%;
+  display: flex !important;
+  flex-direction: column !important;
+  border-radius: 20px !important;
+  border: 1.5px solid var(--border-subtle, #E3CFB1) !important;
+  background: var(--surface-card, #FFF9F0) !important;
+  box-shadow: 0 4px 16px -4px rgba(86, 59, 45, 0.06) !important;
+  transition: border-color 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+              box-shadow 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+              transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+  overflow: hidden !important;
+  position: relative !important;
+}
+
+#rudraksha .prod-card:hover {
+  transform: translateY(-5px) !important;
+  border-color: var(--accent-gold, #AD8441) !important;
+  box-shadow: 0 12px 28px -6px rgba(86, 59, 45, 0.14) !important;
+}
+
+/* Selected Product Card Styling:
+   ONLY apply visual highlight: Golden/orange border and subtle shadow.
+   Never change dimensions, layout, or button positions. */
+#rudraksha .prod-card.is-selected {
+  border: 2px solid var(--accent-gold, #AD8441) !important;
+  box-shadow: 0 8px 24px -4px rgba(173, 132, 65, 0.32), 0 0 0 1px rgba(173, 132, 65, 0.25) !important;
+  transform: translateY(-4px) !important;
+}
+
+#rudraksha .prod-card.is-selected:hover {
+  transform: translateY(-6px) !important;
+  border-color: var(--accent-gold-lt, #C9974C) !important;
+  box-shadow: 0 14px 32px -6px rgba(173, 132, 65, 0.42), 0 0 0 1px rgba(173, 132, 65, 0.3) !important;
+}
+
+/* Product Image Container */
+#rudraksha .prod-img {
+  position: relative !important;
+  height: 230px !important;
+  min-height: 230px !important;
+  max-height: 230px !important;
+  padding: 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: radial-gradient(circle at 50% 30%, rgba(247, 226, 191, 0.55), rgba(255, 249, 240, 0.95)) !important;
+  border-bottom: 1px solid var(--border-subtle, #E3CFB1) !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+#rudraksha .prod-img-wrap {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 196px !important;
+  max-height: 196px !important;
+  aspect-ratio: 1 / 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  background: #FFFFFF !important;
+  box-shadow: 0 2px 8px rgba(86, 59, 45, 0.06) !important;
+  margin: 0 auto !important;
+}
+
+#rudraksha .prod-img-wrap img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  object-position: center !important;
+  border-radius: 14px !important;
+  display: block !important;
+}
+
+#rudraksha .prod-img-wrap svg {
+  width: 130px !important;
+  height: 130px !important;
+  max-width: 85% !important;
+  max-height: 85% !important;
+  display: block !important;
+  margin: auto !important;
+}
+
+/* Card Body & Typography */
+#rudraksha .prod-body {
+  padding: 16px 14px 18px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex-grow: 1 !important;
+  background: transparent !important;
+}
+
+#rudraksha .prod-cat {
+  color: var(--accent-gold, #AD8441) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase !important;
+  margin-bottom: 4px !important;
+}
+
+#rudraksha .prod-title {
+  font-family: var(--serif, 'Cinzel', serif) !important;
+  font-size: 14.5px !important;
+  font-weight: 700 !important;
+  color: var(--text-primary, #35251F) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  height: 2.6em !important;
+  line-height: 1.3 !important;
+  margin-bottom: 6px !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+}
+
+#rudraksha .prod-stars {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-size: 12px !important;
+  color: var(--text-muted, #8F7D72) !important;
+  margin-bottom: 8px !important;
+}
+
+#rudraksha .prod-stars .s {
+  color: var(--accent-gold, #AD8441) !important;
+  letter-spacing: 1px !important;
+}
+
+#rudraksha .prod-price {
+  display: flex !important;
+  align-items: baseline !important;
+  gap: 8px !important;
+  margin-bottom: 14px !important;
+  flex-wrap: wrap !important;
+}
+
+#rudraksha .prod-price .now {
+  font-size: 18px !important;
+  font-weight: 800 !important;
+  color: var(--text-primary, #35251F) !important;
+}
+
+#rudraksha .prod-price .was {
+  font-size: 13px !important;
+  color: var(--text-muted, #8F7D72) !important;
+  text-decoration: line-through !important;
+}
+
+#rudraksha .prod-price .off {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: var(--accent-green, #2E7D32) !important;
+}
+
+/* Card Buttons */
+#rudraksha .prod-actions {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  margin-top: auto !important;
+}
+
+#rudraksha .btn-add {
+  background: var(--accent-primary, #563B2D) !important;
+  color: #FFFFFF !important;
+  border-radius: 99px !important;
+  padding: 10px 14px !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  border: none !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  transition: all 0.25s ease !important;
+  box-shadow: 0 4px 12px rgba(86, 59, 45, 0.2) !important;
+}
+
+#rudraksha .btn-add:hover:not(:disabled) {
+  background: #3f2b20 !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 16px rgba(86, 59, 45, 0.3) !important;
+}
+
+#rudraksha .btn-view {
+  background: transparent !important;
+  color: var(--text-primary, #35251F) !important;
+  border: 1.5px solid var(--border-subtle, #E3CFB1) !important;
+  border-radius: 99px !important;
+  padding: 8px 14px !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  cursor: pointer !important;
+  transition: all 0.25s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+#rudraksha .btn-view:hover {
+  border-color: var(--accent-gold, #AD8441) !important;
+  background: #FFFFFF !important;
+  color: var(--accent-gold, #AD8441) !important;
+}
+
+/* ==========================================================================
+   NAVIGATION CONTROLS CENTERED BELOW ROW
+   ========================================================================== */
+
+.rudraksha-nav-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.rudraksha-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--surface-card, #FFF9F0);
+  border: 1.5px solid var(--border-subtle, #E3CFB1);
+  color: var(--accent-primary, #563B2D);
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(86, 59, 45, 0.08);
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  outline: none;
+}
+
+.rudraksha-nav-btn:hover:not(:disabled) {
+  background: var(--accent-primary, #563B2D);
+  border-color: var(--accent-primary, #563B2D);
+  color: #FFFFFF;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(86, 59, 45, 0.22);
+}
+
+.rudraksha-nav-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.rudraksha-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  border-color: var(--border-subtle, #E3CFB1);
+  background: var(--surface-card, #FFF9F0);
+  color: var(--text-muted, #8F7D72);
+  box-shadow: none;
+  transform: none;
+}
+
+/* ==========================================================================
+   RESPONSIVE AUTO-ADJUSTING CARDS - BREAKPOINTS
+   ========================================================================== */
+
+/* 1. Large desktop: 1920px */
+@media (min-width: 1600px) {
+  .rudraksha-card-item {
+    width: 290px;
+  }
+}
+
+/* 2. Desktop: 1440px */
+@media (max-width: 1599px) and (min-width: 1281px) {
+  .rudraksha-card-item {
+    width: 275px;
+  }
+}
+
+/* 3. Laptop: 1280px */
+@media (max-width: 1280px) and (min-width: 1025px) {
+  .rudraksha-card-item {
+    width: 260px;
+  }
+}
+
+/* 4. Tablet: 768px - 1024px */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .rudraksha-card-item {
+    width: 250px;
+  }
+}
+
+/* 5. Mobile devices: <= 768px */
+@media (max-width: 768px) {
+  .rudraksha-carousel-track {
+    gap: 14px;
+    padding: 8px 2px 14px;
+  }
+
+  .rudraksha-card-item {
+    width: clamp(240px, 68vw, 270px);
+  }
+
+  #rudraksha .prod-img {
+    height: 195px !important;
+    min-height: 195px !important;
+    max-height: 195px !important;
+    padding: 10px !important;
+  }
+
+  #rudraksha .prod-img-wrap {
+    max-width: 160px !important;
+    max-height: 160px !important;
+  }
+
+  #rudraksha .prod-body {
+    padding: 12px 10px 14px !important;
+  }
+
+  #rudraksha .prod-title {
+    font-size: 13.5px !important;
+  }
+
+  #rudraksha .prod-price .now {
+    font-size: 16px !important;
+  }
+
+  #rudraksha .prod-stars {
+    display: none !important;
+  }
+
+  .rudraksha-nav-controls {
+    margin-top: 18px;
+    gap: 12px;
+  }
+
+  .rudraksha-nav-btn {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* Mobile: 430px & 390px */
+@media (max-width: 430px) {
+  .rudraksha-card-item {
+    width: clamp(230px, 75vw, 260px);
+  }
+}
+
+/* Small mobile: 360px */
+@media (max-width: 360px) {
+  .rudraksha-card-item {
+    width: 230px;
+  }
+}

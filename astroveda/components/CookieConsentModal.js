@@ -548,15 +548,17 @@ export default function CookieConsentModal() {
               {activeTab === 'return' && (
                 <div className="policy-tab-content">
                   <h4 style={{ color: '#e0b04a', fontSize: '17px', marginTop: 0 }}>
-                    Sacred Product Return &amp; Refund Policy
+                    Product Return, Refund &amp; Cancellation Policy
                   </h4>
-                  <p>
-                    At Swami Guruji Spiritual Seva, every Rudraksha, Gemstone, Yantra, and Bracelet is handled with the utmost sanctity, accompanied by lab certification and authentic Vedic pran-pratishtha. We stand firmly behind the sanctity and physical perfection of our sacred offerings.
-                  </p>
+                  <div style={{ background: 'rgba(224, 176, 74, 0.08)', border: '1px solid rgba(224, 176, 74, 0.25)', borderRadius: '10px', padding: '16px', marginBottom: '16px' }}>
+                    <p style={{ margin: 0, fontSize: '13.5px', color: '#fef08a', lineHeight: '1.6', fontWeight: '500' }}>
+                      &ldquo;Products listed on this website are offered under the applicable payment options, including Cash on Delivery wherever available. Products are generally non-returnable and non-exchangeable once purchased. However, customers should contact customer support regarding products that are delivered damaged, defective, incorrect, counterfeit, or materially different from their advertised description. Any refunds, replacements, or other remedies will be handled in accordance with applicable consumer protection laws and the published product policy.&rdquo;
+                    </p>
+                  </div>
 
-                  <h5 style={{ color: '#f7dc9a', margin: '18px 0 6px' }}>1. 7-Day Hassle-Free Replacement Guarantee</h5>
+                  <h5 style={{ color: '#f7dc9a', margin: '18px 0 6px' }}>1. Payment Methods &amp; Cash on Delivery</h5>
                   <p>
-                    If your product arrives damaged in transit, defective, physically mismatched, or broken, you are entitled to a <strong>100% free immediate replacement or full refund</strong> within <strong>7 days</strong> of delivery.
+                    Applicable products are offered under multiple secure payment options, including instant online payment (UPI, Credit/Debit Cards, Net Banking) and <strong>Cash on Delivery (COD)</strong> wherever available. Selecting COD does not impact your statutory customer remedies for damaged or incorrect deliveries.
                   </p>
 
                   <h5 style={{ color: '#f7dc9a', margin: '18px 0 6px' }}>2. Consecrated &amp; Energized Items Protocol</h5>
