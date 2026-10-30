@@ -102,68 +102,13 @@ def create_app(config_name=None) -> Flask:
     migrate.init_app(app, db)
     redis_client.init_app(app)
 
+    # Automatic self-healing database schema synchronization and bootstrap
     with app.app_context():
         try:
-            db.create_all()
-            from sqlalchemy import inspect, text
-            inspector = inspect(db.engine)
-            if "categories" in inspector.get_table_names():
-                cols = [c["name"] for c in inspector.get_columns("categories")]
-                if "image_url" not in cols:
-                    with db.engine.connect() as conn:
-                        conn.execute(text("ALTER TABLE categories ADD COLUMN image_url VARCHAR(500)"))
-                        conn.commit()
-
-            if "puja_bookings" in inspector.get_table_names():
-                p_cols = [c["name"] for c in inspector.get_columns("puja_bookings")]
-                with db.engine.connect() as conn:
-                    if "location" not in p_cols:
-                        conn.execute(text("ALTER TABLE puja_bookings ADD COLUMN location VARCHAR(255)"))
-                    if "address" not in p_cols:
-                        conn.execute(text("ALTER TABLE puja_bookings ADD COLUMN address TEXT"))
-                    if db.engine.dialect.name == "postgresql":
-                        conn.execute(text("ALTER TABLE puja_bookings ALTER COLUMN customer_email DROP NOT NULL"))
-                    conn.commit()
-
-            if "orders" in inspector.get_table_names():
-                o_cols = [c["name"] for c in inspector.get_columns("orders")]
-                with db.engine.connect() as conn:
-                    if "access_token" not in o_cols:
-                        conn.execute(text("ALTER TABLE orders ADD COLUMN access_token VARCHAR(128)"))
-                    if "idempotency_key" not in o_cols:
-                        conn.execute(text("ALTER TABLE orders ADD COLUMN idempotency_key VARCHAR(128)"))
-                    if "policy_accepted_at" not in o_cols:
-                        conn.execute(text("ALTER TABLE orders ADD COLUMN policy_accepted_at TIMESTAMP"))
-                    if "policy_version" not in o_cols:
-                        conn.execute(text("ALTER TABLE orders ADD COLUMN policy_version VARCHAR(50)"))
-                    if "cod_status" not in o_cols:
-                        conn.execute(text("ALTER TABLE orders ADD COLUMN cod_status VARCHAR(50)"))
-                    conn.commit()
-
-            if "payment_transactions" in inspector.get_table_names():
-                pt_cols = [c["name"] for c in inspector.get_columns("payment_transactions")]
-                with db.engine.connect() as conn:
-                    if "consultation_id" not in pt_cols:
-                        conn.execute(text("ALTER TABLE payment_transactions ADD COLUMN consultation_id INTEGER"))
-                    if "customer_phone" not in pt_cols:
-                        conn.execute(text("ALTER TABLE payment_transactions ADD COLUMN customer_phone VARCHAR(30)"))
-                    if "item_summary" not in pt_cols:
-                        conn.execute(text("ALTER TABLE payment_transactions ADD COLUMN item_summary VARCHAR(255)"))
-                    if "source_form" not in pt_cols:
-                        conn.execute(text("ALTER TABLE payment_transactions ADD COLUMN source_form VARCHAR(100) DEFAULT 'Store Checkout'"))
-                    if "form_submission_id" not in pt_cols:
-                        conn.execute(text("ALTER TABLE payment_transactions ADD COLUMN form_submission_id VARCHAR(100)"))
-                    if "payment_method" not in pt_cols:
-                        conn.execute(text("ALTER TABLE payment_transactions ADD COLUMN payment_method VARCHAR(50) DEFAULT 'Razorpay'"))
-                    if "refund_status" not in pt_cols:
-                        conn.execute(text("ALTER TABLE payment_transactions ADD COLUMN refund_status VARCHAR(50) DEFAULT 'none'"))
-                    if "refund_amount" not in pt_cols:
-                        conn.execute(text("ALTER TABLE payment_transactions ADD COLUMN refund_amount NUMERIC(12, 2) DEFAULT 0.00"))
-                    if "updated_at" not in pt_cols:
-                        conn.execute(text("ALTER TABLE payment_transactions ADD COLUMN updated_at TIMESTAMP"))
-                    conn.commit()
-        except Exception:
-            pass
+            from app.utils.db_auto_sync import auto_sync_schema_and_bootstrap
+            auto_sync_schema_and_bootstrap(app, db)
+        except Exception as e:
+            app.logger.warning(f"Database auto-sync notice: {e}")
 
     # Register Blueprints
     from app.blueprints.auth import auth_bp

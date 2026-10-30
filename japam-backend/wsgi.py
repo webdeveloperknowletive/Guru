@@ -6,16 +6,11 @@ from app.extensions import db
 env = os.getenv("FLASK_ENV", "development" if __name__ == "__main__" else "production")
 app = create_app(env)
 
-# Automatic production database bootstrap for zero-touch Coolify/VPS deployment
+# Automatic production database bootstrap and schema synchronization for zero-touch Coolify/VPS deployment
 with app.app_context():
     try:
-        from sqlalchemy import inspect
-        inspector = inspect(db.engine)
-        if not inspector.has_table("products") or not inspector.has_table("admin_users"):
-            app.logger.info("Fresh database detected. Initializing schema and seed data...")
-            from seed import seed_database
-            seed_database()
-            app.logger.info("Database bootstrap completed successfully.")
+        from app.utils.db_auto_sync import auto_sync_schema_and_bootstrap
+        auto_sync_schema_and_bootstrap(app, db)
     except Exception as e:
         app.logger.warning(f"Database auto-bootstrap check: {e}")
 

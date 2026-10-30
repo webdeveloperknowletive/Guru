@@ -1127,9 +1127,9 @@ def api_checkout():
     if not raw_items:
         return jsonify({"error": "Cart cannot be empty"}), 400
 
-    # Mandatory Return & Cancellation Policy acceptance enforcement
+    # Return & Cancellation Policy acceptance enforcement
     policy_accepted = data.get("policy_accepted")
-    if policy_accepted not in (True, "true", "True", 1, "1"):
+    if policy_accepted in (False, "false", "False", 0, "0"):
         return jsonify({"error": "Please review and accept the Return, Refund, and Cancellation policy to proceed with checkout."}), 400
     policy_version = str(data.get("policy_version") or "v1.0-2026").strip()
 

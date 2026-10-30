@@ -248,21 +248,35 @@ class CommerceService:
 
         order.admin_notes = f"{order.admin_notes or ''}\n{audit_note}".strip()
 
-        # Create captured PaymentTransaction
+        # Update existing PaymentTransaction or create a captured PaymentTransaction
         txn_ref = transaction_reference or f"OFFLINE-{int(datetime.now(timezone.utc).timestamp())}"
-        txn = PaymentTransaction(
-            transaction_number=f"TXN-{order.order_number.replace('#', '')}-{txn_ref}",
-            order_id=order.id,
-            amount=order.total_amount,
-            currency="INR",
-            gateway=order.payment_method or "Offline / Manual",
-            gateway_payment_id=txn_ref,
-            status="captured",
-            customer_name=order.customer_name,
-            customer_email=order.customer_email,
-            created_at=datetime.now(timezone.utc),
-        )
-        db.session.add(txn)
+        existing_txn = PaymentTransaction.query.filter_by(order_id=order.id).first()
+        if existing_txn:
+            existing_txn.status = "captured"
+            existing_txn.gateway = "Offline Payment"
+            existing_txn.payment_method = "Offline Payment"
+            existing_txn.gateway_payment_id = txn_ref
+            existing_txn.updated_at = datetime.now(timezone.utc)
+            txn = existing_txn
+        else:
+            txn = PaymentTransaction(
+                transaction_number=f"TXN-{order.order_number.replace('#', '')}-{txn_ref}",
+                order_id=order.id,
+                amount=order.total_amount,
+                currency="INR",
+                gateway=order.payment_method or "Offline / Manual",
+                gateway_payment_id=txn_ref,
+                status="captured",
+                customer_name=order.customer_name,
+                customer_email=order.customer_email,
+                customer_phone=order.customer_phone,
+                item_summary=f"Order {order.order_number}",
+                source_form="Store Checkout",
+                form_submission_id=order.order_number,
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
+            )
+            db.session.add(txn)
         db.session.commit()
 
         AuditService.log(
