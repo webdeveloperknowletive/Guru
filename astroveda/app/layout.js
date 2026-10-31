@@ -23,8 +23,12 @@ export const viewport = {
 };
 
 export const metadata = {
+  metadataBase: new URL('https://swamiguruji.com'),
   title: 'Swami Guruji — परंपरेतून मार्गदर्शन • श्रद्धेतून समाधान',
   description: 'Authentic Rudraksha, Gemstones, Yantra, Bracelets and Jyotish Consultation. 25+ years experience. Certified, energised and delivered across India.',
+  alternates: {
+    canonical: '/',
+  },
 };
 
 export default function RootLayout({ children }) {
