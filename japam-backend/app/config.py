@@ -2,10 +2,10 @@ import os
 from datetime import timedelta
 from dotenv import load_dotenv
 
-# Load .env if present
-load_dotenv()
-
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+# Always load .env from japam-backend directory, plus fallback to root cwd
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+load_dotenv()
 
 
 class Config:
@@ -16,7 +16,17 @@ class Config:
 
     # Database
     # Support both PostgreSQL and local SQLite fallback
-    DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{os.path.join(BASE_DIR, 'japam_admin.db')}")
+    raw_db_url = (os.getenv("DATABASE_URL") or "").strip()
+    if not raw_db_url or raw_db_url in ("sqlite:///japam_admin.db", "sqlite:///instance/japam_admin.db"):
+        canonical_sqlite = os.path.join(BASE_DIR, "instance", "japam_admin.db")
+        os.makedirs(os.path.dirname(canonical_sqlite), exist_ok=True)
+        DATABASE_URL = f"sqlite:///{canonical_sqlite.replace(os.sep, '/')}"
+    elif raw_db_url.startswith("sqlite:///") and not os.path.isabs(raw_db_url[10:]):
+        canonical_sqlite = os.path.join(BASE_DIR, "instance", "japam_admin.db")
+        os.makedirs(os.path.dirname(canonical_sqlite), exist_ok=True)
+        DATABASE_URL = f"sqlite:///{canonical_sqlite.replace(os.sep, '/')}"
+    else:
+        DATABASE_URL = raw_db_url
     # Normalize postgres:// to postgresql+psycopg:// if needed
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)

@@ -1,3 +1,5 @@
+import os
+import shutil
 import logging
 import uuid
 from sqlalchemy import (
@@ -141,6 +143,28 @@ def _bootstrap_foundation_data(app, db):
                 admin.password_hash = AuthService.hash_password("Admin@1234")
                 db.session.add(admin)
                 db.session.commit()
+
+        # D. Local SQLite mirror sync (keeps instance/japam_admin.db and japam-backend/japam_admin.db synchronized)
+        if db.engine.dialect.name.lower() == "sqlite":
+            try:
+                import shutil
+                base_dir = os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+                db_instance = os.path.join(base_dir, "instance", "japam_admin.db")
+                db_root = os.path.join(base_dir, "japam_admin.db")
+                if os.path.exists(db_instance) and os.path.exists(db_root):
+                    t_inst = os.path.getmtime(db_instance)
+                    t_root = os.path.getmtime(db_root)
+                    if t_inst > t_root:
+                        shutil.copy2(db_instance, db_root)
+                    elif t_root > t_inst:
+                        shutil.copy2(db_root, db_instance)
+                elif os.path.exists(db_instance) and not os.path.exists(db_root):
+                    shutil.copy2(db_instance, db_root)
+                elif os.path.exists(db_root) and not os.path.exists(db_instance):
+                    os.makedirs(os.path.dirname(db_instance), exist_ok=True)
+                    shutil.copy2(db_root, db_instance)
+            except Exception as se:
+                app.logger.debug(f"[DB AUTO-SYNC] SQLite mirror notice: {se}")
 
     except Exception as e:
         app.logger.warning(f"[DB BOOTSTRAP] Foundation bootstrap warning: {e}")
