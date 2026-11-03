@@ -162,6 +162,28 @@ class Order(db.Model):
     customer = db.relationship("Customer", back_populates="orders")
     items = db.relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
 
+    @property
+    def latest_transaction(self):
+        if not self.transactions:
+            return None
+        for txn in reversed(self.transactions):
+            if txn.status in ("captured", "paid", "successful", "cod_collected"):
+                return txn
+        for txn in reversed(self.transactions):
+            if txn.status in ("failed", "cancelled"):
+                return txn
+        return self.transactions[-1]
+
+    @property
+    def latest_gateway_payment_id(self):
+        txn = self.latest_transaction
+        return txn.gateway_payment_id if txn else None
+
+    @property
+    def bank_rrn(self):
+        txn = self.latest_transaction
+        return getattr(txn, 'bank_rrn', None) if txn else None
+
     def __repr__(self):
         return f"<Order {self.order_number} - {self.total_amount}>"
 

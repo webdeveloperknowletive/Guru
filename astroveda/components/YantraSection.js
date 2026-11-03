@@ -1,5 +1,5 @@
 import { YANTRA } from '@/lib/products';
-import ProductCard from '@/components/ProductCard';
+import ProductCarousel from '@/components/ProductCarousel';
 
 export default function YantraSection({ products, headerText }) {
   const list = products !== undefined && products !== null ? products : YANTRA;
@@ -28,11 +28,12 @@ export default function YantraSection({ products, headerText }) {
           </h2>
           <p>{subtitle}</p>
         </div>
-        <div className="prod-grid">
-          {sortedProducts.map(product => (
-            <ProductCard key={product.id} product={product} showDesc={false} />
-          ))}
-        </div>
+
+        <ProductCarousel
+          products={sortedProducts}
+          ariaLabel="Sacred Yantra Collection carousel"
+          emptyMessage="No yantras currently available."
+        />
       </div>
     </section>
   );

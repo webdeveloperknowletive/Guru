@@ -1,4 +1,4 @@
-import ProductCard from '@/components/ProductCard';
+import ProductCarousel from '@/components/ProductCarousel';
 
 export default function PujaSamagriSection({ products = [], headerText }) {
   if (!products || products.length === 0) return null;
@@ -28,11 +28,12 @@ export default function PujaSamagriSection({ products = [], headerText }) {
           </h2>
           <p>{subtitle}</p>
         </div>
-        <div className="prod-grid">
-          {sortedProducts.map((product) => (
-            <ProductCard key={product.id} product={product} showDesc={false} />
-          ))}
-        </div>
+
+        <ProductCarousel
+          products={sortedProducts}
+          ariaLabel="Sacred Puja Samagri Collection carousel"
+          emptyMessage="No puja samagri products available."
+        />
       </div>
     </section>
   );

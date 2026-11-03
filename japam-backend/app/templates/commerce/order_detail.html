@@ -130,6 +130,90 @@
       </form>
     </div>
 
+    <!-- Razorpay Payment Gateway Details Card -->
+    <div class="dashboard-card" style="margin-bottom:1.5rem;">
+      <div class="card-header-row" style="display:flex; justify-content:space-between; align-items:center;">
+        <h2 class="card-title" style="display:flex; align-items:center; gap:6px;">
+          <span>💳</span> Razorpay Payment Details
+        </h2>
+        {% set txn = order.latest_transaction %}
+        {% if order.payment_status in ['paid', 'captured'] %}
+          <span class="badge" style="background:#e8f7ee; color:#0e8345; border:1px solid #b7ebd0; font-weight:700; font-size:0.75rem;">
+            ✓ Captured
+          </span>
+        {% elif order.payment_status in ['cancelled', 'payment_cancelled'] or (order.order_status == 'cancelled' and order.payment_status in ['pending', 'failed']) %}
+          <span class="badge" style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; font-weight:700; font-size:0.75rem;">
+            ✕ Cancelled
+          </span>
+        {% elif order.payment_status == 'failed' %}
+          <span class="badge" style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; font-weight:700; font-size:0.75rem;">
+            ✕ Failed
+          </span>
+        {% elif order.payment_status == 'offline_pending' %}
+          <span class="badge" style="background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; font-weight:700; font-size:0.75rem;">
+            Offline Pending
+          </span>
+        {% else %}
+          <span class="badge" style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; font-weight:700; font-size:0.75rem;">
+            ⏳ Pending
+          </span>
+        {% endif %}
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:0.7rem; font-size:0.85rem; margin-top:0.5rem;">
+        <div>
+          <span style="font-size:0.72rem; color:var(--text-muted); display:block;">Payment ID (Gateway)</span>
+          <div style="font-family:monospace; font-weight:700; color:var(--text-primary); font-size:0.86rem;">
+            {{ txn.gateway_payment_id if txn and txn.gateway_payment_id and txn.gateway_payment_id not in ['cancelled', 'failed'] else 'Not Generated / Pending' }}
+          </div>
+        </div>
+
+        {% if txn and txn.bank_rrn %}
+        <div>
+          <span style="font-size:0.72rem; color:var(--text-muted); display:block;">Bank RRN / UTR</span>
+          <div style="font-family:monospace; font-weight:700; color:#0369a1; font-size:0.85rem;">
+            {{ txn.bank_rrn }}
+          </div>
+        </div>
+        {% endif %}
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+          <div>
+            <span style="font-size:0.72rem; color:var(--text-muted); display:block;">Payment Method</span>
+            <strong style="color:var(--text-primary);">{{ (txn.payment_method if txn and txn.payment_method else order.payment_method) or 'Razorpay' }}</strong>
+          </div>
+          <div>
+            <span style="font-size:0.72rem; color:var(--text-muted); display:block;">Gateway Order ID</span>
+            <span style="font-family:monospace; font-size:0.75rem; color:var(--text-secondary); word-break:break-all;">
+              {{ (txn.gateway_order_id if txn else None) or '-' }}
+            </span>
+          </div>
+        </div>
+
+        {% if txn and txn.error_message and order.payment_status in ['cancelled', 'failed'] %}
+        <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:6px; padding:8px 10px; font-size:0.78rem; color:#b91c1c;">
+          <strong>Gateway Response:</strong> {{ txn.error_message }}
+        </div>
+        {% endif %}
+
+        <!-- Sync with Razorpay Form -->
+        <div style="margin-top:0.5rem; border-top:1px solid var(--border-light); padding-top:0.75rem;">
+          <form action="{{ url_for('commerce.order_sync_razorpay', order_id=order.id) }}" method="POST" style="display:flex; flex-direction:column; gap:6px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div style="display:flex; gap:6px;">
+              <input type="text" name="razorpay_payment_id" class="form-control" style="font-size:0.78rem; padding:6px 10px;" 
+                     value="{{ txn.gateway_payment_id if txn and txn.gateway_payment_id and txn.gateway_payment_id not in ['cancelled', 'failed'] else '' }}" 
+                     placeholder="pay_... (or leave blank to auto-detect)">
+              <button type="submit" class="btn-secondary" style="font-size:0.78rem; padding:6px 12px; white-space:nowrap; font-weight:600; display:inline-flex; align-items:center; gap:4px;" title="Query Razorpay API for live payment status and Bank RRN">
+                🔄 Sync
+              </button>
+            </div>
+            <span style="font-size:0.70rem; color:var(--text-muted);">Sync live payment status, method & Bank RRN directly from Razorpay.</span>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <!-- Customer Details Card -->
     <div class="dashboard-card">
       <div class="card-header-row">

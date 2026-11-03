@@ -84,7 +84,9 @@ export default function RudrakshaSection({ products, headerText }) {
   const isProgrammaticScrollRef = useRef(false);
   const scrollTimeoutRef = useRef(null);
   const rafIdRef = useRef(null);
+  const isFirstRender = useRef(true);
 
+  const [canScroll, setCanScroll] = useState(false);
   const [isAtStart, setIsAtStart] = useState(true);
   const [isAtEnd, setIsAtEnd] = useState(false);
 
@@ -112,10 +114,18 @@ export default function RudrakshaSection({ products, headerText }) {
   const updateArrowStates = useCallback(() => {
     const track = trackRef.current;
     if (!track) return;
-    const maxScroll = Math.max(0, track.scrollWidth - track.clientWidth);
-    const currentScroll = track.scrollLeft;
-    setIsAtStart(currentScroll <= 5);
-    setIsAtEnd(currentScroll >= maxScroll - 5 || maxScroll <= 0);
+    const overflow = track.scrollWidth > track.clientWidth + 2;
+    setCanScroll(overflow);
+
+    if (overflow) {
+      const maxScroll = Math.max(0, track.scrollWidth - track.clientWidth);
+      const currentScroll = track.scrollLeft;
+      setIsAtStart(currentScroll <= 5);
+      setIsAtEnd(currentScroll >= maxScroll - 5 || maxScroll <= 0);
+    } else {
+      setIsAtStart(true);
+      setIsAtEnd(true);
+    }
   }, []);
 
   const detectProminentCard = useCallback(() => {
@@ -213,12 +223,26 @@ export default function RudrakshaSection({ products, headerText }) {
     };
   }, [updateArrowStates, handleScroll]);
 
-  // Ensure active tab chip is in view when changed
+  // Ensure active tab chip is in view within horizontal filter bar when changed by user (never scroll page window)
   useEffect(() => {
-    if (!filterBarRef.current) return;
-    const activeChip = filterBarRef.current.querySelector('.filter-chip.active');
-    if (activeChip && typeof activeChip.scrollIntoView === 'function') {
-      activeChip.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    const bar = filterBarRef.current;
+    if (!bar) return;
+    const activeChip = bar.querySelector('.filter-chip.active');
+    if (!activeChip) return;
+
+    const chipLeft = activeChip.offsetLeft;
+    const chipWidth = activeChip.offsetWidth;
+    const barScroll = bar.scrollLeft;
+    const barWidth = bar.clientWidth;
+
+    if (chipLeft < barScroll) {
+      bar.scrollTo({ left: Math.max(0, chipLeft - 16), behavior: 'smooth' });
+    } else if (chipLeft + chipWidth > barScroll + barWidth) {
+      bar.scrollTo({ left: chipLeft + chipWidth - barWidth + 16, behavior: 'smooth' });
     }
   }, [active]);
 
@@ -386,8 +410,8 @@ export default function RudrakshaSection({ products, headerText }) {
         <div className="rudraksha-carousel-wrapper">
           <div
             ref={trackRef}
-            className="rudraksha-carousel-track"
-            tabIndex={0}
+            className={`rudraksha-carousel-track${!canScroll ? ' no-scroll' : ''}`}
+            tabIndex={canScroll ? 0 : -1}
             role="region"
             aria-label="Rudraksha products carousel"
           >
@@ -422,7 +446,7 @@ export default function RudrakshaSection({ products, headerText }) {
             )}
           </div>
 
-          {sortedList.length > 0 && (
+          {canScroll && sortedList.length > 0 && (
             <div className="rudraksha-nav-controls">
               <button
                 type="button"

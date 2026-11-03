@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { BRACELETS } from '@/lib/products';
-import ProductCard from '@/components/ProductCard';
+import ProductCarousel from '@/components/ProductCarousel';
 
 const FILTERS = [
   { label: 'All', value: 'all' },
@@ -83,6 +83,7 @@ export default function BraceletsSection({ products, headerText }) {
           {FILTERS.map(f => (
             <button
               key={f.value}
+              type="button"
               className={`filter-chip${active === f.value ? ' active' : ''}`}
               onClick={() => setActive(f.value)}
             >
@@ -90,17 +91,12 @@ export default function BraceletsSection({ products, headerText }) {
             </button>
           ))}
         </div>
-        <div className="prod-grid">
-          {filtered.length > 0 ? (
-            filtered.map(product => (
-              <ProductCard key={product.id} product={product} showDesc={false} />
-            ))
-          ) : (
-            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '40px', color: 'var(--muted)', fontSize: '13px' }}>
-              या श्रेणीतील ब्रेसलेट्स लवकरच उपलब्ध होतील. (Products in this category will be available soon).
-            </div>
-          )}
-        </div>
+
+        <ProductCarousel
+          products={filtered}
+          ariaLabel="Spiritual Bracelets Collection carousel"
+          emptyMessage="या श्रेणीतील ब्रेसलेट्स लवकरच उपलब्ध होतील. (Products in this category will be available soon)."
+        />
       </div>
     </section>
   );

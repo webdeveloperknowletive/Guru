@@ -5,6 +5,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from sqlalchemy.orm.attributes import flag_modified
 from app.extensions import db
 from app.models.commerce import Product, Category, InventoryAdjustment, Order, OrderItem, Customer, ProductReview
+from app.models.operations import PaymentTransaction
 from app.services.commerce_service import CommerceService
 from app.services.rbac_service import login_required, permission_required, get_current_admin
 from app.services.audit_service import AuditService
@@ -854,12 +855,15 @@ def orders_list():
         q = q.filter_by(order_status=status)
     if query_str:
         clean_num = query_str.lstrip('#').strip()
-        q = q.filter(
+        q = q.outerjoin(PaymentTransaction, Order.id == PaymentTransaction.order_id).filter(
             (Order.order_number.ilike(f"%{query_str}%")) |
             (Order.order_number.ilike(f"%{clean_num}%")) |
             (Order.customer_name.ilike(f"%{query_str}%")) |
-            (Order.customer_email.ilike(f"%{query_str}%"))
-        )
+            (Order.customer_email.ilike(f"%{query_str}%")) |
+            (Order.customer_phone.ilike(f"%{query_str}%")) |
+            (PaymentTransaction.gateway_payment_id.ilike(f"%{query_str}%")) |
+            (PaymentTransaction.bank_rrn.ilike(f"%{query_str}%"))
+        ).distinct()
 
     q = apply_date_time_filters(q, Order.placed_at, request.args)
     date_filter = extract_date_filter_context(request.args)
@@ -914,6 +918,109 @@ def order_verify_payment(order_id):
     except Exception as e:
         flash(f"Failed to verify payment: {str(e)}", "danger")
     return redirect(url_for("commerce.order_detail", order_id=order_id))
+
+
+@commerce_bp.route("/orders/<int:order_id>/sync-razorpay", methods=["POST"])
+@login_required
+@permission_required("orders", "edit")
+def order_sync_razorpay(order_id):
+    user = get_current_admin()
+    order = Order.query.get_or_404(order_id)
+    provided_payment_id = request.form.get("razorpay_payment_id", "").strip()
+
+    from app.services.razorpay_service import RazorpayService
+
+    payment_id = provided_payment_id or order.latest_gateway_payment_id
+    if not payment_id:
+        for txn in order.transactions:
+            if txn.gateway_order_id:
+                try:
+                    client = RazorpayService.get_client()
+                    order_payments = client.order.payments(txn.gateway_order_id)
+                    items = order_payments.get("items", [])
+                    if items:
+                        payment_id = items[0].get("id")
+                        break
+                except Exception as e:
+                    pass
+
+    if not payment_id:
+        flash("No Razorpay Payment ID found for this order. Please enter a Payment ID (e.g. pay_...).", "warning")
+        return redirect(url_for("commerce.order_detail", order_id=order.id))
+
+    try:
+        rzp_payment = RazorpayService.fetch_payment(payment_id)
+        if not rzp_payment:
+            flash(f"Payment {payment_id} not found in Razorpay.", "danger")
+            return redirect(url_for("commerce.order_detail", order_id=order.id))
+
+        status = rzp_payment.get("status")
+        method = (rzp_payment.get("method") or "Razorpay").upper()
+        acq = rzp_payment.get("acquirer_data") or {}
+        bank_rrn = acq.get("rrn") or acq.get("bank_transaction_id") or acq.get("upi_transaction_id")
+        amount_paise = rzp_payment.get("amount", 0)
+        paid_amount = Decimal(amount_paise) / Decimal("100.0")
+
+        txn_number = f"TXN-{order.order_number.replace('#', '')}-{payment_id}"
+        txn = PaymentTransaction.query.filter(
+            (PaymentTransaction.gateway_payment_id == payment_id) |
+            (PaymentTransaction.transaction_number == txn_number)
+        ).first()
+
+        if not txn:
+            txn = PaymentTransaction(
+                transaction_number=txn_number,
+                order_id=order.id,
+                amount=paid_amount,
+                currency="INR",
+                gateway="Razorpay",
+                gateway_payment_id=payment_id,
+                gateway_order_id=rzp_payment.get("order_id"),
+                status=status,
+                payment_method=method,
+                bank_rrn=bank_rrn,
+                customer_name=rzp_payment.get("notes", {}).get("customer_name") or order.customer_name,
+                customer_email=rzp_payment.get("email") or order.customer_email,
+                customer_phone=rzp_payment.get("contact") or order.customer_phone,
+                item_summary=f"Order {order.order_number}",
+                source_form="Store Checkout",
+                form_submission_id=order.order_number,
+                created_at=datetime.now(timezone.utc),
+            )
+            db.session.add(txn)
+        else:
+            txn.order_id = order.id
+            txn.status = status
+            txn.gateway_payment_id = payment_id
+            txn.payment_method = method
+            if bank_rrn:
+                txn.bank_rrn = bank_rrn
+            txn.updated_at = datetime.now(timezone.utc)
+
+        if status in ("captured", "paid"):
+            order.payment_status = "paid"
+            order.payment_method = f"Razorpay ({method})"
+            if order.order_status == "pending":
+                order.order_status = "processing"
+            flash(f"Payment verified with Razorpay! Status: CAPTURED | Method: {method} | RRN: {bank_rrn or 'N/A'}", "success")
+        elif status == "failed":
+            order.payment_status = "failed"
+            txn.error_message = rzp_payment.get("error_description") or "Failed in Razorpay"
+            flash(f"Razorpay reports payment status: FAILED ({txn.error_message})", "warning")
+        elif status == "refunded":
+            order.payment_status = "refunded"
+            flash("Razorpay reports payment status: REFUNDED", "info")
+        else:
+            flash(f"Razorpay reports payment status: {status.upper()}", "info")
+
+        order.admin_notes = f"{order.admin_notes or ''}\n[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}] Synced with Razorpay: Payment {payment_id} is {status.upper()} (RRN: {bank_rrn or 'N/A'})".strip()
+        db.session.commit()
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Failed to sync with Razorpay: {str(e)}", "danger")
+
+    return redirect(url_for("commerce.order_detail", order_id=order.id))
 
 
 

@@ -64,16 +64,62 @@
           <td style="white-space:nowrap; color:var(--text-muted);">{{ format_date(o.placed_at, "%b %d, %Y") }}</td>
           <td style="font-weight:700;">{{ format_currency(o.total_amount) }}</td>
           <td>
-            {% if o.payment_status == 'offline_pending' %}
+            {% set txn = o.latest_transaction %}
+            {% if o.payment_status in ['paid', 'captured'] %}
+              <span class="badge" style="background:#e8f7ee; color:#0e8345; border:1px solid #b7ebd0; font-weight:700; font-size:0.75rem; display:inline-flex; align-items:center; gap:4px;">
+                <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#10b981;"></span>
+                Captured
+              </span>
+            {% elif o.payment_status in ['cancelled', 'payment_cancelled'] or (o.order_status == 'cancelled' and o.payment_status in ['pending', 'failed']) %}
+              <span class="badge" style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; font-weight:700; font-size:0.75rem; display:inline-flex; align-items:center; gap:4px;">
+                <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#ef4444;"></span>
+                Cancelled
+              </span>
+            {% elif o.payment_status == 'failed' %}
+              <span class="badge" style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; font-weight:700; font-size:0.75rem; display:inline-flex; align-items:center; gap:4px;">
+                <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#ef4444;"></span>
+                Failed
+              </span>
+            {% elif o.payment_status == 'refunded' %}
+              <span class="badge" style="background:#f3e8ff; color:#7e22ce; border:1px solid #e9d5ff; font-weight:700; font-size:0.72rem;">
+                Refunded
+              </span>
+            {% elif o.payment_status == 'offline_pending' %}
               <span class="badge" style="background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; font-weight:700; font-size:0.72rem;">
                 Offline Pending
               </span>
-            {% elif o.payment_status in ['paid', 'captured'] %}
-              <span class="badge badge-delivered">Paid</span>
-            {% elif o.payment_status == 'refunded' %}
-              <span class="badge badge-cancelled">Refunded</span>
             {% else %}
-              <span class="badge badge-processing">{{ o.payment_status }}</span>
+              <span class="badge" style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; font-weight:700; font-size:0.72rem;">
+                Pending
+              </span>
+            {% endif %}
+
+            {% if txn and txn.gateway_payment_id and txn.gateway_payment_id not in ['cancelled', 'failed'] %}
+              <div style="font-family:monospace; font-size:0.72rem; color:var(--text-primary); margin-top:3px; font-weight:600;" title="Razorpay Payment ID">
+                💳 {{ txn.gateway_payment_id }}
+              </div>
+            {% endif %}
+
+            {% if txn and txn.bank_rrn %}
+              <div style="font-family:monospace; font-size:0.70rem; color:#0369a1; margin-top:1px;" title="Bank RRN / UTR">
+                RRN: {{ txn.bank_rrn }}
+              </div>
+            {% endif %}
+
+            {% if txn and txn.payment_method %}
+              <div style="font-size:0.68rem; color:var(--text-muted); text-transform:uppercase; margin-top:1px;">
+                {{ txn.payment_method }}
+              </div>
+            {% elif o.payment_method and o.payment_method != 'Online' %}
+              <div style="font-size:0.68rem; color:var(--text-muted); margin-top:1px;">
+                {{ o.payment_method }}
+              </div>
+            {% endif %}
+
+            {% if o.payment_status in ['cancelled', 'failed'] and txn and txn.error_message %}
+              <div style="font-size:0.68rem; color:#dc2626; margin-top:1px; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ txn.error_message }}">
+                {{ txn.error_message }}
+              </div>
             {% endif %}
           </td>
           <td>

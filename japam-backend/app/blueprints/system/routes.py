@@ -1,10 +1,11 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, Response, abort
+from flask import Blueprint, render_template, request, redirect, url_for, flash, Response, abort, jsonify
 from app.extensions import db
 from app.models.user import AdminUser, Role, AuditLog
 from app.models.operations import SystemSetting
 from app.services.rbac_service import login_required, permission_required, get_current_admin
 from app.services.report_service import ReportService
 from app.services.audit_service import AuditService
+from app.services.checkout_builder_service import CheckoutBuilderService
 from app.utils.date_filter import apply_date_time_filters, extract_date_filter_context
 
 system_bp = Blueprint("system", __name__, url_prefix="/admin/system")
@@ -196,3 +197,108 @@ def settings_page():
     # Load all settings
     all_settings = {s.key: s.value for s in SystemSetting.query.all()}
     return render_template("system/settings.html", current_user=user, settings=all_settings, active_page="settings")
+
+
+# -------------------------------------------------------------
+# Checkout Form Builder
+# -------------------------------------------------------------
+@system_bp.route("/checkout-builder", methods=["GET"])
+@login_required
+@permission_required("system", "manage_settings")
+def checkout_builder_page():
+    user = get_current_admin()
+    draft = CheckoutBuilderService.get_draft_config()
+    published = CheckoutBuilderService.get_published_config()
+    has_draft = CheckoutBuilderService.get_draft_record() is not None
+    active_config = draft if has_draft else published
+    history = CheckoutBuilderService.get_version_history(limit=20)
+    return render_template(
+        "system/checkout_builder.html",
+        current_user=user,
+        active_config=active_config,
+        published_config=published,
+        has_draft=has_draft,
+        history=history,
+        active_page="checkout_builder",
+    )
+
+
+@system_bp.route("/checkout-builder/save-draft", methods=["POST"])
+@login_required
+@permission_required("system", "manage_settings")
+def checkout_builder_save_draft():
+    user = get_current_admin()
+    data = request.get_json(silent=True) or {}
+    config_dict = data.get("config") or data
+    if not config_dict or not isinstance(config_dict, dict):
+        return jsonify({"success": False, "message": "Invalid configuration payload"}), 400
+    try:
+        saved = CheckoutBuilderService.save_draft(config_dict, admin_user=user)
+        return jsonify({
+            "success": True,
+            "message": "Draft saved successfully.",
+            "record": saved,
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+
+
+@system_bp.route("/checkout-builder/publish", methods=["POST"])
+@login_required
+@permission_required("system", "manage_settings")
+def checkout_builder_publish():
+    user = get_current_admin()
+    data = request.get_json(silent=True) or {}
+    publish_notes = data.get("notes", "").strip()
+    config_dict = data.get("config")
+    try:
+        if config_dict and isinstance(config_dict, dict):
+            CheckoutBuilderService.save_draft(config_dict, admin_user=user)
+        published = CheckoutBuilderService.publish_config(publish_notes=publish_notes, admin_user=user)
+        return jsonify({
+            "success": True,
+            "message": f"Checkout form version {published.get('version')} published live!",
+            "record": published,
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+
+
+@system_bp.route("/checkout-builder/restore-defaults", methods=["POST"])
+@login_required
+@permission_required("system", "manage_settings")
+def checkout_builder_restore_defaults():
+    user = get_current_admin()
+    try:
+        restored = CheckoutBuilderService.restore_defaults(admin_user=user)
+        return jsonify({
+            "success": True,
+            "message": "Draft reset to default canonical checkout configuration.",
+            "record": restored,
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+
+
+@system_bp.route("/checkout-builder/restore-version/<int:version_id>", methods=["POST"])
+@login_required
+@permission_required("system", "manage_settings")
+def checkout_builder_restore_version(version_id):
+    user = get_current_admin()
+    try:
+        restored = CheckoutBuilderService.restore_version(version_id, admin_user=user)
+        return jsonify({
+            "success": True,
+            "message": f"Restored version {version_id} into draft editor.",
+            "record": restored,
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+
+
+@system_bp.route("/checkout-builder/history", methods=["GET"])
+@login_required
+@permission_required("system", "manage_settings")
+def checkout_builder_history():
+    history = CheckoutBuilderService.get_version_history(limit=30)
+    return jsonify({"success": True, "history": history})

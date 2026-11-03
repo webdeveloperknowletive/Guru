@@ -21,6 +21,7 @@ from app.models.operations import (
     ReturnRequest,
     CustomerEnquiry,
     SystemSetting,
+    CheckoutFormConfig,
 )
 from app.models.analytics import (
     AnalyticsVisitor,
@@ -55,6 +56,7 @@ __all__ = [
     "ReturnRequest",
     "CustomerEnquiry",
     "SystemSetting",
+    "CheckoutFormConfig",
     "AnalyticsVisitor",
     "AnalyticsSession",
     "AnalyticsEvent",

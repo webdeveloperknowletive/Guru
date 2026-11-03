@@ -486,7 +486,7 @@ export default function ProductModal() {
               <strong>Payment Options:</strong> Online Payment (Razorpay, UPI, Credit/Debit Cards, Net Banking) and Cash on Delivery (COD) available across India.
             </p>
             <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--muted)', lineHeight: '1.5' }}>
-              <strong>Return Policy:</strong> Products listed on this website are offered under the applicable payment options, including Cash on Delivery wherever available. Products are generally non-returnable and non-exchangeable once purchased. However, customers should contact customer support regarding products that are delivered damaged, defective, incorrect, counterfeit, or materially different from their advertised description. Any refunds, replacements, or other remedies will be handled in accordance with applicable consumer protection laws and the published product policy.
+              <strong>Return Policy:</strong> Products listed on this website are offered under the applicable payment options. Products are generally non-returnable and non-exchangeable once purchased. However, customers should contact customer support regarding products that are delivered damaged, defective, incorrect, counterfeit, or materially different from their advertised description. Any refunds, replacements, or other remedies will be handled in accordance with applicable consumer protection laws and the published product policy.
             </p>
           </div>
 

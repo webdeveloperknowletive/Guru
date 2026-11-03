@@ -552,7 +552,7 @@ export default function CookieConsentModal() {
                   </h4>
                   <div style={{ background: 'rgba(224, 176, 74, 0.08)', border: '1px solid rgba(224, 176, 74, 0.25)', borderRadius: '10px', padding: '16px', marginBottom: '16px' }}>
                     <p style={{ margin: 0, fontSize: '13.5px', color: '#fef08a', lineHeight: '1.6', fontWeight: '500' }}>
-                      &ldquo;Products listed on this website are offered under the applicable payment options, including Cash on Delivery wherever available. Products are generally non-returnable and non-exchangeable once purchased. However, customers should contact customer support regarding products that are delivered damaged, defective, incorrect, counterfeit, or materially different from their advertised description. Any refunds, replacements, or other remedies will be handled in accordance with applicable consumer protection laws and the published product policy.&rdquo;
+                      &ldquo;Products listed on this website are offered under the applicable payment options. Products are generally non-returnable and non-exchangeable once purchased. However, customers should contact customer support regarding products that are delivered damaged, defective, incorrect, counterfeit, or materially different from their advertised description. Any refunds, replacements, or other remedies will be handled in accordance with applicable consumer protection laws and the published product policy.&rdquo;
                     </p>
                   </div>
 

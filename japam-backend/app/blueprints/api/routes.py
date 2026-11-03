@@ -1058,11 +1058,29 @@ def calculate_cart():
         else:
             return jsonify({"error": f"Invalid or expired coupon '{coupon_code}'"}), 400
 
+    # Dynamic tax & shipping rates strictly controlled by Checkout Form Builder
+    try:
+        from app.services.checkout_builder_service import CheckoutBuilderService
+        _checkout_cfg = CheckoutBuilderService.get_published_config()
+        _sum_cfg = _checkout_cfg.get("order_summary", {})
+        _gst_active = bool(_sum_cfg.get("show_tax_row", True))
+        _shipping_active = bool(_sum_cfg.get("show_shipping_row", True))
+        _gst_rate = (Decimal(str(_sum_cfg.get("gst_percentage", 3))) / Decimal("100")) if _gst_active else Decimal("0.00")
+        _std_shipping = Decimal(str(_sum_cfg.get("shipping_charge", 99.0))) if _shipping_active else Decimal("0.00")
+        _free_thresh = Decimal(str(_sum_cfg.get("free_shipping_threshold", 999.0)))
+    except Exception:
+        _gst_active = True
+        _shipping_active = True
+        _gst_rate = Decimal("0.03")
+        _std_shipping = Decimal("99.00")
+        _free_thresh = Decimal("999.00")
+
     taxable = max(Decimal("0.00"), subtotal - discount_amount)
-    # GST on spiritual items / handicraft: 3% standard rate
-    tax_amount = (taxable * Decimal("0.03")).quantize(Decimal("0.01"))
-    # Free shipping on orders over ₹999, else standard ₹99 courier charge
-    shipping_amount = Decimal("0.00") if taxable >= Decimal("999.00") else Decimal("99.00")
+    tax_amount = (taxable * _gst_rate).quantize(Decimal("0.01")) if _gst_active else Decimal("0.00")
+    if _shipping_active:
+        shipping_amount = Decimal("0.00") if taxable >= _free_thresh else _std_shipping
+    else:
+        shipping_amount = Decimal("0.00")
     total_amount = taxable + tax_amount + shipping_amount
 
     return jsonify({
@@ -1076,6 +1094,20 @@ def calculate_cart():
     }), 200
 
 
+@api_v1_bp.route("/checkout/config", methods=["GET"])
+def get_checkout_config():
+    """
+    Public configuration endpoint for the dynamic checkout form builder.
+    Returns published configuration with sanitized public keys (no server secrets).
+    """
+    from app.services.checkout_builder_service import CheckoutBuilderService
+    config = CheckoutBuilderService.get_public_config()
+    return jsonify({
+        "success": True,
+        "config": config,
+    }), 200
+
+
 @api_v1_bp.route("/orders/checkout", methods=["POST"])
 def api_checkout():
     """
@@ -1084,16 +1116,24 @@ def api_checkout():
     """
     import secrets
     data = request.get_json() or {}
-    # Google reCAPTCHA v2 verification
+    # Load published checkout builder configuration for dynamic validation
+    from app.services.checkout_builder_service import CheckoutBuilderService
+    checkout_cfg = CheckoutBuilderService.get_published_config()
+
+    # Google reCAPTCHA v2 verification (dynamic builder toggle)
+    captcha_cfg = checkout_cfg.get("captcha", {})
+    captcha_enabled = captcha_cfg.get("enabled", True)
     captcha_token = data.get("recaptcha_token") or data.get("captcha_token") or data.get("recaptchaToken")
     remote_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
     if remote_ip and "," in remote_ip:
         remote_ip = remote_ip.split(",")[0].strip()
 
-    from app.services.captcha_service import CaptchaService
-    is_valid, captcha_err = CaptchaService.verify(captcha_token, remote_ip)
-    if not is_valid:
-        return jsonify({"error": captcha_err}), 400
+    if captcha_enabled:
+        from app.services.captcha_service import CaptchaService
+        is_valid, captcha_err = CaptchaService.verify(captcha_token, remote_ip)
+        if not is_valid:
+            custom_err = captcha_cfg.get("error_message") or captcha_err
+            return jsonify({"error": custom_err}), 400
 
     customer_name = data.get("customer_name", "").strip()
     customer_email = data.get("customer_email", "").strip().lower()
@@ -1121,16 +1161,71 @@ def api_checkout():
     coupon_code = data.get("coupon_code", "").strip().upper()
     idempotency_key = (request.headers.get("Idempotency-Key") or data.get("idempotency_key") or "").strip()
 
-    if not customer_name or not customer_email or not shipping_address:
-        return jsonify({"error": "Customer name, email, and shipping address are required"}), 400
-
     if not raw_items:
         return jsonify({"error": "Cart cannot be empty"}), 400
 
+    # Dynamic Field Manager Validation
+    fields_cfg = checkout_cfg.get("fields", [])
+    submitted_data = dict(data)
+    if isinstance(data.get("custom_fields"), dict):
+        submitted_data.update(data["custom_fields"])
+
+    field_val_map = {
+        "full_name": customer_name,
+        "name": customer_name,
+        "email": customer_email,
+        "customer_email": customer_email,
+        "phone": customer_phone,
+        "mobile": customer_phone,
+        "whatsapp_number": customer_phone,
+        "address": shipping_address,
+        "shipping_address": shipping_address,
+        "city": cust_city,
+        "pincode": cust_pincode,
+        "postal_code": cust_pincode,
+    }
+
+    custom_field_notes = []
+    for f in fields_cfg:
+        if not f.get("enabled", True):
+            continue
+        f_key = f.get("key") or f.get("id")
+        f_label = f.get("label") or f_key
+        val = field_val_map.get(f_key, submitted_data.get(f_key))
+        if val is None and f_key in submitted_data:
+            val = submitted_data.get(f_key)
+        val_str = str(val).strip() if val is not None else ""
+
+        if f.get("required", False) and not val_str:
+            err_msg = f.get("error_message") or f"{f_label} is required."
+            return jsonify({"error": err_msg, "field": f_key}), 400
+
+        if val_str:
+            min_len = f.get("min_length")
+            if min_len is not None and len(val_str) < int(min_len):
+                return jsonify({"error": f"{f_label} must be at least {min_len} characters.", "field": f_key}), 400
+            max_len = f.get("max_length")
+            if max_len is not None and len(val_str) > int(max_len):
+                return jsonify({"error": f"{f_label} cannot exceed {max_len} characters.", "field": f_key}), 400
+
+            if f_key not in field_val_map:
+                custom_field_notes.append(f"{f_label}: {val_str}")
+
+    # Fallbacks if optional standard fields were omitted
+    if not customer_name:
+        customer_name = "Devotee"
+    if not customer_email:
+        customer_email = f"devotee.{secrets.token_hex(4)}@japam.local"
+    if not shipping_address:
+        shipping_address = "Address not provided / In-person dispatch"
+
     # Return & Cancellation Policy acceptance enforcement
+    policy_cfg = checkout_cfg.get("policy", {})
     policy_accepted = data.get("policy_accepted")
-    if policy_accepted in (False, "false", "False", 0, "0"):
-        return jsonify({"error": "Please review and accept the Return, Refund, and Cancellation policy to proceed with checkout."}), 400
+    if policy_cfg.get("enabled", True) and policy_cfg.get("agreement_required", True):
+        if policy_accepted in (False, "false", "False", 0, "0", None, ""):
+            err_msg = policy_cfg.get("agreement_error") or "Please review and accept the Return, Refund, and Cancellation policy to proceed with checkout."
+            return jsonify({"error": err_msg}), 400
     policy_version = str(data.get("policy_version") or "v1.0-2026").strip()
 
     from app.services.payment_mode_service import PaymentModeService
@@ -1141,8 +1236,24 @@ def api_checkout():
     raw_method_check = str(data.get("payment_method") or "").strip().lower()
     is_cod = raw_method_check in ("cash on delivery", "cod", "pay on delivery")
 
+    # Dynamic Payment Methods from Checkout Builder
+    pm_cfg = checkout_cfg.get("payment_methods", {})
+    rzp_cfg = pm_cfg.get("razorpay", {})
+    cod_cfg = pm_cfg.get("cod", {})
+
     # Payment mode & method resolution
     if is_cod:
+        if not cod_cfg.get("enabled", True):
+            return jsonify({"error": "Cash on Delivery (COD) is currently disabled by administrator."}), 400
+        pincode_rule = cod_cfg.get("pincode_rule", "all")
+        allowed_pins = [str(p).strip() for p in cod_cfg.get("allowed_pincodes", []) if str(p).strip()]
+        blocked_pins = [str(p).strip() for p in cod_cfg.get("blocked_pincodes", []) if str(p).strip()]
+        if cust_pincode:
+            if pincode_rule == "allow_list" and allowed_pins and cust_pincode not in allowed_pins:
+                return jsonify({"error": f"Cash on Delivery is not available for pincode {cust_pincode}."}), 400
+            if pincode_rule == "block_list" and cust_pincode in blocked_pins:
+                return jsonify({"error": f"Cash on Delivery is not available for pincode {cust_pincode}."}), 400
+
         order_payment_method = "COD"
         order_payment_status = "cod_pending"
         order_cod_status = "cod_pending"
@@ -1155,12 +1266,17 @@ def api_checkout():
         order_cod_status = None
         notes_record = "Payment Mode: OFFLINE PAYMENT (WhatsApp / Direct Devotee Confirmation)"
     else:
+        if not rzp_cfg.get("enabled", True):
+            return jsonify({"error": "Online payment gateway is currently disabled by administrator."}), 400
         if client_payment_mode == "offline" or raw_method_check in ("offline payment", "whatsapp order", "whatsapp checkout", "offline / direct upi / bank transfer"):
             return jsonify({"error": "Store is currently in Online Payment Mode. Offline checkout is disabled."}), 400
         order_payment_method = "Razorpay"
         order_payment_status = "pending"
         order_cod_status = None
         notes_record = "Payment Mode: ONLINE GATEWAY (Awaiting Verification/Capture)"
+
+    if custom_field_notes:
+        notes_record = f"{notes_record} | Dynamic Fields: " + "; ".join(custom_field_notes)
 
     # Idempotency check: if client sent an idempotency key and order exists, return existing order
     if idempotency_key:
@@ -1228,10 +1344,28 @@ def api_checkout():
             else:
                 raise ValueError(f"Coupon '{coupon_code}' is invalid or expired")
 
+        _sum_cfg = checkout_cfg.get("order_summary", {})
+        _gst_active = bool(_sum_cfg.get("show_tax_row", True))
+        _shipping_active = bool(_sum_cfg.get("show_shipping_row", True))
+        _gst_rate = (Decimal(str(_sum_cfg.get("gst_percentage", 3))) / Decimal("100")) if _gst_active else Decimal("0.00")
+        _std_shipping = Decimal(str(_sum_cfg.get("shipping_charge", 99.0))) if _shipping_active else Decimal("0.00")
+        _free_thresh = Decimal(str(_sum_cfg.get("free_shipping_threshold", 999.0)))
+
         taxable = max(Decimal("0.00"), subtotal - discount_amount)
-        tax_amount = (taxable * Decimal("0.03")).quantize(Decimal("0.01"))
-        shipping_amount = Decimal("0.00") if taxable >= Decimal("999.00") else Decimal("99.00")
+        tax_amount = (taxable * _gst_rate).quantize(Decimal("0.01")) if _gst_active else Decimal("0.00")
+        if _shipping_active:
+            shipping_amount = Decimal("0.00") if taxable >= _free_thresh else _std_shipping
+        else:
+            shipping_amount = Decimal("0.00")
         total_amount = taxable + tax_amount + shipping_amount
+
+        if is_cod:
+            min_cod = Decimal(str(cod_cfg.get("min_order_value", 0)))
+            max_cod = Decimal(str(cod_cfg.get("max_order_value", 50000)))
+            if total_amount < min_cod:
+                return jsonify({"error": f"Cash on Delivery requires a minimum order of ₹{min_cod}."}), 400
+            if total_amount > max_cod:
+                return jsonify({"error": f"Cash on Delivery is limited to orders up to ₹{max_cod}."}), 400
 
         # Find or create customer
         customer = Customer.query.filter_by(email=customer_email).first()
@@ -1407,6 +1541,9 @@ def api_checkout():
                     "currency": rzp_res["currency"],
                     "key_id": rzp_res["key_id"],
                 }
+                if txn:
+                    txn.gateway_order_id = rzp_res["razorpay_order_id"]
+                    db.session.commit()
             except Exception as e:
                 current_app.logger.warning(f"Could not auto-generate Razorpay order on checkout: {e}")
 
@@ -1542,6 +1679,9 @@ def payment_webhook():
                     txn.customer_name = order.customer_name
                     txn.source_form = "Store Checkout"
                     txn.form_submission_id = order.order_number
+                    if order.payment_status != "paid":
+                        order.payment_status = "failed"
+                        order.admin_notes = f"{order.admin_notes or ''}\n[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}] Webhook: Payment Failed ({error_desc})".strip()
             elif booking_number:
                 booking = PujaBooking.query.filter_by(booking_number=str(booking_number).strip()).first()
                 if booking:
@@ -1581,6 +1721,12 @@ def payment_webhook():
             if order.order_status == "pending":
                 order.order_status = "processing"
 
+            acquirer_data = payment_obj.get("acquirer_data") or {}
+            bank_rrn = acquirer_data.get("rrn") or acquirer_data.get("bank_transaction_id") or acquirer_data.get("upi_transaction_id")
+            raw_method = payment_obj.get("method") or "Razorpay"
+            method_str = raw_method.upper() if raw_method else "Razorpay"
+            order.payment_method = f"Razorpay ({method_str})"
+
             txn_number = f"TXN-{order.order_number.replace('#', '')}-{gateway_payment_id}"
             txn = PaymentTransaction.query.filter_by(transaction_number=txn_number).first()
             if not txn:
@@ -1591,7 +1737,8 @@ def payment_webhook():
                     txn.gateway_payment_id = gateway_payment_id
                     txn.gateway_order_id = gateway_order_id
                     txn.status = "captured"
-                    txn.payment_method = "Razorpay"
+                    txn.payment_method = method_str
+                    txn.bank_rrn = bank_rrn
                     txn.updated_at = datetime.now(timezone.utc)
                 else:
                     txn = PaymentTransaction(
@@ -1603,7 +1750,8 @@ def payment_webhook():
                         gateway_payment_id=gateway_payment_id,
                         gateway_order_id=gateway_order_id,
                         status="captured",
-                        payment_method="Razorpay",
+                        payment_method=method_str,
+                        bank_rrn=bank_rrn,
                         customer_name=order.customer_name,
                         customer_email=order.customer_email,
                         customer_phone=order.customer_phone,
@@ -1615,8 +1763,12 @@ def payment_webhook():
                     db.session.add(txn)
             else:
                 txn.status = "captured"
+                txn.gateway_payment_id = gateway_payment_id
+                if bank_rrn:
+                    txn.bank_rrn = bank_rrn
                 txn.updated_at = datetime.now(timezone.utc)
 
+            order.admin_notes = f"{order.admin_notes or ''}\n[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}] Razorpay Payment Captured: ID {gateway_payment_id}, RRN {bank_rrn or 'N/A'}, Method {method_str}".strip()
             db.session.commit()
 
         return jsonify({"status": "payment_processed", "order_number": order.order_number}), 200
@@ -2053,28 +2205,68 @@ def payment_verify():
 
         # Transition order to paid
         order.payment_status = "paid"
-        order.payment_method = "Razorpay"
         if order.order_status == "pending":
             order.order_status = "processing"
+
+        # Fetch live payment details from Razorpay to get real Bank RRN and method
+        bank_rrn = None
+        raw_method = None
+        try:
+            rzp_payment = RazorpayService.fetch_payment(razorpay_payment_id)
+            if rzp_payment:
+                raw_method = (rzp_payment.get("method") or "").upper()
+                acq = rzp_payment.get("acquirer_data") or {}
+                bank_rrn = acq.get("rrn") or acq.get("bank_transaction_id") or acq.get("upi_transaction_id")
+        except Exception as e:
+            current_app.logger.warning(f"Could not fetch payment details from Razorpay for {razorpay_payment_id}: {e}")
+
+        method_str = f"Razorpay ({raw_method})" if raw_method else "Razorpay"
+        order.payment_method = method_str
 
         txn_number = f"TXN-{order.order_number.replace('#', '')}-{razorpay_payment_id}"
         existing_num = PaymentTransaction.query.filter_by(transaction_number=txn_number).first()
         if not existing_num:
-            txn = PaymentTransaction(
-                transaction_number=txn_number,
-                order_id=order.id,
-                amount=order.total_amount,
-                currency="INR",
-                gateway="Razorpay",
-                gateway_payment_id=razorpay_payment_id,
-                gateway_order_id=razorpay_order_id,
-                status="captured",
-                customer_name=order.customer_name,
-                customer_email=order.customer_email,
-                created_at=datetime.now(timezone.utc),
-            )
-            db.session.add(txn)
+            base_txn = PaymentTransaction.query.filter_by(order_id=order.id).order_by(PaymentTransaction.id.desc()).first()
+            if base_txn and base_txn.status != "captured":
+                txn = base_txn
+                txn.transaction_number = txn_number
+                txn.gateway_payment_id = razorpay_payment_id
+                txn.gateway_order_id = razorpay_order_id
+                txn.status = "captured"
+                txn.payment_method = raw_method or "Razorpay"
+                txn.bank_rrn = bank_rrn
+                txn.updated_at = datetime.now(timezone.utc)
+            else:
+                txn = PaymentTransaction(
+                    transaction_number=txn_number,
+                    order_id=order.id,
+                    amount=order.total_amount,
+                    currency="INR",
+                    gateway="Razorpay",
+                    gateway_payment_id=razorpay_payment_id,
+                    gateway_order_id=razorpay_order_id,
+                    status="captured",
+                    payment_method=raw_method or "Razorpay",
+                    bank_rrn=bank_rrn,
+                    customer_name=order.customer_name,
+                    customer_email=order.customer_email,
+                    customer_phone=order.customer_phone,
+                    item_summary=f"Order {order.order_number}",
+                    source_form="Store Checkout",
+                    form_submission_id=order.order_number,
+                    created_at=datetime.now(timezone.utc),
+                )
+                db.session.add(txn)
+        else:
+            existing_num.status = "captured"
+            existing_num.gateway_payment_id = razorpay_payment_id
+            if bank_rrn:
+                existing_num.bank_rrn = bank_rrn
+            if raw_method:
+                existing_num.payment_method = raw_method
+            existing_num.updated_at = datetime.now(timezone.utc)
 
+        order.admin_notes = f"{order.admin_notes or ''}\n[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}] Razorpay Payment Captured: ID {razorpay_payment_id}, RRN {bank_rrn or 'N/A'}, Method {raw_method or 'Razorpay'}".strip()
         db.session.commit()
 
         AuditService.log(
@@ -2285,6 +2477,17 @@ def payment_failure():
             return jsonify({"error": "Cannot verify online payment for an offline order."}), 400
 
         if order.payment_status != "paid":
+            is_cancellation = (
+                error_code in ("MODAL_DISMISSED", "PAYMENT_CANCELLED")
+                or "cancel" in str(error_code).lower()
+                or "dismiss" in str(error_code).lower()
+                or "cancel" in str(error_description).lower()
+            )
+            new_payment_status = "cancelled" if is_cancellation else "failed"
+            order.payment_status = new_payment_status
+            if is_cancellation and order.order_status == "pending":
+                order.order_status = "cancelled"
+
             fail_txn_num = f"TXN-FAIL-{order.order_number.replace('#', '')}-{int(datetime.now(timezone.utc).timestamp())}"
             txn = PaymentTransaction(
                 transaction_number=fail_txn_num,
@@ -2292,17 +2495,21 @@ def payment_failure():
                 amount=order.total_amount,
                 currency="INR",
                 gateway="Razorpay",
-                gateway_payment_id=razorpay_payment_id or "cancelled",
+                gateway_payment_id=razorpay_payment_id or ("cancelled" if is_cancellation else "failed"),
                 gateway_order_id=razorpay_order_id,
-                status="failed",
+                status=new_payment_status,
                 customer_name=order.customer_name,
                 customer_email=order.customer_email,
+                customer_phone=order.customer_phone,
+                item_summary=f"Order {order.order_number}",
+                source_form="Store Checkout",
+                form_submission_id=order.order_number,
                 error_message=f"[{error_code}] {error_description}",
                 created_at=datetime.now(timezone.utc),
             )
             db.session.add(txn)
 
-            order.admin_notes = f"{order.admin_notes or ''}\n[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}] Payment Attempt Failed: {error_description}".strip()
+            order.admin_notes = f"{order.admin_notes or ''}\n[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}] Payment {new_payment_status.capitalize()}: [{error_code}] {error_description}".strip()
             db.session.commit()
 
             AuditService.log(
@@ -2457,6 +2664,8 @@ def cancel_order_api(order_number):
         return jsonify({"message": "Order is already cancelled", "order_number": order.order_number}), 200
 
     order.order_status = "cancelled"
+    if order.payment_status in ("pending", "offline_pending"):
+        order.payment_status = "cancelled"
     # Restock inventory
     for item in order.items:
         if item.product:

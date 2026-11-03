@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
   <script src="{{ url_for('static', filename='js/admin.js') }}" defer></script>
+  {% block extra_head %}{% endblock %}
+  {% block extra_css %}{% endblock %}
 </head>
 <body>
   <div class="admin-layout">
@@ -273,7 +275,7 @@
 
         <!-- System Group -->
         {% if can_system %}
-          {% set is_system_active = active_page in ['users', 'reports', 'audit_logs', 'settings'] %}
+          {% set is_system_active = active_page in ['users', 'reports', 'audit_logs', 'settings', 'checkout_builder'] %}
           <div class="nav-group {% if is_system_active %}has-active-child{% endif %}" data-group="system">
             <button type="button" 
                     class="nav-group-toggle {% if is_system_active %}is-expanded{% endif %}" 
@@ -311,6 +313,10 @@
                   <a href="{{ url_for('system.settings_page') }}" class="nav-link sub-link {% if active_page == 'settings' %}active{% endif %}" {% if active_page == 'settings' %}aria-current="page"{% endif %}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                     <span>Settings</span>
+                  </a>
+                  <a href="{{ url_for('system.checkout_builder_page') }}" class="nav-link sub-link {% if active_page == 'checkout_builder' %}active{% endif %}" {% if active_page == 'checkout_builder' %}aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    <span>Checkout Builder</span>
                   </a>
                 {% endif %}
               </div>

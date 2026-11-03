@@ -1,0 +1,2172 @@
+{% extends "base.html" %}
+
+{% block title %}Checkout Form Builder{% endblock %}
+
+{% block extra_head %}
+<!-- Injected in Head -->
+{% endblock %}
+
+{% block content %}
+<style>
+  /* Root Theme Variables for Checkout Builder */
+  :root {
+    --cb-gold-primary: #d4af37;
+    --cb-gold-hover: #b89628;
+    --cb-gold-subtle: rgba(212, 175, 55, 0.15);
+    --cb-gold-border: rgba(212, 175, 55, 0.35);
+    --cb-dark-bg: #0f0904;
+    --cb-dark-card: #171009;
+    --cb-dark-input: #20160d;
+    --cb-dark-border: rgba(212, 175, 55, 0.25);
+    --cb-dark-text: #fdf8ed;
+    --cb-dark-muted: #c4b59f;
+  }
+
+  .cb-container {
+    max-width: 1680px;
+    margin: 0 auto;
+    padding: 0.25rem 0.5rem 3rem;
+  }
+
+  /* Top Sticky Control Header */
+  .cb-header {
+    background: #ffffff;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+  .cb-title-box h1 {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #1e293b;
+    margin: 0 0 4px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .cb-title-box p {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin: 0;
+  }
+  .cb-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .cb-badge.published {
+    background: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+  }
+  .cb-badge.published .cb-pulse {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    animation: cb-pulse 1.8s infinite;
+  }
+  .cb-badge.draft {
+    background: #fffbeb;
+    color: #92400e;
+    border: 1px solid #fde68a;
+  }
+  @keyframes cb-pulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  }
+
+  .cb-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+  }
+  .cb-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.84rem;
+    font-weight: 600;
+    padding: 8px 15px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .cb-btn-secondary {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #334155;
+  }
+  .cb-btn-secondary:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+    color: #0f172a;
+  }
+  .cb-btn-draft {
+    background: #fef3c7;
+    border-color: #fde68a;
+    color: #92400e;
+  }
+  .cb-btn-draft:hover {
+    background: #fde68a;
+    color: #78350f;
+  }
+  .cb-btn-publish {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    border-color: #047857;
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(5, 150, 105, 0.28);
+  }
+  .cb-btn-publish:hover {
+    background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.38);
+    transform: translateY(-1px);
+  }
+
+  /* Subbar: Navigation Tabs & Device Frame Switchers */
+  .cb-subbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+    background: #ffffff;
+    padding: 0.5rem 0.75rem;
+    border-radius: 10px;
+    border: 1px solid var(--border-color, #e2e8f0);
+  }
+  .cb-tabs-list {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+  .cb-tab-pill {
+    padding: 7px 14px;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    font-size: 0.83rem;
+    font-weight: 600;
+    border-radius: 7px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+  }
+  .cb-tab-pill:hover {
+    background: #f1f5f9;
+    color: #1e293b;
+  }
+  .cb-tab-pill.active {
+    background: #fef3c7;
+    color: #b45309;
+    box-shadow: inset 0 -2px 0 #f59e0b;
+    font-weight: 700;
+  }
+  .cb-tab-count {
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 12px;
+  }
+  .cb-tab-pill.active .cb-tab-count {
+    background: #fde68a;
+    color: #78350f;
+  }
+
+  .cb-device-switch {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    background: #f1f5f9;
+    padding: 3px;
+    border-radius: 7px;
+  }
+  .cb-dev-btn {
+    padding: 4px 10px;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .cb-dev-btn.active {
+    background: #ffffff;
+    color: #0f172a;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+
+  /* Two Column Main Workspace */
+  .cb-workspace {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    align-items: start;
+  }
+  @media (min-width: 1200px) {
+    .cb-workspace {
+      grid-template-columns: 1.15fr 0.85fr;
+    }
+  }
+
+  /* Editor Panels */
+  .cb-panel {
+    display: none;
+  }
+  .cb-panel.active {
+    display: block;
+    animation: cb-fadeIn 0.2s ease;
+  }
+  @keyframes cb-fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .cb-card {
+    background: #ffffff;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+  }
+  .cb-card-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 4px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .cb-card-desc {
+    font-size: 0.82rem;
+    color: #64748b;
+    margin: 0 0 1.25rem 0;
+  }
+
+  /* Form Elements */
+  .cb-form-group {
+    margin-bottom: 1rem;
+  }
+  .cb-form-group:last-child {
+    margin-bottom: 0;
+  }
+  .cb-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 5px;
+  }
+  .cb-input, .cb-select, .cb-textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.86rem;
+    color: #1e293b;
+    background: #ffffff;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    box-sizing: border-box;
+  }
+  .cb-input:focus, .cb-select:focus, .cb-textarea:focus {
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+  }
+  .cb-hint {
+    font-size: 0.74rem;
+    color: #64748b;
+    margin-top: 4px;
+    display: block;
+  }
+
+  /* Modern iOS / SaaS Switch Toggle */
+  .cb-switch-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.65rem 0.85rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    margin-bottom: 0.65rem;
+    border: 1px solid #f1f5f9;
+  }
+  .cb-switch-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .cb-switch-sub {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: 400;
+    display: block;
+  }
+  .cb-switch {
+    position: relative;
+    display: inline-block;
+    width: 42px;
+    height: 23px;
+    flex-shrink: 0;
+  }
+  .cb-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .cb-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #cbd5e1;
+    transition: .2s;
+    border-radius: 24px;
+  }
+  .cb-slider:before {
+    position: absolute;
+    content: "";
+    height: 17px;
+    width: 17px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .2s;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .cb-switch input:checked + .cb-slider {
+    background-color: #10b981;
+  }
+  .cb-switch input:checked + .cb-slider:before {
+    transform: translateX(19px);
+  }
+
+  /* Field Cards in Field Manager */
+  .cb-field-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 9px;
+    padding: 0.9rem 1rem;
+    margin-bottom: 0.75rem;
+    transition: all 0.15s ease;
+  }
+  .cb-field-card:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  }
+  .cb-field-card.inactive {
+    opacity: 0.65;
+    background: #f8fafc;
+  }
+  .cb-field-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 0.65rem;
+  }
+  .cb-field-title-area {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .cb-field-name {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #1e293b;
+  }
+  .cb-field-tag {
+    font-size: 0.7rem;
+    font-family: monospace;
+    background: #f1f5f9;
+    color: #475569;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .cb-field-type-badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    background: #e0f2fe;
+    color: #0369a1;
+    padding: 2px 7px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+  .cb-field-req-badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    background: #fee2e2;
+    color: #b91c1c;
+    padding: 2px 7px;
+    border-radius: 4px;
+  }
+  .cb-field-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .cb-icon-btn {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.78rem;
+    color: #475569;
+    transition: all 0.12s;
+  }
+  .cb-icon-btn:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+    border-color: #cbd5e1;
+  }
+  .cb-icon-btn.danger:hover {
+    background: #fee2e2;
+    color: #b91c1c;
+    border-color: #fca5a5;
+  }
+
+  .cb-field-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+  @media (max-width: 600px) {
+    .cb-field-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* Right Sticky Preview Container */
+  .cb-preview-wrapper {
+    position: sticky;
+    top: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .cb-preview-bar {
+    width: 100%;
+    background: #1e293b;
+    color: #ffffff;
+    padding: 8px 14px;
+    border-radius: 10px 10px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .cb-preview-dots {
+    display: flex;
+    gap: 5px;
+  }
+  .cb-preview-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+  .cb-preview-frame {
+    width: 100%;
+    transition: max-width 0.25s ease;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+    border-radius: 0 0 12px 12px;
+    overflow: hidden;
+  }
+  .cb-preview-frame.desktop {
+    max-width: 100%;
+  }
+  .cb-preview-frame.tablet {
+    max-width: 720px;
+  }
+  .cb-preview-frame.mobile {
+    max-width: 420px;
+  }
+
+  /* Exact Swami Guruji Spiritual Dark Gold Theme for Preview */
+  .sg-preview-box {
+    background: radial-gradient(circle at 50% 10%, #201309 0%, #0d0703 100%);
+    color: #fdf8ed;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Cinzel", "Outfit", sans-serif;
+    padding: 1.25rem;
+    min-height: 640px;
+    max-height: 820px;
+    overflow-y: auto;
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    border-top: none;
+    box-sizing: border-box;
+  }
+  .sg-preview-box::-webkit-scrollbar {
+    width: 6px;
+  }
+  .sg-preview-box::-webkit-scrollbar-track {
+    background: #0f0904;
+  }
+  .sg-preview-box::-webkit-scrollbar-thumb {
+    background: rgba(212, 175, 55, 0.3);
+    border-radius: 3px;
+  }
+
+  .sg-preview-inner {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+  @media (min-width: 680px) {
+    .cb-preview-frame.desktop .sg-preview-inner,
+    .cb-preview-frame.tablet .sg-preview-inner {
+      grid-template-columns: 1.2fr 0.95fr;
+    }
+  }
+
+  /* Spiritual Checkout Components */
+  .sg-kicker {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    color: #e5c07b;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .sg-kicker::before {
+    content: "—";
+    color: #d4af37;
+  }
+  .sg-title {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #fef3c7;
+    margin: 0 0 4px 0;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+  .sg-subtitle {
+    font-size: 0.78rem;
+    color: #c4b59f;
+    margin: 0 0 1rem 0;
+    line-height: 1.4;
+  }
+
+  .sg-fields-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.65rem;
+    margin-bottom: 1rem;
+  }
+  .sg-field-col-full {
+    grid-column: 1 / -1;
+  }
+  .sg-field-label {
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: #f5eedf;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+    display: block;
+  }
+  .sg-field-label .req {
+    color: #f59e0b;
+  }
+  .sg-field-input {
+    width: 100%;
+    background: #1b1209;
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    border-radius: 6px;
+    padding: 7px 10px;
+    color: #fdf8ed;
+    font-size: 0.82rem;
+    box-sizing: border-box;
+    outline: none;
+  }
+  .sg-field-input::placeholder {
+    color: rgba(196, 181, 159, 0.5);
+  }
+
+  /* Payment Choice in Preview */
+  .sg-pm-section-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #e5c07b;
+    margin: 0 0 8px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .sg-pm-live-tag {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(16, 185, 129, 0.2);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+  .sg-pm-card {
+    background: #160e07;
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    border-radius: 8px;
+    padding: 9px 12px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .sg-pm-card.active {
+    background: #23160a;
+    border-color: #f59e0b;
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+  }
+  .sg-pm-radio {
+    margin-top: 3px;
+    accent-color: #f59e0b;
+  }
+  .sg-pm-info {
+    flex: 1;
+  }
+  .sg-pm-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .sg-pm-name {
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: #fdf8ed;
+  }
+  .sg-pm-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(245, 158, 11, 0.18);
+    color: #fbbf24;
+  }
+  .sg-pm-desc {
+    font-size: 0.72rem;
+    color: #c4b59f;
+    margin-top: 2px;
+  }
+
+  /* Policy Card */
+  .sg-policy-card {
+    background: rgba(26, 18, 11, 0.7);
+    border: 1px solid rgba(212, 175, 55, 0.25);
+    border-radius: 7px;
+    padding: 8px 10px;
+    margin-bottom: 0.85rem;
+  }
+  .sg-policy-heading {
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: #e5c07b;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .sg-policy-body {
+    font-size: 0.68rem;
+    color: #c4b59f;
+    line-height: 1.35;
+  }
+  .sg-consent-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 0.7rem;
+    color: #e5c07b;
+    margin-bottom: 0.85rem;
+  }
+  .sg-consent-row input {
+    margin-top: 2px;
+    accent-color: #f59e0b;
+  }
+
+  /* CAPTCHA mock */
+  .sg-captcha-mock {
+    background: #222222;
+    border: 1px solid #333333;
+    border-radius: 4px;
+    padding: 7px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.85rem;
+  }
+  .sg-captcha-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+    color: #e2e8f0;
+  }
+  .sg-captcha-right {
+    font-size: 0.6rem;
+    color: #94a3b8;
+    text-align: right;
+  }
+
+  /* Submit Button */
+  .sg-submit-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #b45309 0%, #d97706 50%, #b45309 100%);
+    border: 1px solid #f59e0b;
+    color: #ffffff;
+    font-size: 0.9rem;
+    font-weight: 700;
+    padding: 10px 14px;
+    border-radius: 7px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    box-shadow: 0 4px 15px rgba(217, 119, 6, 0.4);
+    transition: all 0.15s;
+  }
+
+  /* Order Summary Right Side in Preview */
+  .sg-summary-col {
+    background: #140d06;
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    border-radius: 9px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .sg-sum-header {
+    font-size: 0.88rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #fef3c7;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .sg-item-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed rgba(212, 175, 55, 0.15);
+  }
+  .sg-item-img {
+    width: 44px;
+    height: 44px;
+    border-radius: 6px;
+    object-fit: cover;
+    border: 1px solid rgba(212, 175, 55, 0.4);
+  }
+  .sg-item-info {
+    flex: 1;
+  }
+  .sg-item-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #fdf8ed;
+  }
+  .sg-item-qty {
+    font-size: 0.7rem;
+    color: #c4b59f;
+  }
+  .sg-item-price {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #f59e0b;
+  }
+
+  .sg-coupon-box {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .sg-coupon-input {
+    flex: 1;
+    background: #1b1209;
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    border-radius: 5px;
+    padding: 5px 8px;
+    color: #ffffff;
+    font-size: 0.75rem;
+  }
+  .sg-coupon-btn {
+    background: #291a0c;
+    border: 1px solid rgba(212, 175, 55, 0.4);
+    color: #e5c07b;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 5px;
+  }
+
+  .sg-calc-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.78rem;
+    color: #c4b59f;
+    margin-bottom: 5px;
+  }
+  .sg-calc-row.total {
+    border-top: 1px solid rgba(212, 175, 55, 0.35);
+    padding-top: 8px;
+    margin-top: 8px;
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #fef3c7;
+  }
+  .sg-calc-row.total .price {
+    color: #f59e0b;
+  }
+
+  .sg-trust-note {
+    background: rgba(212, 175, 55, 0.08);
+    border: 1px solid rgba(212, 175, 55, 0.2);
+    border-radius: 6px;
+    padding: 7px 9px;
+    margin-top: 12px;
+    font-size: 0.68rem;
+    color: #e5c07b;
+    line-height: 1.35;
+    display: flex;
+    gap: 6px;
+  }
+
+  /* Modals */
+  .cb-modal-backdrop {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+  .cb-modal-backdrop.show {
+    display: flex;
+  }
+  .cb-modal-dialog {
+    background: #ffffff;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 580px;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 1.5rem;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+  }
+  .cb-modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 0.75rem;
+  }
+  .cb-modal-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0;
+  }
+  .cb-modal-close {
+    background: transparent;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    color: #64748b;
+  }
+
+  /* Toast Notification */
+  #cbToast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: #059669;
+    color: #ffffff;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+    z-index: 10000;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    animation: cb-slideUp 0.25s ease;
+  }
+  @keyframes cb-slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+</style>
+
+<div class="cb-container">
+  <!-- Top Control Bar -->
+  <header class="cb-header">
+    <div class="cb-title-box">
+      <h1>
+        <span>🕉️</span> Checkout Form Builder
+        <span id="cbStatusBadge" class="cb-badge {{ 'published' if active_config.status == 'published' else 'draft' }}">
+          {% if active_config.status == 'published' %}
+            <span class="cb-pulse"></span> Published (v{{ active_config.version }})
+          {% else %}
+            ● Draft (v{{ active_config.version }})
+          {% endif %}
+        </span>
+      </h1>
+      <p>Configure all fields, copy, payment methods, policies, CAPTCHA, and order summary. 100% connected to live checkout modal.</p>
+    </div>
+
+    <div class="cb-header-actions">
+      <button type="button" class="cb-btn cb-btn-secondary" onclick="openHistoryModal()">
+        📜 History (v{{ active_config.version }})
+      </button>
+      <button type="button" class="cb-btn cb-btn-secondary" onclick="restoreDefaults()">
+        🔄 Reset Defaults
+      </button>
+      <button type="button" class="cb-btn cb-btn-draft" onclick="saveDraft()">
+        💾 Save Draft
+      </button>
+      <button type="button" class="cb-btn cb-btn-publish" onclick="publishLive()">
+        🚀 Publish Live to Website
+      </button>
+    </div>
+  </header>
+
+  <!-- Subbar: Section Tabs & Device Frame View Toggles -->
+  <div class="cb-subbar">
+    <nav class="cb-tabs-list" aria-label="Builder Sections">
+      <button type="button" class="cb-tab-pill active" data-tab="tab-fields">
+        📝 Form Fields <span class="cb-tab-count" id="fieldCountBadge">6</span>
+      </button>
+      <button type="button" class="cb-tab-pill" data-tab="tab-page">
+        🏷️ Page & Headings
+      </button>
+      <button type="button" class="cb-tab-pill" data-tab="tab-payments">
+        💳 Payment Methods
+      </button>
+      <button type="button" class="cb-tab-pill" data-tab="tab-policy">
+        📜 Policy & Legal
+      </button>
+      <button type="button" class="cb-tab-pill" data-tab="tab-captcha">
+        🛡️ CAPTCHA & Security
+      </button>
+      <button type="button" class="cb-tab-pill" data-tab="tab-summary">
+        📊 Order Summary & Button
+      </button>
+      <button type="button" class="cb-tab-pill" data-tab="tab-trust">
+        🌟 Trust Copy
+      </button>
+    </nav>
+
+    <div class="cb-device-switch">
+      <span style="font-size:0.75rem; color:#64748b; margin-right:4px; font-weight:600;">Preview:</span>
+      <button type="button" class="cb-dev-btn active" data-frame="desktop" title="Desktop 100%">🖥️ Desktop</button>
+      <button type="button" class="cb-dev-btn" data-frame="tablet" title="Tablet 720px">📱 Tablet</button>
+      <button type="button" class="cb-dev-btn" data-frame="mobile" title="Mobile 420px">📱 Mobile</button>
+    </div>
+  </div>
+
+  <!-- Main Workspace (Editor + Live Reactive Preview) -->
+  <main class="cb-workspace">
+    <!-- LEFT COLUMN: Config Editor Panels -->
+    <div class="cb-editor-col">
+
+      <!-- TAB 1: FORM FIELDS -->
+      <div id="tab-fields" class="cb-panel active">
+        <div class="cb-card">
+          <div class="cb-card-title">
+            <span>Dynamic Checkout Fields</span>
+            <button type="button" class="cb-btn cb-btn-publish" style="font-size:0.78rem; padding:5px 12px;" onclick="openAddFieldModal()">
+              + Add Custom Field
+            </button>
+          </div>
+          <p class="cb-card-desc">Activate/deactivate fields, edit labels/placeholders, adjust required status, and reorder fields for the checkout form.</p>
+
+          <div id="fieldsListContainer">
+            <!-- Dynamically populated by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: PAGE & HEADINGS -->
+      <div id="tab-page" class="cb-panel">
+        <div class="cb-card">
+          <div class="cb-card-title">Checkout Header & Brand Messaging</div>
+          <p class="cb-card-desc">Control headings, sacred kicker badge, devotee subtitles, and footer trust notes.</p>
+
+          <div class="cb-switch-row">
+            <div>
+              <span class="cb-switch-label">Display Kicker Badge</span>
+              <span class="cb-switch-sub">Shows sacred status badge above checkout header</span>
+            </div>
+            <label class="cb-switch">
+              <input type="checkbox" id="cfg_kicker_visible" onchange="updateConfig('page_config.kicker_visible', this.checked)">
+              <span class="cb-slider"></span>
+            </label>
+          </div>
+
+          <div class="cb-form-group">
+            <label class="cb-label">Kicker Badge Text</label>
+            <input type="text" id="cfg_kicker" class="cb-input" oninput="updateConfig('page_config.kicker', this.value)">
+          </div>
+
+          <div class="cb-form-group">
+            <label class="cb-label">Main Checkout Heading (English)</label>
+            <input type="text" id="cfg_page_title" class="cb-input" oninput="updateConfig('page_config.title', this.value)">
+          </div>
+
+          <div class="cb-form-group">
+            <label class="cb-label">Devotee Subtitle (Marathi)</label>
+            <input type="text" id="cfg_page_subtitle" class="cb-input" oninput="updateConfig('page_config.subtitle', this.value)">
+          </div>
+
+          <div class="cb-form-group">
+            <label class="cb-label">Devotee Subtitle (English)</label>
+            <input type="text" id="cfg_page_subtitle_en" class="cb-input" oninput="updateConfig('page_config.subtitle_en', this.value)">
+          </div>
+
+          <div class="cb-switch-row" style="margin-top:1rem;">
+            <div>
+              <span class="cb-switch-label">Footer Trust Note</span>
+              <span class="cb-switch-sub">Shows sacred temple consecration dispatch note</span>
+            </div>
+            <label class="cb-switch">
+              <input type="checkbox" id="cfg_footer_trust_visible" onchange="updateConfig('page_config.footer_trust_visible', this.checked)">
+              <span class="cb-slider"></span>
+            </label>
+          </div>
+
+          <div class="cb-form-group">
+            <label class="cb-label">Footer Trust Text</label>
+            <textarea id="cfg_footer_trust" class="cb-textarea" rows="2" oninput="updateConfig('page_config.footer_trust_note', this.value)"></textarea>
+          </div>
+
+          <div class="cb-switch-row">
+            <div>
+              <span class="cb-switch-label">SSL Security Badge</span>
+              <span class="cb-switch-sub">Display 256-bit bank encrypted message</span>
+            </div>
+            <label class="cb-switch">
+              <input type="checkbox" id="cfg_ssl_visible" onchange="updateConfig('page_config.ssl_message_visible', this.checked)">
+              <span class="cb-slider"></span>
+            </label>
+          </div>
+
+          <div class="cb-form-group">
+            <label class="cb-label">SSL Security Text</label>
+            <input type="text" id="cfg_ssl_message" class="cb-input" oninput="updateConfig('page_config.ssl_message', this.value)">
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: PAYMENT METHODS -->
+      <div id="tab-payments" class="cb-panel">
+        <div class="cb-card">
+          <div class="cb-card-title">1. Razorpay Secure Online Payment</div>
+          <p class="cb-card-desc">UPI (GPay, PhonePe, Paytm), Credit & Debit cards, and Net Banking gateway.</p>
+
+          <div class="cb-switch-row">
+            <div>
+              <span class="cb-switch-label">Enable Razorpay Online Payment</span>
+              <span class="cb-switch-sub">Allows devotees to pay instantly online</span>
+            </div>
+            <label class="cb-switch">
+              <input type="checkbox" id="pm_rzp_enabled" onchange="updateConfig('payment_methods.razorpay.enabled', this.checked)">
+              <span class="cb-slider"></span>
+            </label>
+          </div>
+
+          <div class="cb-field-grid">
+            <div class="cb-form-group">
+              <label class="cb-label">Payment Title</label>
+              <input type="text" id="pm_rzp_title" class="cb-input" oninput="updateConfig('payment_methods.razorpay.title', this.value)">
+            </div>
+            <div class="cb-form-group">
+              <label class="cb-label">Badge Label</label>
+              <input type="text" id="pm_rzp_badge" class="cb-input" oninput="updateConfig('payment_methods.razorpay.badge', this.value)">
+            </div>
+          </div>
+
+          <div class="cb-form-group">
+            <label class="cb-label">Description / Subtitle</label>
+            <input type="text" id="pm_rzp_desc" class="cb-input" oninput="updateConfig('payment_methods.razorpay.description', this.value)">
+          </div>
+
+          <div style="display:flex; gap:16px; margin-top:8px; font-size:0.82rem;">
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" id="pm_rzp_upi" onchange="updateConfig('payment_methods.razorpay.instruments.upi', this.checked)"> UPI Enabled
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" id="pm_rzp_cards" onchange="updateConfig('payment_methods.razorpay.instruments.cards', this.checked)"> Cards Enabled
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" id="pm_rzp_netbanking" onchange="updateConfig('payment_methods.razorpay.instruments.netbanking', this.checked)"> Net Banking Enabled
+            </label>
+          </div>
+        </div>
+
+        <div class="cb-card">
+          <div class="cb-card-title">2. Cash on Delivery (COD)</div>
+          <p class="cb-card-desc">Doorstep cash collection on delivery with order value limits and pincode rules.</p>
+
+          <div class="cb-switch-row">
+            <div>
+              <span class="cb-switch-label">Enable Cash on Delivery</span>
+              <span class="cb-switch-sub">When inactive, COD is completely hidden from checkout</span>
+            </div>
+            <label class="cb-switch">
+              <input type="checkbox" id="pm_cod_enabled" onchange="updateConfig('payment_methods.cod.enabled', this.checked)">
+              <span class="cb-slider"></span>
+            </label>
+          </div>
+
+          <div class="cb-field-grid">
+            <div class="cb-form-group">
+              <label class="cb-label">COD Method Title</label>
+              <input type="text" id="pm_cod_title" class="cb-input" oninput="updateConfig('payment_methods.cod.title', this.value)">
+            </div>
+            <div class="cb-form-group">
+              <label class="cb-label">Badge Label</label>
+              <input type="text" id="pm_cod_badge" class="cb-input" oninput="updateConfig('payment_methods.cod.badge', this.value)">
+            </div>
+          </div>
+
+          <div class="cb-form-group">
+            <label class="cb-label">Description</label>
+            <input type="text" id="pm_cod_desc" class="cb-input" oninput="updateConfig('payment_methods.cod.description', this.value)">
+          </div>
+
+          <div class="cb-field-grid">
+            <div class="cb-form-group">
+              <label class="cb-label">Min Order Value (₹)</label>
+              <input type="number" id="pm_cod_min" class="cb-input" min="0" oninput="updateConfig('payment_methods.cod.min_order_value', parseInt(this.value)||0)">
+            </div>
+            <div class="cb-form-group">
+              <label class="cb-label">Max Order Value (₹)</label>
+              <input type="number" id="pm_cod_max" class="cb-input" min="0" oninput="updateConfig('payment_methods.cod.max_order_value', parseInt(this.value)||50000)">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: POLICY & TERMS -->
+      <div id="tab-policy" class="cb-panel">
+        <div class="cb-card">
+          <div class="cb-card-title">Return Policy & Legal Agreement</div>
+          <p class="cb-card-desc">Configure the legal disclaimer card and mandatory customer consent checkbox.</p>
+
+          <div class="cb-switch-row">
+            <div>
+              <span class="cb-switch-label">Show Policy Card</span>
+              <span class="cb-switch-sub">Renders spiritual return & replacement policies</span>
+            </div>
+            <label class="cb-switch">
+              <input type="checkbox" id="policy_enabled" onchange="updateConfig('policy.enabled', this.checked)">
+              <span class="cb-slider"></span>
+            </label>
+          </div>
+
+          <div class="cb-form-group">
+            <label class="cb-label">Policy Heading</label>
+            <input type="text" id="policy_title" class="cb-input" oninput="updateConfig('policy.title', this.value)">
+          </div>
+
+          <div class="cb-form-group">
+            <label class="cb-label">Policy Content</label>
+            <textarea id="policy_content" class="cb-textarea" rows="4" oninput="updateConfig('policy.content', this.value)"></textarea>
+          </div>
+
+          <div class="cb-switch-row" style="margin-top:1rem;">
+            <div>
+              <span class="cb-switch-label">Require Mandatory Consent</span>
+              <span class="cb-switch-sub">Devotee must check the agreement box before placing order</span>
+            </div>
+            <label class="cb-switch">
+              <input type="checkbox" id="policy_agree_req" onchange="updateConfig('policy.agreement_required', this.checked)">
+              <span class="cb-slider"></span>
+            </label>
+          </div>
+
+          <div class="cb-form-group">
+            <label class="cb-label">Checkbox Agreement Text</label>
+            <textarea id="policy_agree_text" class="cb-textarea" rows="2" oninput="updateConfig('policy.agreement_text', this.value)"></textarea>
+          </div>
+
+          <div class="cb-form-group">
+            <label class="cb-label">Validation Error Message (If unchecked)</label>
+            <input type="text" id="policy_agree_err" class="cb-input" oninput="updateConfig('policy.agreement_error', this.value)">
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 5: CAPTCHA & SECURITY -->
+      <div id="tab-captcha" class="cb-panel">
+        <div class="cb-card">
+          <div class="cb-card-title">Bot Shield & CAPTCHA Verification</div>
+          <p class="cb-card-desc">Configure Google reCAPTCHA v2 bot protection. Server rate limiting always protects backend.</p>
+
+          <div class="cb-switch-row">
+            <div>
+              <span class="cb-switch-label">Enable CAPTCHA on Checkout</span>
+              <span class="cb-switch-sub">When disabled, automatic server-side bot rate limiting protects the API</span>
+            </div>
+            <label class="cb-switch">
+              <input type="checkbox" id="captcha_enabled" onchange="updateConfig('captcha.enabled', this.checked)">
+              <span class="cb-slider"></span>
+            </label>
+          </div>
+
+          <div class="cb-form-group">
+            <label class="cb-label">Public Site Key</label>
+            <input type="text" id="captcha_site_key" class="cb-input" oninput="updateConfig('captcha.site_key', this.value)">
+            <span class="cb-hint">Secret key is stored safely on server and never exposed in browser.</span>
+          </div>
+
+          <div class="cb-form-group">
+            <label class="cb-label">Error Message</label>
+            <input type="text" id="captcha_error_msg" class="cb-input" oninput="updateConfig('captcha.error_message', this.value)">
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 6: ORDER SUMMARY & BUTTONS -->
+      <div id="tab-summary" class="cb-panel">
+        <div class="cb-card">
+          <div class="cb-card-title">Order Summary Rows & Calculations</div>
+          <p class="cb-card-desc">Control visible summary line items, GST rate display, and shipping thresholds.</p>
+
+          <div class="cb-form-group">
+            <label class="cb-label">Summary Heading</label>
+            <input type="text" id="sum_title" class="cb-input" oninput="updateConfig('order_summary.title', this.value)">
+          </div>
+
+          <div class="cb-switch-row">
+            <span class="cb-switch-label">Show Product Thumbnails</span>
+            <label class="cb-switch">
+              <input type="checkbox" id="sum_show_thumb" onchange="updateConfig('order_summary.show_thumbnails', this.checked)">
+              <span class="cb-slider"></span>
+            </label>
+          </div>
+
+          <div class="cb-switch-row">
+            <span class="cb-switch-label">Show Vedic Goods GST (3%) Row</span>
+            <label class="cb-switch">
+              <input type="checkbox" id="sum_show_tax" onchange="updateConfig('order_summary.show_tax_row', this.checked)">
+              <span class="cb-slider"></span>
+            </label>
+          </div>
+
+          <div class="cb-switch-row">
+            <span class="cb-switch-label">Show Shipping Row</span>
+            <label class="cb-switch">
+              <input type="checkbox" id="sum_show_shipping" onchange="updateConfig('order_summary.show_shipping_row', this.checked)">
+              <span class="cb-slider"></span>
+            </label>
+          </div>
+
+          <div class="cb-field-grid">
+            <div class="cb-form-group">
+              <label class="cb-label">Vedic GST Percentage (%)</label>
+              <input type="number" id="sum_gst_pct" class="cb-input" min="0" max="28" step="0.5" oninput="updateConfig('order_summary.gst_percentage', parseFloat(this.value)||0)">
+            </div>
+            <div class="cb-form-group">
+              <label class="cb-label">Standard Shipping Charge (₹)</label>
+              <input type="number" id="sum_shipping_charge" class="cb-input" min="0" oninput="updateConfig('order_summary.shipping_charge', parseFloat(this.value)||0)">
+            </div>
+            <div class="cb-form-group">
+              <label class="cb-label">Free Shipping Threshold (₹)</label>
+              <input type="number" id="sum_free_thresh" class="cb-input" min="0" oninput="updateConfig('order_summary.free_shipping_threshold', parseInt(this.value)||0)">
+            </div>
+          </div>
+        </div>
+
+        <div class="cb-card">
+          <div class="cb-card-title">Action Buttons Copy</div>
+          <p class="cb-card-desc">Configure place order and apply coupon button labels.</p>
+
+          <div class="cb-form-group">
+            <label class="cb-label">Place Order Button Label Template</label>
+            <input type="text" id="btn_submit_label" class="cb-input" oninput="updateConfig('buttons.place_order.label', this.value)">
+            <span class="cb-hint">Use {total} to insert dynamic calculated total (e.g. "Place Order · ₹{total}").</span>
+          </div>
+
+          <div class="cb-form-group">
+            <label class="cb-label">Button Loading State Text</label>
+            <input type="text" id="btn_loading_text" class="cb-input" oninput="updateConfig('buttons.place_order.loading_text', this.value)">
+          </div>
+
+          <div class="cb-form-group">
+            <label class="cb-label">Apply Coupon Button Text</label>
+            <input type="text" id="btn_coupon_label" class="cb-input" oninput="updateConfig('buttons.apply_coupon.label', this.value)">
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 7: TRUST COPY -->
+      <div id="tab-trust" class="cb-panel">
+        <div class="cb-card">
+          <div class="cb-card-title">Trust Messages & Badges</div>
+          <p class="cb-card-desc">Manage sacred certification notes displayed under the order summary.</p>
+          <div id="trustListContainer">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN: Sticky Real-Time Live Preview -->
+    <div class="cb-preview-wrapper">
+      <div class="cb-preview-bar">
+        <div class="cb-preview-dots">
+          <span class="cb-preview-dot" style="background:#ef4444;"></span>
+          <span class="cb-preview-dot" style="background:#f59e0b;"></span>
+          <span class="cb-preview-dot" style="background:#10b981;"></span>
+        </div>
+        <span>LIVE STORE PREVIEW (INSTANT SYNC)</span>
+        <span id="previewDeviceLabel" style="font-size:0.7rem; color:#94a3b8;">100% Desktop</span>
+      </div>
+
+      <div id="previewFrame" class="cb-preview-frame desktop">
+        <div class="sg-preview-box">
+          <div class="sg-preview-inner">
+            <!-- Left Side: Devotee Form & Payment -->
+            <div class="sg-form-col">
+              <div id="prevKicker" class="sg-kicker">100% SACRED CHECKOUT</div>
+              <h2 id="prevTitle" class="sg-title">DEVOTEE & SHIPPING DETAILS</h2>
+              <p id="prevSubtitle" class="sg-subtitle">डिलिव्हरीसाठी आवश्यक माहिती भरा — सुरक्षित आणि जलद डिस्पॅच.</p>
+
+              <!-- Dynamic Preview Fields -->
+              <div id="prevFieldsGrid" class="sg-fields-grid">
+                <!-- Dynamically populated -->
+              </div>
+
+              <!-- Payment Method Section -->
+              <div class="sg-pm-section">
+                <div class="sg-pm-section-title">
+                  <span>PAYMENT METHOD · पेमेंट पर्याय</span>
+                  <span class="sg-pm-live-tag">Online Mode Active</span>
+                </div>
+
+                <div id="prevRzpCard" class="sg-pm-card active" onclick="selectPreviewPayment('online')">
+                  <input type="radio" name="prev_pm" class="sg-pm-radio" checked>
+                  <div class="sg-pm-info">
+                    <div class="sg-pm-title-row">
+                      <span id="prevRzpTitle" class="sg-pm-name">Razorpay Secure Payment</span>
+                      <span id="prevRzpBadge" class="sg-pm-badge">✓ Instant</span>
+                    </div>
+                    <div id="prevRzpDesc" class="sg-pm-desc">UPI (GPay, PhonePe, Paytm), Credit/Debit Cards, Net Banking</div>
+                  </div>
+                </div>
+
+                <div id="prevCodCard" class="sg-pm-card" onclick="selectPreviewPayment('cod')">
+                  <input type="radio" name="prev_pm" class="sg-pm-radio">
+                  <div class="sg-pm-info">
+                    <div class="sg-pm-title-row">
+                      <span id="prevCodTitle" class="sg-pm-name">Cash on Delivery (COD)</span>
+                      <span id="prevCodBadge" class="sg-pm-badge">✓ Available</span>
+                    </div>
+                    <div id="prevCodDesc" class="sg-pm-desc">Pay in cash upon doorstep delivery · Consecrated Packaging</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Return Policy Box -->
+              <div id="prevPolicyBox" class="sg-policy-card">
+                <div id="prevPolicyTitle" class="sg-policy-heading">📜 Return & Product Policy:</div>
+                <div id="prevPolicyContent" class="sg-policy-body">
+                  Products listed on this website are offered under the applicable payment options...
+                </div>
+              </div>
+
+              <!-- Consent Checkbox -->
+              <div id="prevConsentRow" class="sg-consent-row">
+                <input type="checkbox" id="prevConsentCheck" checked>
+                <label for="prevConsentCheck" id="prevConsentText">
+                  I have read and agree to the Return Policy, Terms of Service, and understand that sacred consecrated products are non-returnable except for damaged, defective, or incorrect deliveries.
+                </label>
+              </div>
+
+              <!-- CAPTCHA Preview Box -->
+              <div id="prevCaptchaBox" class="sg-captcha-mock">
+                <div class="sg-captcha-left">
+                  <input type="checkbox" checked disabled style="accent-color:#10b981;">
+                  <span>I'm not a robot</span>
+                </div>
+                <div class="sg-captcha-right">
+                  reCAPTCHA<br>Privacy · Terms
+                </div>
+              </div>
+
+              <!-- Submit Place Order Button -->
+              <button type="button" id="prevSubmitBtn" class="sg-submit-btn">
+                Place Order · ₹1,337.97
+              </button>
+            </div>
+
+            <!-- Right Side: Order Summary -->
+            <div class="sg-summary-col">
+              <div>
+                <div class="sg-sum-header">
+                  <span id="prevSumTitle">ORDER SUMMARY</span>
+                  <span>(1)</span>
+                </div>
+
+                <!-- Sample Product Row -->
+                <div class="sg-item-row">
+                  <img src="/categories/rudraksha.png" alt="Rose Quartz Bracelet" class="sg-item-img" onerror="this.src='https://placehold.co/44x44/22150a/d4af37?text=ॐ'">
+                  <div class="sg-item-info">
+                    <div class="sg-item-title">Sacred Rose Quartz Bracelet</div>
+                    <div class="sg-item-qty">Qty: 1 × ₹1,299</div>
+                  </div>
+                  <div class="sg-item-price">₹1,299</div>
+                </div>
+
+                <!-- Coupon Input Row -->
+                <div class="sg-coupon-box">
+                  <input type="text" class="sg-coupon-input" placeholder="COUPON (E.G. DIWALI108)" readonly>
+                  <button type="button" id="prevCouponBtn" class="sg-coupon-btn">APPLY</button>
+                </div>
+
+                <!-- Subtotal Row -->
+                <div class="sg-calc-row">
+                  <span>Subtotal</span>
+                  <span>₹1,299.00</span>
+                </div>
+
+                <!-- Vedic Goods GST Row -->
+                <div id="prevTaxRow" class="sg-calc-row">
+                  <span id="prevTaxLabel">Vedic Goods GST (3%)</span>
+                  <span id="prevTaxVal">₹38.97</span>
+                </div>
+
+                <!-- Shipping Row -->
+                <div id="prevShippingRow" class="sg-calc-row">
+                  <span>Shipping</span>
+                  <span id="prevShippingVal" style="color:#10b981; font-weight:700;">FREE (Orders &gt; ₹999)</span>
+                </div>
+
+                <!-- Authoritative Total Row -->
+                <div class="sg-calc-row total">
+                  <span>TOTAL AMOUNT</span>
+                  <span id="prevTotalVal" class="price">₹1,337.97</span>
+                </div>
+              </div>
+
+              <!-- Consecration Bottom Note -->
+              <div id="prevTrustNote" class="sg-trust-note">
+                <span>🌿</span>
+                <span id="prevTrustText">
+                  सर्व वस्तू शास्त्रोक्त पद्धतीने अभिमंत्रित करून वाराणसी/हरिद्वार आश्रमातून पाठवल्या जातात. 100% Consecrated & Lab Certified Sacred Products.
+                </span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Modal 1: Add Custom Field Modal -->
+<div id="addFieldModal" class="cb-modal-backdrop">
+  <div class="cb-modal-dialog">
+    <div class="cb-modal-head">
+      <h3 class="cb-modal-title">Add Custom Checkout Field</h3>
+      <button type="button" class="cb-modal-close" onclick="closeAddFieldModal()">✕</button>
+    </div>
+    <form id="addFieldForm" onsubmit="saveCustomField(event)">
+      <div class="cb-form-group">
+        <label class="cb-label">Field Unique Key / Identifier (e.g. landmark, company_name)</label>
+        <input type="text" id="new_field_id" class="cb-input" required pattern="[a-zA-Z0-9_]+" placeholder="e.g. landmark">
+      </div>
+      <div class="cb-form-group">
+        <label class="cb-label">Field Label (English & Marathi)</label>
+        <input type="text" id="new_field_label" class="cb-input" required placeholder="e.g. Landmark · जवळची खूण">
+      </div>
+      <div class="cb-form-group">
+        <label class="cb-label">Placeholder Text</label>
+        <input type="text" id="new_field_placeholder" class="cb-input" placeholder="e.g. Near Temple / Opposite Bank">
+      </div>
+      <div class="cb-field-grid">
+        <div class="cb-form-group">
+          <label class="cb-label">Field Type</label>
+          <select id="new_field_type" class="cb-select" onchange="toggleFieldOptionsInput(this.value)">
+            <option value="text">Text (Single Line)</option>
+            <option value="textarea">Textarea (Multi-line)</option>
+            <option value="tel">Phone / WhatsApp</option>
+            <option value="email">Email Address</option>
+            <option value="number">Numeric</option>
+            <option value="dropdown">Dropdown Select</option>
+            <option value="radio">Radio Buttons</option>
+            <option value="checkbox">Single Checkbox</option>
+            <option value="date">Date</option>
+            <option value="url">URL Link</option>
+          </select>
+        </div>
+        <div class="cb-form-group">
+          <label class="cb-label">Required Status</label>
+          <select id="new_field_required" class="cb-select">
+            <option value="false">Optional</option>
+            <option value="true">Required (*)</option>
+          </select>
+        </div>
+      </div>
+      <div id="new_field_options_row" class="cb-form-group" style="display:none;">
+        <label class="cb-label">Choices / Options (comma separated)</label>
+        <input type="text" id="new_field_options" class="cb-input" placeholder="Option 1, Option 2, Option 3">
+      </div>
+      <div class="cb-form-group">
+        <label class="cb-label">Help Text (Optional hint under input)</label>
+        <input type="text" id="new_field_help" class="cb-input" placeholder="e.g. Helps the courier locate your address faster">
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:1.25rem;">
+        <button type="button" class="cb-btn cb-btn-secondary" onclick="closeAddFieldModal()">Cancel</button>
+        <button type="submit" class="cb-btn cb-btn-publish">+ Add Field</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal 2: Version History Modal -->
+<div id="historyModal" class="cb-modal-backdrop">
+  <div class="cb-modal-dialog" style="max-width:720px;">
+    <div class="cb-modal-head">
+      <h3 class="cb-modal-title">Checkout Configuration Version History</h3>
+      <button type="button" class="cb-modal-close" onclick="closeHistoryModal()">✕</button>
+    </div>
+    <div style="max-height:480px; overflow-y:auto;">
+      <table style="width:100%; border-collapse:collapse; font-size:0.83rem;">
+        <thead>
+          <tr style="border-bottom:2px solid #e2e8f0; text-align:left; color:#475569;">
+            <th style="padding:8px 6px;">Ver</th>
+            <th style="padding:8px 6px;">Status</th>
+            <th style="padding:8px 6px;">Published By</th>
+            <th style="padding:8px 6px;">Notes</th>
+            <th style="padding:8px 6px;">Timestamp</th>
+            <th style="padding:8px 6px; text-align:right;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="historyTableBody">
+          <!-- Dynamically populated -->
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex; justify-content:flex-end; margin-top:1rem;">
+      <button type="button" class="cb-btn cb-btn-secondary" onclick="closeHistoryModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Floating Toast Notification -->
+<div id="cbToast"></div>
+
+<script>
+  // Authoritative State Object
+  let checkoutConfig = {{ active_config | tojson }};
+  let versionHistory = {{ history | tojson }};
+
+  // Helper to safely set nested path
+  function setDeep(obj, path, value) {
+    const keys = path.split('.');
+    let cur = obj;
+    for (let i = 0; i < keys.length - 1; i++) {
+      if (!cur[keys[i]]) cur[keys[i]] = {};
+      cur = cur[keys[i]];
+    }
+    cur[keys[keys.length - 1]] = value;
+  }
+
+  function getDeep(obj, path, fallback = '') {
+    const keys = path.split('.');
+    let cur = obj;
+    for (const key of keys) {
+      if (cur === undefined || cur === null) return fallback;
+      cur = cur[key];
+    }
+    return cur !== undefined ? cur : fallback;
+  }
+
+  function updateConfig(path, value) {
+    setDeep(checkoutConfig, path, value);
+    renderLivePreview();
+  }
+
+  // Toast Helper
+  function showToast(msg, isSuccess = true) {
+    const toast = document.getElementById('cbToast');
+    toast.textContent = (isSuccess ? '✓ ' : '⚠️ ') + msg;
+    toast.style.background = isSuccess ? '#059669' : '#dc2626';
+    toast.style.display = 'flex';
+    setTimeout(() => { toast.style.display = 'none'; }, 3500);
+  }
+
+  // Tab Switching
+  document.querySelectorAll('.cb-tab-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.cb-tab-pill').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.cb-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      const targetId = btn.getAttribute('data-tab');
+      document.getElementById(targetId)?.classList.add('active');
+    });
+  });
+
+  // Device Frame View Switcher
+  document.querySelectorAll('.cb-dev-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.cb-dev-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const frame = btn.getAttribute('data-frame');
+      const frameEl = document.getElementById('previewFrame');
+      frameEl.className = `cb-preview-frame ${frame}`;
+      document.getElementById('previewDeviceLabel').textContent = 
+        frame === 'mobile' ? '390px Mobile View' : (frame === 'tablet' ? '720px Tablet View' : '100% Desktop View');
+    });
+  });
+
+  // Populate Editor Inputs from State
+  function populateEditorInputs() {
+    // Page Config
+    document.getElementById('cfg_kicker').value = getDeep(checkoutConfig, 'page_config.kicker', '100% SACRED CHECKOUT');
+    document.getElementById('cfg_kicker_visible').checked = getDeep(checkoutConfig, 'page_config.kicker_visible', true);
+    document.getElementById('cfg_page_title').value = getDeep(checkoutConfig, 'page_config.title', 'DEVOTEE & SHIPPING DETAILS');
+    document.getElementById('cfg_page_subtitle').value = getDeep(checkoutConfig, 'page_config.subtitle', 'डिलिव्हरीसाठी आवश्यक माहिती भरा — सुरक्षित आणि जलद डिस्पॅच.');
+    document.getElementById('cfg_page_subtitle_en').value = getDeep(checkoutConfig, 'page_config.subtitle_en', 'Fill delivery details for sacred and fast dispatch.');
+    document.getElementById('cfg_footer_trust').value = getDeep(checkoutConfig, 'page_config.footer_trust_note', 'सर्व वस्तू शास्त्रोक्त पद्धतीने अभिमंत्रित करून वाराणसी/हरिद्वार आश्रमातून पाठवल्या जातात. 100% Consecrated & Lab Certified Sacred Products.');
+    document.getElementById('cfg_footer_trust_visible').checked = getDeep(checkoutConfig, 'page_config.footer_trust_visible', true);
+    document.getElementById('cfg_ssl_message').value = getDeep(checkoutConfig, 'page_config.ssl_message', '100% Secure Checkout · SSL 256-bit Encrypted');
+    document.getElementById('cfg_ssl_visible').checked = getDeep(checkoutConfig, 'page_config.ssl_message_visible', true);
+
+    // Payment Methods
+    document.getElementById('pm_rzp_enabled').checked = getDeep(checkoutConfig, 'payment_methods.razorpay.enabled', true);
+    document.getElementById('pm_rzp_title').value = getDeep(checkoutConfig, 'payment_methods.razorpay.title', 'Razorpay Secure Payment');
+    document.getElementById('pm_rzp_desc').value = getDeep(checkoutConfig, 'payment_methods.razorpay.description', 'UPI (GPay, PhonePe, Paytm), Credit/Debit Cards, Net Banking');
+    document.getElementById('pm_rzp_badge').value = getDeep(checkoutConfig, 'payment_methods.razorpay.badge', '✓ Instant');
+    document.getElementById('pm_rzp_upi').checked = getDeep(checkoutConfig, 'payment_methods.razorpay.instruments.upi', true);
+    document.getElementById('pm_rzp_cards').checked = getDeep(checkoutConfig, 'payment_methods.razorpay.instruments.cards', true);
+    document.getElementById('pm_rzp_netbanking').checked = getDeep(checkoutConfig, 'payment_methods.razorpay.instruments.netbanking', true);
+
+    document.getElementById('pm_cod_enabled').checked = getDeep(checkoutConfig, 'payment_methods.cod.enabled', true);
+    document.getElementById('pm_cod_title').value = getDeep(checkoutConfig, 'payment_methods.cod.title', 'Cash on Delivery (COD)');
+    document.getElementById('pm_cod_desc').value = getDeep(checkoutConfig, 'payment_methods.cod.description', 'Pay in cash upon doorstep delivery · Consecrated Packaging');
+    document.getElementById('pm_cod_badge').value = getDeep(checkoutConfig, 'payment_methods.cod.badge', '✓ Available');
+    document.getElementById('pm_cod_min').value = getDeep(checkoutConfig, 'payment_methods.cod.min_order_value', 0);
+    document.getElementById('pm_cod_max').value = getDeep(checkoutConfig, 'payment_methods.cod.max_order_value', 50000);
+
+    // Policy & Legal
+    document.getElementById('policy_enabled').checked = getDeep(checkoutConfig, 'policy.enabled', true);
+    document.getElementById('policy_title').value = getDeep(checkoutConfig, 'policy.title', 'Return & Product Policy:');
+    document.getElementById('policy_content').value = getDeep(checkoutConfig, 'policy.content', '');
+    document.getElementById('policy_agree_req').checked = getDeep(checkoutConfig, 'policy.agreement_required', true);
+    document.getElementById('policy_agree_text').value = getDeep(checkoutConfig, 'policy.agreement_text', '');
+    document.getElementById('policy_agree_err').value = getDeep(checkoutConfig, 'policy.agreement_error', '');
+
+    // CAPTCHA
+    document.getElementById('captcha_enabled').checked = getDeep(checkoutConfig, 'captcha.enabled', true);
+    document.getElementById('captcha_site_key').value = getDeep(checkoutConfig, 'captcha.site_key', '');
+    document.getElementById('captcha_error_msg').value = getDeep(checkoutConfig, 'captcha.error_message', '');
+
+    // Summary & Buttons
+    document.getElementById('sum_title').value = getDeep(checkoutConfig, 'order_summary.title', 'ORDER SUMMARY');
+    document.getElementById('sum_show_thumb').checked = getDeep(checkoutConfig, 'order_summary.show_thumbnails', true);
+    document.getElementById('sum_show_tax').checked = getDeep(checkoutConfig, 'order_summary.show_tax_row', true);
+    document.getElementById('sum_show_shipping').checked = getDeep(checkoutConfig, 'order_summary.show_shipping_row', true);
+    document.getElementById('sum_gst_pct').value = getDeep(checkoutConfig, 'order_summary.gst_percentage', 3);
+    const shipInput = document.getElementById('sum_shipping_charge');
+    if (shipInput) shipInput.value = getDeep(checkoutConfig, 'order_summary.shipping_charge', 99);
+    document.getElementById('sum_free_thresh').value = getDeep(checkoutConfig, 'order_summary.free_shipping_threshold', 999);
+
+    const submitLabel = typeof checkoutConfig?.buttons?.place_order === 'string'
+      ? checkoutConfig.buttons.place_order
+      : getDeep(checkoutConfig, 'buttons.place_order.label', 'Place Order · ₹{total}');
+    document.getElementById('btn_submit_label').value = submitLabel;
+    document.getElementById('btn_loading_text').value = getDeep(checkoutConfig, 'buttons.place_order.loading_text', 'Processing Sacred Order...');
+    document.getElementById('btn_coupon_label').value = getDeep(checkoutConfig, 'buttons.apply_coupon.label', 'APPLY');
+
+    renderFieldsList();
+    renderTrustList();
+    renderLivePreview();
+  }
+
+  // Render Fields List in Tab 1
+  function renderFieldsList() {
+    const container = document.getElementById('fieldsListContainer');
+    const fields = checkoutConfig.fields || [];
+    document.getElementById('fieldCountBadge').textContent = fields.length;
+
+    let html = '';
+    fields.forEach((f, idx) => {
+      const isCustom = !['name', 'email', 'phone', 'address', 'city', 'pincode'].includes(f.key || f.id);
+      html += `
+        <div class="cb-field-card ${f.enabled ? '' : 'inactive'}">
+          <div class="cb-field-top">
+            <div class="cb-field-title-area">
+              <span class="cb-field-name">${f.label || f.id}</span>
+              <span class="cb-field-tag">[${f.key || f.id}]</span>
+              <span class="cb-field-type-badge">${f.type || 'text'}</span>
+              ${f.required ? '<span class="cb-field-req-badge">Required (*)</span>' : '<span style="font-size:0.7rem; color:#64748b;">Optional</span>'}
+            </div>
+            <div class="cb-field-actions">
+              <button type="button" class="cb-icon-btn" title="Move Up" onclick="moveField(${idx}, -1)" ${idx === 0 ? 'disabled style="opacity:0.3;"' : ''}>▲</button>
+              <button type="button" class="cb-icon-btn" title="Move Down" onclick="moveField(${idx}, 1)" ${idx === fields.length - 1 ? 'disabled style="opacity:0.3;"' : ''}>▼</button>
+              ${isCustom ? `<button type="button" class="cb-icon-btn danger" title="Delete Custom Field" onclick="deleteField(${idx})">🗑️</button>` : ''}
+            </div>
+          </div>
+
+          <div class="cb-field-grid">
+            <div>
+              <label class="cb-label">Label</label>
+              <input type="text" class="cb-input" value="${f.label || ''}" oninput="updateFieldProp(${idx}, 'label', this.value)">
+            </div>
+            <div>
+              <label class="cb-label">Placeholder</label>
+              <input type="text" class="cb-input" value="${f.placeholder || ''}" oninput="updateFieldProp(${idx}, 'placeholder', this.value)">
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; padding-top:6px; border-top:1px dashed #e2e8f0;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.78rem; cursor:pointer;">
+              <input type="checkbox" ${f.enabled ? 'checked' : ''} onchange="updateFieldProp(${idx}, 'enabled', this.checked)"> 
+              <strong>Active on Checkout</strong>
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.78rem; cursor:pointer;">
+              <input type="checkbox" ${f.required ? 'checked' : ''} onchange="updateFieldProp(${idx}, 'required', this.checked)"> 
+              <span>Mandatory / Required</span>
+            </label>
+          </div>
+        </div>
+      `;
+    });
+    container.innerHTML = html;
+  }
+
+  function updateFieldProp(idx, prop, val) {
+    checkoutConfig.fields[idx][prop] = val;
+    renderLivePreview();
+  }
+
+  function moveField(idx, dir) {
+    const targetIdx = idx + dir;
+    if (targetIdx < 0 || targetIdx >= checkoutConfig.fields.length) return;
+    const temp = checkoutConfig.fields[idx];
+    checkoutConfig.fields[idx] = checkoutConfig.fields[targetIdx];
+    checkoutConfig.fields[targetIdx] = temp;
+    renderFieldsList();
+    renderLivePreview();
+  }
+
+  function deleteField(idx) {
+    if (!confirm('Are you sure you want to remove this custom field?')) return;
+    checkoutConfig.fields.splice(idx, 1);
+    renderFieldsList();
+    renderLivePreview();
+  }
+
+  function renderTrustList() {
+    const container = document.getElementById('trustListContainer');
+    const messages = checkoutConfig.trust_messages || [];
+    let html = '';
+    messages.forEach((m, idx) => {
+      html += `
+        <div class="cb-field-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="font-weight:700; font-size:0.85rem;">Badge #${idx + 1}</span>
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.78rem;">
+              <input type="checkbox" ${m.enabled ? 'checked' : ''} onchange="checkoutConfig.trust_messages[${idx}].enabled = this.checked; renderLivePreview();"> Active
+            </label>
+          </div>
+          <input type="text" class="cb-input" value="${m.text || ''}" oninput="checkoutConfig.trust_messages[${idx}].text = this.value; renderLivePreview();">
+        </div>
+      `;
+    });
+    container.innerHTML = html;
+  }
+
+  // --- Real-time Interactive Preview Renderer ---
+  function renderLivePreview() {
+    const pageCfg = checkoutConfig.page_config || {};
+    const rzpCfg = checkoutConfig.payment_methods?.razorpay || {};
+    const codCfg = checkoutConfig.payment_methods?.cod || {};
+    const polCfg = checkoutConfig.policy || {};
+    const sumCfg = checkoutConfig.order_summary || {};
+    const capCfg = checkoutConfig.captcha || {};
+
+    // Header Kicker
+    const kickerEl = document.getElementById('prevKicker');
+    if (pageCfg.kicker_visible !== false) {
+      kickerEl.style.display = 'flex';
+      kickerEl.textContent = pageCfg.kicker || '100% SACRED CHECKOUT';
+    } else {
+      kickerEl.style.display = 'none';
+    }
+
+    // Titles
+    document.getElementById('prevTitle').textContent = pageCfg.title || 'DEVOTEE & SHIPPING DETAILS';
+    document.getElementById('prevSubtitle').textContent = pageCfg.subtitle || 'डिलिव्हरीसाठी आवश्यक माहिती भरा — सुरक्षित आणि जलद डिस्पॅच.';
+
+    // Dynamic Form Fields
+    const fieldsGrid = document.getElementById('prevFieldsGrid');
+    const activeFields = (checkoutConfig.fields || []).filter(f => f.enabled !== false);
+    let fieldsHtml = '';
+
+    activeFields.forEach(f => {
+      const isFull = f.type === 'textarea' || ['name', 'address', 'shipping_address', 'full_name'].includes(f.key || f.id);
+      fieldsHtml += `
+        <div class="${isFull ? 'sg-field-col-full' : ''}">
+          <label class="sg-field-label">
+            ${f.label || f.id} ${f.required ? '<span class="req">*</span>' : ''}
+          </label>
+          ${f.type === 'textarea' ? `
+            <textarea class="sg-field-input" rows="2" placeholder="${f.placeholder || ''}" readonly></textarea>
+          ` : `
+            <input type="text" class="sg-field-input" placeholder="${f.placeholder || ''}" readonly>
+          `}
+        </div>
+      `;
+    });
+    fieldsGrid.innerHTML = fieldsHtml;
+
+    // Payment Methods
+    const rzpCard = document.getElementById('prevRzpCard');
+    const codCard = document.getElementById('prevCodCard');
+
+    if (rzpCfg.enabled !== false) {
+      rzpCard.style.display = 'flex';
+      document.getElementById('prevRzpTitle').textContent = rzpCfg.title || 'Razorpay Secure Payment';
+      document.getElementById('prevRzpBadge').textContent = rzpCfg.badge || '✓ Instant';
+      document.getElementById('prevRzpDesc').textContent = rzpCfg.description || 'UPI (GPay, PhonePe, Paytm), Credit/Debit Cards, Net Banking';
+    } else {
+      rzpCard.style.display = 'none';
+    }
+
+    if (codCfg.enabled === true) {
+      codCard.style.display = 'flex';
+      document.getElementById('prevCodTitle').textContent = codCfg.title || 'Cash on Delivery (COD)';
+      document.getElementById('prevCodBadge').textContent = codCfg.badge || '✓ Available';
+      document.getElementById('prevCodDesc').textContent = codCfg.description || 'Pay in cash upon doorstep delivery · Consecrated Packaging';
+    } else {
+      codCard.style.display = 'none';
+    }
+
+    // Return Policy Card
+    const policyBox = document.getElementById('prevPolicyBox');
+    if (polCfg.enabled !== false) {
+      policyBox.style.display = 'block';
+      document.getElementById('prevPolicyTitle').textContent = polCfg.title || '📜 Return & Product Policy:';
+      document.getElementById('prevPolicyContent').textContent = (polCfg.content || '').slice(0, 180) + '...';
+    } else {
+      policyBox.style.display = 'none';
+    }
+
+    // Consent Checkbox
+    const consentRow = document.getElementById('prevConsentRow');
+    if (polCfg.agreement_required !== false) {
+      consentRow.style.display = 'flex';
+      document.getElementById('prevConsentText').textContent = polCfg.agreement_text || 'I have read and agree to the Return Policy, Terms of Service, and sacred consecration terms.';
+    } else {
+      consentRow.style.display = 'none';
+    }
+
+    // CAPTCHA
+    const captchaBox = document.getElementById('prevCaptchaBox');
+    captchaBox.style.display = (capCfg.enabled !== false) ? 'flex' : 'none';
+
+    // Summary Calculations strictly dynamic based on Checkout Form Builder
+    const isTaxActive = sumCfg.show_tax_row !== false;
+    const isShippingActive = sumCfg.show_shipping_row !== false;
+    const gstRate = typeof sumCfg.gst_percentage !== 'undefined' ? parseFloat(sumCfg.gst_percentage) : 3;
+    const stdShipping = typeof sumCfg.shipping_charge !== 'undefined' ? parseFloat(sumCfg.shipping_charge) : 99;
+    const freeThresh = typeof sumCfg.free_shipping_threshold !== 'undefined' ? parseInt(sumCfg.free_shipping_threshold) : 999;
+
+    const baseSubtotal = 1299;
+    const taxVal = isTaxActive ? Number((baseSubtotal * (gstRate / 100)).toFixed(2)) : 0;
+    const shippingFee = isShippingActive ? ((baseSubtotal >= freeThresh) ? 0 : stdShipping) : 0;
+    const totalVal = (baseSubtotal + taxVal + shippingFee).toFixed(2);
+
+    document.getElementById('prevSumTitle').textContent = sumCfg.title || 'ORDER SUMMARY';
+    document.getElementById('prevTaxLabel').textContent = `Vedic Goods GST (${gstRate}%)`;
+    document.getElementById('prevTaxVal').textContent = `₹${taxVal.toFixed(2)}`;
+    document.getElementById('prevTaxRow').style.display = (sumCfg.show_tax_row !== false) ? 'flex' : 'none';
+    document.getElementById('prevShippingRow').style.display = (sumCfg.show_shipping_row !== false) ? 'flex' : 'none';
+    document.getElementById('prevTotalVal').textContent = `₹${Number(totalVal).toLocaleString('en-IN')}`;
+
+    // Submit Button Label
+    const submitBtn = document.getElementById('prevSubmitBtn');
+    let submitTemplate = typeof checkoutConfig?.buttons?.place_order === 'string'
+      ? checkoutConfig.buttons.place_order
+      : getDeep(checkoutConfig, 'buttons.place_order.label', 'Place Order · ₹{total}');
+    submitBtn.textContent = submitTemplate.replace('{total}', Number(totalVal).toLocaleString('en-IN'));
+
+    // Coupon Button
+    const couponLabel = getDeep(checkoutConfig, 'buttons.apply_coupon.label', 'APPLY');
+    document.getElementById('prevCouponBtn').textContent = couponLabel;
+
+    // Trust Note
+    const trustNoteEl = document.getElementById('prevTrustNote');
+    if (pageCfg.footer_trust_visible !== false) {
+      trustNoteEl.style.display = 'flex';
+      document.getElementById('prevTrustText').textContent = pageCfg.footer_trust_note || 'सर्व वस्तू शास्त्रोक्त पद्धतीने अभिमंत्रित करून वाराणसी/हरिद्वार आश्रमातून पाठवल्या जातात.';
+    } else {
+      trustNoteEl.style.display = 'none';
+    }
+  }
+
+  function selectPreviewPayment(choice) {
+    const rzpCard = document.getElementById('prevRzpCard');
+    const codCard = document.getElementById('prevCodCard');
+    if (choice === 'online') {
+      rzpCard.classList.add('active');
+      rzpCard.querySelector('input').checked = true;
+      codCard.classList.remove('active');
+      codCard.querySelector('input').checked = false;
+    } else {
+      codCard.classList.add('active');
+      codCard.querySelector('input').checked = true;
+      rzpCard.classList.remove('active');
+      rzpCard.querySelector('input').checked = false;
+    }
+  }
+
+  // --- Add Custom Field Modal ---
+  function openAddFieldModal() {
+    document.getElementById('addFieldForm').reset();
+    document.getElementById('new_field_options_row').style.display = 'none';
+    document.getElementById('addFieldModal').classList.add('show');
+  }
+  function closeAddFieldModal() {
+    document.getElementById('addFieldModal').classList.remove('show');
+  }
+  function toggleFieldOptionsInput(type) {
+    const row = document.getElementById('new_field_options_row');
+    row.style.display = ['dropdown', 'radio', 'checkbox'].includes(type) ? 'block' : 'none';
+  }
+  function saveCustomField(e) {
+    e.preventDefault();
+    const id = document.getElementById('new_field_id').value.trim();
+    const label = document.getElementById('new_field_label').value.trim();
+    const placeholder = document.getElementById('new_field_placeholder').value.trim();
+    const type = document.getElementById('new_field_type').value;
+    const required = document.getElementById('new_field_required').value === 'true';
+    const help = document.getElementById('new_field_help').value.trim();
+    const rawOptions = document.getElementById('new_field_options').value.trim();
+
+    if (!id || !label) {
+      alert('Key and Label are required.');
+      return;
+    }
+    // Check duplicates
+    if ((checkoutConfig.fields || []).some(f => (f.key || f.id) === id)) {
+      alert(`A field with key "${id}" already exists.`);
+      return;
+    }
+
+    const newField = {
+      id: id,
+      key: id,
+      label: label,
+      placeholder: placeholder,
+      type: type,
+      required: required,
+      enabled: true,
+      help_text: help,
+    };
+    if (['dropdown', 'radio', 'checkbox'].includes(type) && rawOptions) {
+      newField.options = rawOptions.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    checkoutConfig.fields.push(newField);
+    renderFieldsList();
+    renderLivePreview();
+    closeAddFieldModal();
+    showToast(`Added field "${label}". Remember to Publish Live.`);
+  }
+
+  // --- Save Draft & Publish Live Endpoints ---
+  async function saveDraft() {
+    try {
+      const res = await fetch('{{ url_for("system.checkout_builder_save_draft") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config: checkoutConfig })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Draft configuration saved.');
+        const badge = document.getElementById('cbStatusBadge');
+        badge.className = 'cb-badge draft';
+        badge.innerHTML = `● Draft (v${data.record.version})`;
+      } else {
+        showToast(data.message || 'Error saving draft', false);
+      }
+    } catch (err) {
+      showToast('Network error saving draft', false);
+    }
+  }
+
+  async function publishLive() {
+    const notes = prompt('Enter a short release note for this published version (optional):', 'Updated checkout configuration') || '';
+    try {
+      const res = await fetch('{{ url_for("system.checkout_builder_publish") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config: checkoutConfig, notes: notes })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message, true);
+        const badge = document.getElementById('cbStatusBadge');
+        badge.className = 'cb-badge published';
+        badge.innerHTML = `<span class="cb-pulse"></span> Published (v${data.record.version})`;
+        checkoutConfig.version = data.record.version;
+        checkoutConfig.status = 'published';
+      } else {
+        showToast(data.message || 'Error publishing live', false);
+      }
+    } catch (err) {
+      showToast('Network error publishing live', false);
+    }
+  }
+
+  async function restoreDefaults() {
+    if (!confirm('Are you sure you want to restore the canonical default checkout settings? All customizations will be reset.')) return;
+    try {
+      const res = await fetch('{{ url_for("system.checkout_builder_restore_defaults") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (data.success) {
+        checkoutConfig = JSON.parse(data.record.config_data);
+        populateEditorInputs();
+        showToast('Canonical checkout defaults restored.');
+      } else {
+        showToast(data.message || 'Error restoring defaults', false);
+      }
+    } catch (err) {
+      showToast('Network error restoring defaults', false);
+    }
+  }
+
+  // --- Version History Modal ---
+  async function openHistoryModal() {
+    document.getElementById('historyModal').classList.add('show');
+    try {
+      const res = await fetch('{{ url_for("system.checkout_builder_history") }}');
+      const data = await res.json();
+      if (data.success && data.history) {
+        versionHistory = data.history;
+      }
+    } catch (e) {}
+
+    const tbody = document.getElementById('historyTableBody');
+    if (!versionHistory || !versionHistory.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:12px; color:#64748b;">No versions recorded yet.</td></tr>';
+      return;
+    }
+    let html = '';
+    versionHistory.forEach(v => {
+      html += `
+        <tr style="border-bottom:1px solid #f1f5f9;">
+          <td style="padding:8px 6px; font-weight:700;">v${v.version}</td>
+          <td style="padding:8px 6px;">
+            <span class="cb-badge ${v.status === 'published' ? 'published' : 'draft'}" style="font-size:0.68rem; padding:2px 6px;">
+              ${v.status}
+            </span>
+          </td>
+          <td style="padding:8px 6px; color:#64748b;">${v.created_by_email || 'admin'}</td>
+          <td style="padding:8px 6px; color:#334155;">${v.publish_notes || '—'}</td>
+          <td style="padding:8px 6px; color:#64748b; font-size:0.75rem;">${v.created_at ? v.created_at.slice(0, 16).replace('T', ' ') : '—'}</td>
+          <td style="padding:8px 6px; text-align:right;">
+            <button type="button" class="cb-btn cb-btn-secondary" style="font-size:0.75rem; padding:3px 8px;" onclick="rollbackVersion(${v.id})">
+              Rollback
+            </button>
+          </td>
+        </tr>
+      `;
+    });
+    tbody.innerHTML = html;
+  }
+  function closeHistoryModal() {
+    document.getElementById('historyModal').classList.remove('show');
+  }
+  async function rollbackVersion(id) {
+    if (!confirm(`Rollback to version ID #${id}?`)) return;
+    try {
+      const res = await fetch(`{{ url_for("system.checkout_builder_page") }}/restore-version/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (data.success) {
+        checkoutConfig = JSON.parse(data.record.config_data);
+        populateEditorInputs();
+        closeHistoryModal();
+        showToast(data.message);
+      } else {
+        showToast(data.message || 'Error restoring version', false);
+      }
+    } catch (err) {
+      showToast('Network error restoring version', false);
+    }
+  }
+
+  // Initialize on page load
+  document.addEventListener('DOMContentLoaded', () => {
+    populateEditorInputs();
+  });
+</script>
+{% endblock %}

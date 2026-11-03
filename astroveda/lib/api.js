@@ -412,6 +412,17 @@ export async function getAvailabilitySlots(serviceType = null, date = null) {
 }
 
 
+/**
+ * GET /api/v1/checkout/config
+ * Retrieves published Checkout Form Builder configuration
+ */
+export async function getCheckoutConfig() {
+  return request('/checkout/config?_t=' + Date.now(), {
+    method: 'GET',
+    headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+  });
+}
+
 const api = {
   getProducts,
   getProductDetail,
@@ -442,7 +453,10 @@ const api = {
   getPaymentMode,
   getAds,
   getSections,
+  getCheckoutConfig,
 };
+
+
 
 export default api;
 

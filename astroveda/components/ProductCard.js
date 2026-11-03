@@ -64,6 +64,7 @@ export default function ProductCard({
           className={`wish${inWish ? ' on' : ''}`}
           aria-label={inWish ? 'Remove from wishlist' : 'Add to wishlist'}
           onClick={(e) => {
+              console.log('PRODUCT_CARD_BTN_ADD_CLICKED', isInStock);
             e.stopPropagation();
             toggleWishlist(product, priceNum);
           }}
@@ -127,7 +128,22 @@ export default function ProductCard({
       </div>
       <div className="prod-body">
         <p className="prod-cat">{catLabel}</p>
-        <h3 className="prod-title">{title}</h3>
+        <h3 className="prod-title">
+          {product.slug ? (
+            <a
+              href={`/product/${encodeURIComponent(product.slug)}`}
+              onClick={(e) => {
+                e.preventDefault();
+                handleCardClick();
+              }}
+              style={{ color: 'inherit', textDecoration: 'none' }}
+            >
+              {title}
+            </a>
+          ) : (
+            title
+          )}
+        </h3>
         {showDesc && <p className="prod-desc">{desc}</p>}
         <div className="prod-stars">
           <span className="s">★★★★★</span>

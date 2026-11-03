@@ -10,6 +10,20 @@
   </div>
 </div>
 
+<div class="dashboard-card" style="max-width:840px; margin-bottom:1.5rem; background:linear-gradient(135deg, var(--saffron-50), var(--gold-50)); border:1px solid var(--saffron-200); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+  <div>
+    <h3 style="font-size:1.05rem; font-weight:700; color:var(--saffron-700); margin-bottom:4px;">
+      🛒 Dynamic Checkout Form Builder
+    </h3>
+    <p style="font-size:0.85rem; color:var(--text-secondary); margin:0;">
+      Add, edit, reorder, or toggle checkout fields, payment methods, policies, and order summary with live multi-device preview.
+    </p>
+  </div>
+  <a href="{{ url_for('system.checkout_builder_page') }}" class="btn btn-primary" style="background:var(--saffron-600); border-color:var(--saffron-600); white-space:nowrap;">
+    Open Checkout Builder →
+  </a>
+</div>
+
 <div class="dashboard-card" style="max-width:840px;">
   <form method="POST" action="{{ url_for('system.settings_page') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

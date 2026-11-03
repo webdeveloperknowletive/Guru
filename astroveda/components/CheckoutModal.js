@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useStore } from '@/context/StoreContext';
 import OfflinePaymentBox from '@/components/OfflinePaymentBox';
 import ReCaptcha from '@/components/ReCaptcha';
@@ -25,10 +25,14 @@ export default function CheckoutModal() {
     businessWhatsappNumber,
     offlineInstructions,
     offlineQrCode,
+    checkoutConfig,
+    checkoutConfigLoading,
   } = useStore();
 
   const [captchaToken, setCaptchaToken] = useState('');
   const recaptchaRef = useRef(null);
+
+  // Dynamic Form State supporting standard and custom fields
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -37,6 +41,7 @@ export default function CheckoutModal() {
     pincode: '',
     city: '',
   });
+  const [customFieldValues, setCustomFieldValues] = useState({});
 
   const [couponInput, setCouponInput] = useState(couponCode || '');
   const [paymentMethodChoice, setPaymentMethodChoice] = useState('online'); // 'online' or 'cod'
@@ -44,6 +49,96 @@ export default function CheckoutModal() {
   const [localValidationErr, setLocalValidationErr] = useState('');
 
   const confirmedScrollRef = useRef(null);
+
+  // Default Fallback Configuration matching Swami Guruji canonical UI
+  const defaultPageConfig = {
+    kicker: 'Secure Checkout',
+    kicker_visible: true,
+    title: 'Devotee & Shipping Details',
+    subtitle: 'डिलिव्हरीसाठी आवश्यक माहिती भरा — सुरक्षित आणि जलद डिस्पॅच.',
+    close_btn_visible: true,
+    order_summary_title: 'Order Summary',
+    footer_trust_note: 'सर्व वस्तू शास्त्रोक्त पद्धतीने अभिमंत्रित करून वाराणसी/हरिद्वार आश्रमातून पाठवल्या जातात. 100% Consecrated & Lab Certified Sacred Products.',
+    footer_trust_visible: true,
+    ssl_message: '100% Secure Checkout · SSL 256-bit Encrypted',
+    ssl_message_visible: true,
+  };
+
+  const defaultFields = [
+    { key: 'full_name', id: 'full_name', label: 'Full Name · पूर्ण नाव', placeholder: 'e.g. Rahul Sharma', type: 'text', required: true, enabled: true },
+    { key: 'email', id: 'email', label: 'Email Address', placeholder: 'devotee@example.com', type: 'email', required: true, enabled: true },
+    { key: 'phone', id: 'phone', label: 'Mobile / WhatsApp Number', placeholder: '+91 98765 43210', type: 'tel', required: true, enabled: true },
+    { key: 'shipping_address', id: 'shipping_address', label: 'Shipping Address · पत्ता', placeholder: 'House / Flat No., Society, Landmark, Street', type: 'textarea', required: true, enabled: true },
+    { key: 'city', id: 'city', label: 'City / Town · शहर', placeholder: 'Pune, Mumbai, etc.', type: 'text', required: false, enabled: true },
+    { key: 'pincode', id: 'pincode', label: 'Pincode · पिनकोड', placeholder: 'e.g. 411001', type: 'text', required: false, enabled: true },
+  ];
+
+  const pageConfig = checkoutConfig?.page_config || defaultPageConfig;
+  const activeFields = useMemo(() => {
+    const list = checkoutConfig?.fields && checkoutConfig.fields.length > 0 ? checkoutConfig.fields : defaultFields;
+    return list.filter(f => f.enabled !== false);
+  }, [checkoutConfig]);
+
+  const rzpConfig = checkoutConfig?.payment_methods?.razorpay || {
+    enabled: true,
+    title: 'Razorpay Secure Payment',
+    description: 'UPI (GPay, PhonePe, Paytm), Credit/Debit Cards, Net Banking',
+    badge: '✓ Instant',
+  };
+
+  const codConfig = checkoutConfig?.payment_methods?.cod || {
+    enabled: true,
+    title: 'Cash on Delivery (COD)',
+    description: 'Pay in cash upon doorstep delivery · COD Available',
+    badge: '✓ Available',
+    min_order_value: 0,
+    max_order_value: 50000,
+  };
+
+  const policyConfig = checkoutConfig?.policy || {
+    enabled: true,
+    title: 'Return & Product Policy:',
+    content: 'Products listed on this website are offered under the applicable payment options. Products are generally non-returnable and non-exchangeable once purchased. However, customers should contact customer support regarding products that are delivered damaged, defective, incorrect, counterfeit, or materially different from their advertised description. Any refunds, replacements, or other remedies will be handled in accordance with applicable consumer protection laws and the published product policy.',
+    agreement_required: true,
+    agreement_text: 'I have read and agree to the Return Policy, Terms of Service, and understand that sacred consecrated products are non-returnable except for damaged, defective, or incorrect deliveries.',
+    agreement_error: 'कृपया पुढे जाण्यासाठी रिटर्न व रिफंड पॉलिसी मान्य करा (Please accept the Return and Refund policy to proceed).',
+  };
+
+  const captchaConfig = checkoutConfig?.captcha || {
+    enabled: true,
+    provider: 'recaptcha_v2',
+    error_message: 'Please complete the CAPTCHA verification (कृपया कॅप्चा पूर्ण करा).',
+  };
+
+  const summaryConfig = checkoutConfig?.order_summary || {
+    title: 'Order Summary',
+    show_thumbnails: true,
+    show_quantity: true,
+    show_tax_row: true,
+    show_shipping_row: true,
+    show_coupon_row: true,
+    show_trust_note: true,
+    gst_percentage: 3,
+  };
+
+  const buttonsConfig = checkoutConfig?.buttons || {
+    place_order: {
+      label: 'Complete Sacred Order · ₹{total}',
+      loading_text: 'Processing Sacred Order...',
+    },
+    apply_coupon: {
+      label: 'Apply',
+    },
+  };
+
+  // Ensure selected payment choice aligns with enabled methods
+  useEffect(() => {
+    if (rzpConfig.enabled === false && codConfig.enabled !== false) {
+      setPaymentMethodChoice('cod');
+    } else if (codConfig.enabled === false && rzpConfig.enabled !== false) {
+      setPaymentMethodChoice('online');
+    }
+  }, [rzpConfig.enabled, codConfig.enabled]);
 
   // Auto-focus the confirmation container for keyboard scrolling and accessibility
   useEffect(() => {
@@ -74,10 +169,33 @@ export default function CheckoutModal() {
 
   if (!checkoutOpen) return null;
 
-  const handleFieldChange = (e) => {
-    const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+  const handleFieldChange = (key, value) => {
+    if (['name', 'full_name'].includes(key)) {
+      setForm(prev => ({ ...prev, name: value }));
+    } else if (['email', 'customer_email'].includes(key)) {
+      setForm(prev => ({ ...prev, email: value }));
+    } else if (['phone', 'mobile', 'whatsapp_number'].includes(key)) {
+      setForm(prev => ({ ...prev, phone: value }));
+    } else if (['address', 'shipping_address'].includes(key)) {
+      setForm(prev => ({ ...prev, address: value }));
+    } else if (['city'].includes(key)) {
+      setForm(prev => ({ ...prev, city: value }));
+    } else if (['pincode', 'postal_code'].includes(key)) {
+      setForm(prev => ({ ...prev, pincode: value }));
+    } else {
+      setCustomFieldValues(prev => ({ ...prev, [key]: value }));
+    }
     setLocalValidationErr('');
+  };
+
+  const getFieldValue = (key) => {
+    if (['name', 'full_name'].includes(key)) return form.name;
+    if (['email', 'customer_email'].includes(key)) return form.email;
+    if (['phone', 'mobile', 'whatsapp_number'].includes(key)) return form.phone;
+    if (['address', 'shipping_address'].includes(key)) return form.address;
+    if (['city'].includes(key)) return form.city;
+    if (['pincode', 'postal_code'].includes(key)) return form.pincode;
+    return customFieldValues[key] !== undefined ? customFieldValues[key] : '';
   };
 
   const handleApplyCoupon = (e) => {
@@ -106,52 +224,91 @@ export default function CheckoutModal() {
       return;
     }
 
-    if (!form.name.trim()) {
-      setLocalValidationErr('कृपया तुमचे पूर्ण नाव प्रविष्ट करा (Please enter your full name)');
-      return;
-    }
-    if (!form.email.trim() || !form.email.includes('@')) {
-      setLocalValidationErr('कृपया वैध ईमेल पत्ता प्रविष्ट करा (Please enter a valid email address)');
-      return;
-    }
-    if (!form.phone.trim() || form.phone.replace(/[^\d]/g, '').length < 10) {
-      setLocalValidationErr('कृपया वैध 10-अंकी मोबाइल नंबर प्रविष्ट करा (Please enter a valid phone number)');
-      return;
-    }
-    const fullAddress = `${form.address.trim()}, ${form.city ? form.city.trim() + ', ' : ''}${form.pincode ? 'PIN: ' + form.pincode.trim() : ''}`.replace(/^, |, $/g, '');
-    if (!form.address.trim()) {
-      setLocalValidationErr('कृपया संपूर्ण डिलिव्हरी पत्ता प्रविष्ट करा (Please enter your delivery address)');
-      return;
-    }
+    // Dynamic Validation against Active Fields
+    for (const f of activeFields) {
+      const fKey = f.key || f.id;
+      const fLabel = f.label || fKey;
+      const val = String(getFieldValue(fKey) || '').trim();
 
-    if (!policyAccepted) {
-      setLocalValidationErr('कृपया पुढे जाण्यासाठी रिटर्न व रिफंड पॉलिसी मान्य करा (Please accept the Return and Refund policy to proceed).');
-      return;
-    }
+      if (f.required && !val) {
+        setLocalValidationErr(f.error_message || `कृपया ${fLabel} प्रविष्ट करा (${fLabel} is required).`);
+        return;
+      }
 
-    if (!captchaToken) {
-      setLocalValidationErr('Please complete the CAPTCHA verification (कृपया कॅप्चा पूर्ण करा).');
-      setTimeout(() => {
-        const captchaEl = document.getElementById('recaptcha-checkout');
-        if (captchaEl) {
-          captchaEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (val) {
+        if (f.type === 'email' && !val.includes('@')) {
+          setLocalValidationErr('कृपया वैध ईमेल पत्ता प्रविष्ट करा (Please enter a valid email address)');
+          return;
         }
-      }, 50);
-      return;
+        if (f.type === 'tel' || f.type === 'phone' || fKey === 'phone') {
+          if (val.replace(/[^\d]/g, '').length < 10) {
+            setLocalValidationErr('कृपया वैध 10-अंकी मोबाइल नंबर प्रविष्ट करा (Please enter a valid 10-digit phone number)');
+            return;
+          }
+        }
+        if (f.min_length && val.length < f.min_length) {
+          setLocalValidationErr(`${fLabel} must be at least ${f.min_length} characters.`);
+          return;
+        }
+        if (f.max_length && val.length > f.max_length) {
+          setLocalValidationErr(`${fLabel} cannot exceed ${f.max_length} characters.`);
+          return;
+        }
+      }
     }
 
+    // Return policy acceptance check
+    if (policyConfig.enabled !== false && policyConfig.agreement_required !== false) {
+      if (!policyAccepted) {
+        setLocalValidationErr(policyConfig.agreement_error || 'कृपया पुढे जाण्यासाठी रिटर्न व रिफंड पॉलिसी मान्य करा (Please accept the Return and Refund policy to proceed).');
+        return;
+      }
+    }
+
+    // Dynamic CAPTCHA enforcement
+    if (captchaConfig.enabled === true) {
+      if (!captchaToken) {
+        setLocalValidationErr(captchaConfig.error_message || 'Please complete the CAPTCHA verification (कृपया कॅप्चा पूर्ण करा).');
+        setTimeout(() => {
+          const captchaEl = document.getElementById('recaptcha-checkout');
+          if (captchaEl) {
+            captchaEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 50);
+        return;
+      }
+    }
+
+    // COD order limits verification
+    if (paymentMethodChoice === 'cod' && paymentMode === 'online') {
+      const totalNum = Number(serverCart.total_amount || 0);
+      if (codConfig.min_order_value && totalNum < codConfig.min_order_value) {
+        setLocalValidationErr(`Cash on Delivery requires a minimum order of ₹${codConfig.min_order_value}.`);
+        return;
+      }
+      if (codConfig.max_order_value && totalNum > codConfig.max_order_value) {
+        setLocalValidationErr(`Cash on Delivery is limited to orders up to ₹${codConfig.max_order_value}.`);
+        return;
+      }
+    }
+
+    const fullAddress = `${form.address.trim()}${form.city ? ', ' + form.city.trim() : ''}${form.pincode ? ', PIN: ' + form.pincode.trim() : ''}`.replace(/^, |, $/g, '');
     const selectedMethod = paymentMode === 'offline' ? 'WhatsApp Order' : (paymentMethodChoice === 'cod' ? 'COD' : 'Razorpay');
 
     const res = await submitCheckout({
-      name: form.name,
-      email: form.email,
-      phone: form.phone,
-      address: fullAddress,
+      name: form.name.trim() || 'Devotee',
+      email: form.email.trim(),
+      phone: form.phone.trim(),
+      address: fullAddress || 'Address on file',
+      city: form.city.trim(),
+      pincode: form.pincode.trim(),
+      custom_fields: customFieldValues,
       payment_method: selectedMethod,
-      policy_accepted: true,
+      policy_accepted: policyAccepted,
       policy_version: 'v1.0-2026',
-      recaptcha_token: captchaToken,
+      recaptcha_token: captchaToken || null,
     });
+
     if (!res || !res.success) {
       recaptchaRef.current?.reset();
       setCaptchaToken('');
@@ -198,6 +355,11 @@ export default function CheckoutModal() {
     );
   };
 
+  // Format button label template (e.g. "Place Order · ₹{total}")
+  const formattedTotal = serverCart.total_amount ? Number(serverCart.total_amount).toLocaleString('en-IN') : '0';
+  const submitButtonTemplate = (typeof buttonsConfig?.place_order === 'string' ? buttonsConfig.place_order : buttonsConfig?.place_order?.label) || 'Complete Sacred Order · ₹{total}';
+  const customSubmitLabel = submitButtonTemplate.replace('{total}', formattedTotal);
+
   return (
     <div
       className="pd-modal-overlay show"
@@ -209,14 +371,16 @@ export default function CheckoutModal() {
       <div
         className={`pd-modal checkout-modal ${checkoutStep === 'confirmed' ? 'confirmed' : ''}`}
       >
-        <button
-          className="pd-close"
-          onClick={closeCheckout}
-          aria-label="Close checkout"
-          disabled={checkoutLoading}
-        >
-          ✕
-        </button>
+        {pageConfig.close_btn_visible !== false && (
+          <button
+            className="pd-close"
+            onClick={closeCheckout}
+            aria-label="Close checkout"
+            disabled={checkoutLoading}
+          >
+            ✕
+          </button>
+        )}
 
         {checkoutStep === 'confirmed' && lastOrder ? (
           /* ================= ORDER CONFIRMATION VIEW ================= */
@@ -376,18 +540,22 @@ export default function CheckoutModal() {
             </div>
           </div>
         ) : (
-          /* ================= ACTIVE CHECKOUT WORKFLOW ================= */
+          /* ================= ACTIVE DYNAMIC CHECKOUT WORKFLOW ================= */
           <>
             {/* Left: Devotee & Shipping Form */}
             <div className="checkout-form-col">
               <div style={{ marginBottom: '20px' }}>
-                <span className="kicker">Secure Checkout</span>
+                {pageConfig.kicker_visible !== false && (
+                  <span className="kicker">{pageConfig.kicker || 'Secure Checkout'}</span>
+                )}
                 <h3 style={{ fontFamily: 'var(--serif)', fontSize: '22px', color: 'var(--cream)', margin: '4px 0 6px' }}>
-                  Devotee &amp; Shipping Details
+                  {pageConfig.title || 'Devotee & Shipping Details'}
                 </h3>
-                <p style={{ color: 'var(--muted)', fontSize: '12.5px', margin: 0 }}>
-                  डिलिव्हरीसाठी आवश्यक माहिती भरा — सुरक्षित आणि जलद डिस्पॅच.
-                </p>
+                {pageConfig.subtitle && (
+                  <p style={{ color: 'var(--muted)', fontSize: '12.5px', margin: 0 }}>
+                    {pageConfig.subtitle}
+                  </p>
+                )}
               </div>
 
               {(localValidationErr || checkoutError) && (
@@ -408,83 +576,42 @@ export default function CheckoutModal() {
 
               <form onSubmit={handleSubmit} noValidate>
                 <div className="form-grid" style={{ gap: '14px' }}>
-                  <div className="field full">
-                    <label htmlFor="chk-name">Full Name · पूर्ण नाव *</label>
-                    <input
-                      type="text"
-                      id="chk-name"
-                      name="name"
-                      value={form.name}
-                      onChange={handleFieldChange}
-                      placeholder="e.g. Rahul Sharma"
-                      required
-                    />
-                  </div>
+                  {activeFields.map((field) => {
+                    const fKey = field.key || field.id;
+                    const fLabel = field.label || fKey;
+                    const isFullWidth = field.type === 'textarea' || ['full_name', 'shipping_address', 'address'].includes(fKey);
+                    const val = getFieldValue(fKey);
 
-                  <div className="field">
-                    <label htmlFor="chk-email">Email Address *</label>
-                    <input
-                      type="email"
-                      id="chk-email"
-                      name="email"
-                      value={form.email}
-                      onChange={handleFieldChange}
-                      placeholder="devotee@example.com"
-                      required
-                    />
-                  </div>
+                    return (
+                      <div key={fKey} className={`field ${isFullWidth ? 'full' : ''}`}>
+                        <label htmlFor={`chk-${fKey}`}>
+                          {fLabel} {field.required ? '*' : ''}
+                        </label>
+                        {field.type === 'textarea' ? (
+                          <textarea
+                            id={`chk-${fKey}`}
+                            name={fKey}
+                            value={val}
+                            onChange={(e) => handleFieldChange(fKey, e.target.value)}
+                            placeholder={field.placeholder || ''}
+                            rows={2}
+                          />
+                        ) : (
+                          <input
+                            type={field.type === 'phone' ? 'tel' : (field.type || 'text')}
+                            id={`chk-${fKey}`}
+                            name={fKey}
+                            value={val}
+                            onChange={(e) => handleFieldChange(fKey, e.target.value)}
+                            placeholder={field.placeholder || ''}
+                            maxLength={field.max_length || (fKey === 'pincode' ? 6 : undefined)}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
 
-                  <div className="field">
-                    <label htmlFor="chk-phone">Mobile / WhatsApp Number *</label>
-                    <input
-                      type="tel"
-                      id="chk-phone"
-                      name="phone"
-                      value={form.phone}
-                      onChange={handleFieldChange}
-                      placeholder="+91 98765 43210"
-                      required
-                    />
-                  </div>
-
-                  <div className="field full">
-                    <label htmlFor="chk-address">Shipping Address · पत्ता *</label>
-                    <textarea
-                      id="chk-address"
-                      name="address"
-                      value={form.address}
-                      onChange={handleFieldChange}
-                      placeholder="House / Flat No., Society, Landmark, Street"
-                      rows={2}
-                      required
-                    />
-                  </div>
-
-                  <div className="field">
-                    <label htmlFor="chk-city">City / Town · शहर</label>
-                    <input
-                      type="text"
-                      id="chk-city"
-                      name="city"
-                      value={form.city}
-                      onChange={handleFieldChange}
-                      placeholder="Pune, Mumbai, etc."
-                    />
-                  </div>
-
-                  <div className="field">
-                    <label htmlFor="chk-pin">Pincode · पिनकोड</label>
-                    <input
-                      type="text"
-                      id="chk-pin"
-                      name="pincode"
-                      value={form.pincode}
-                      onChange={handleFieldChange}
-                      placeholder="e.g. 411001"
-                      maxLength={6}
-                    />
-                  </div>
-
+                  {/* Payment Method Section */}
                   <div className="field full" style={{ marginTop: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                       <label style={{ margin: 0 }}>Payment Method · पेमेंट पर्याय</label>
@@ -554,138 +681,150 @@ export default function CheckoutModal() {
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {/* Option 1: Razorpay Online */}
-                        <div
-                          onClick={() => setPaymentMethodChoice('online')}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '12px 14px',
-                            borderRadius: '8px',
-                            border: paymentMethodChoice === 'online' ? '2px solid var(--gold)' : '1px solid rgba(224, 176, 74, 0.25)',
-                            background: paymentMethodChoice === 'online' ? 'rgba(224, 176, 74, 0.12)' : 'rgba(255, 255, 255, 0.02)',
-                            fontSize: '13px',
-                            color: 'var(--cream)',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <input
-                              type="radio"
-                              name="pay_choice"
-                              checked={paymentMethodChoice === 'online'}
-                              onChange={() => setPaymentMethodChoice('online')}
-                              style={{ accentColor: 'var(--gold)', cursor: 'pointer' }}
-                            />
-                            <div>
-                              <div style={{ fontWeight: '700', color: 'var(--gold-lt)' }}>
-                                💳 Razorpay Secure Payment
-                              </div>
-                              <div style={{ fontSize: '11.5px', color: 'var(--muted)' }}>
-                                UPI (GPay, PhonePe, Paytm), Credit/Debit Cards, Net Banking
+                        {/* Option 1: Razorpay Online (Controlled by Builder) */}
+                        {rzpConfig.enabled !== false && (
+                          <div
+                            onClick={() => setPaymentMethodChoice('online')}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '12px 14px',
+                              borderRadius: '8px',
+                              border: paymentMethodChoice === 'online' ? '2px solid var(--gold)' : '1px solid rgba(224, 176, 74, 0.25)',
+                              background: paymentMethodChoice === 'online' ? 'rgba(224, 176, 74, 0.12)' : 'rgba(255, 255, 255, 0.02)',
+                              fontSize: '13px',
+                              color: 'var(--cream)',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <input
+                                type="radio"
+                                name="pay_choice"
+                                checked={paymentMethodChoice === 'online'}
+                                onChange={() => setPaymentMethodChoice('online')}
+                                style={{ accentColor: 'var(--gold)', cursor: 'pointer' }}
+                              />
+                              <div>
+                                <div style={{ fontWeight: '700', color: 'var(--gold-lt)' }}>
+                                  💳 {rzpConfig.title || 'Razorpay Secure Payment'}
+                                </div>
+                                <div style={{ fontSize: '11.5px', color: 'var(--muted)' }}>
+                                  {rzpConfig.description || 'UPI (GPay, PhonePe, Paytm), Credit/Debit Cards, Net Banking'}
+                                </div>
                               </div>
                             </div>
+                            <span style={{ fontSize: '11px', color: 'var(--gold-lt)', fontWeight: '700' }}>
+                              {rzpConfig.badge || '✓ Instant'}
+                            </span>
                           </div>
-                          <span style={{ fontSize: '11px', color: 'var(--gold-lt)', fontWeight: '700' }}>
-                            ✓ Instant
-                          </span>
-                        </div>
+                        )}
 
-                        {/* Option 2: Cash on Delivery (COD) */}
-                        <div
-                          onClick={() => setPaymentMethodChoice('cod')}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '12px 14px',
-                            borderRadius: '8px',
-                            border: paymentMethodChoice === 'cod' ? '2px solid var(--gold)' : '1px solid rgba(224, 176, 74, 0.25)',
-                            background: paymentMethodChoice === 'cod' ? 'rgba(224, 176, 74, 0.12)' : 'rgba(255, 255, 255, 0.02)',
-                            fontSize: '13px',
-                            color: 'var(--cream)',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <input
-                              type="radio"
-                              name="pay_choice"
-                              checked={paymentMethodChoice === 'cod'}
-                              onChange={() => setPaymentMethodChoice('cod')}
-                              style={{ accentColor: 'var(--gold)', cursor: 'pointer' }}
-                            />
-                            <div>
-                              <div style={{ fontWeight: '700', color: 'var(--cream)' }}>
-                                📦 Cash on Delivery (COD)
-                              </div>
-                              <div style={{ fontSize: '11.5px', color: 'var(--muted)' }}>
-                                Pay in cash upon doorstep delivery · COD Available
+                        {/* Option 2: Cash on Delivery (Controlled by Builder) */}
+                        {codConfig.enabled !== false && (
+                          <div
+                            onClick={() => setPaymentMethodChoice('cod')}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '12px 14px',
+                              borderRadius: '8px',
+                              border: paymentMethodChoice === 'cod' ? '2px solid var(--gold)' : '1px solid rgba(224, 176, 74, 0.25)',
+                              background: paymentMethodChoice === 'cod' ? 'rgba(224, 176, 74, 0.12)' : 'rgba(255, 255, 255, 0.02)',
+                              fontSize: '13px',
+                              color: 'var(--cream)',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <input
+                                type="radio"
+                                name="pay_choice"
+                                checked={paymentMethodChoice === 'cod'}
+                                onChange={() => setPaymentMethodChoice('cod')}
+                                style={{ accentColor: 'var(--gold)', cursor: 'pointer' }}
+                              />
+                              <div>
+                                <div style={{ fontWeight: '700', color: 'var(--cream)' }}>
+                                  📦 {codConfig.title || 'Cash on Delivery (COD)'}
+                                </div>
+                                <div style={{ fontSize: '11.5px', color: 'var(--muted)' }}>
+                                  {codConfig.description || 'Pay in cash upon doorstep delivery · COD Available'}
+                                </div>
                               </div>
                             </div>
+                            <span style={{ fontSize: '11px', color: '#10b981', fontWeight: '700' }}>
+                              {codConfig.badge || '✓ Available'}
+                            </span>
                           </div>
-                          <span style={{ fontSize: '11px', color: '#10b981', fontWeight: '700' }}>
-                            ✓ Available
-                          </span>
-                        </div>
+                        )}
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Mandatory Return Policy & Consecrated Goods Notice */}
-                <div
-                  style={{
-                    marginTop: '14px',
-                    marginBottom: '12px',
-                    padding: '12px 14px',
-                    borderRadius: '8px',
-                    background: 'rgba(224, 176, 74, 0.05)',
-                    border: '1px solid rgba(224, 176, 74, 0.2)',
-                    fontSize: '11.5px',
-                    color: 'var(--muted)',
-                    lineHeight: '1.5',
-                  }}
-                >
-                  <strong style={{ color: 'var(--gold-lt)', display: 'block', marginBottom: '4px' }}>
-                    📜 Return &amp; Product Policy:
-                  </strong>
-                  Products listed on this website are offered under the applicable payment options, including Cash on Delivery wherever available. Products are generally non-returnable and non-exchangeable once purchased. However, customers should contact customer support regarding products that are delivered damaged, defective, incorrect, counterfeit, or materially different from their advertised description. Any refunds, replacements, or other remedies will be handled in accordance with applicable consumer protection laws and the published product policy.
-                </div>
-
-                {/* Explicit Unchecked Policy Acceptance Checkbox */}
-                <div style={{ marginBottom: '14px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                  <input
-                    type="checkbox"
-                    id="chk-policy-accept"
-                    checked={policyAccepted}
-                    onChange={(e) => {
-                      setPolicyAccepted(e.target.checked);
-                      setLocalValidationErr('');
+                {/* Return Policy Card (Controlled by Builder) */}
+                {policyConfig.enabled !== false && (
+                  <div
+                    style={{
+                      marginTop: '14px',
+                      marginBottom: '12px',
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                      background: 'rgba(224, 176, 74, 0.05)',
+                      border: '1px solid rgba(224, 176, 74, 0.2)',
+                      fontSize: '11.5px',
+                      color: 'var(--muted)',
+                      lineHeight: '1.5',
                     }}
-                    style={{ marginTop: '3px', accentColor: 'var(--gold)', cursor: 'pointer', width: '16px', height: '16px', flexShrink: 0 }}
-                  />
-                  <label
-                    htmlFor="chk-policy-accept"
-                    style={{ fontSize: '12px', color: 'var(--cream)', lineHeight: '1.4', cursor: 'pointer' }}
                   >
-                    I have read and agree to the <strong>Return Policy</strong>, <strong>Terms of Service</strong>, and understand that sacred consecrated products are non-returnable except for damaged, defective, or incorrect deliveries.
-                  </label>
-                </div>
+                    <strong style={{ color: 'var(--gold-lt)', display: 'block', marginBottom: '4px' }}>
+                      📜 {policyConfig.title || 'Return & Product Policy:'}
+                    </strong>
+                    {policyConfig.content}
+                  </div>
+                )}
 
-                <div style={{ marginTop: '12px', marginBottom: '4px' }}>
-                  <ReCaptcha
-                    id="recaptcha-checkout"
-                    ref={recaptchaRef}
-                    onChange={setCaptchaToken}
-                    onExpired={() => setCaptchaToken('')}
-                    onError={() => setCaptchaToken('')}
-                  />
-                </div>
+                {/* Mandatory Agreement Checkbox (Controlled by Builder) */}
+                {policyConfig.agreement_required !== false && (
+                  <div style={{ marginBottom: '14px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <input
+                      type="checkbox"
+                      id="chk-policy-accept"
+                      checked={policyAccepted}
+                      onChange={(e) => {
+                        setPolicyAccepted(e.target.checked);
+                        setLocalValidationErr('');
+                      }}
+                      style={{ marginTop: '3px', accentColor: 'var(--gold)', cursor: 'pointer', width: '16px', height: '16px', flexShrink: 0 }}
+                    />
+                    <label
+                      htmlFor="chk-policy-accept"
+                      style={{ fontSize: '12px', color: 'var(--cream)', lineHeight: '1.4', cursor: 'pointer' }}
+                    >
+                      {policyConfig.agreement_text || 'I have read and agree to the Return Policy, Terms of Service, and understand that sacred consecrated products are non-returnable except for damaged, defective, or incorrect deliveries.'}
+                    </label>
+                  </div>
+                )}
 
+                {/* Google reCAPTCHA v2 (Controlled by Builder) */}
+                {captchaConfig.enabled === true && (
+                  <div style={{ marginTop: '12px', marginBottom: '4px' }}>
+                    <ReCaptcha
+                      id="recaptcha-checkout"
+                      ref={recaptchaRef}
+                      onChange={setCaptchaToken}
+                      onExpired={() => setCaptchaToken('')}
+                      onError={() => setCaptchaToken('')}
+                    />
+                  </div>
+                )}
+
+                {/* Submit Action Button (Dynamic Template & Label) */}
                 <button
                   type="submit"
                   className={paymentMode === 'offline' ? 'btn' : 'btn btn-gold'}
@@ -719,22 +858,25 @@ export default function CheckoutModal() {
                   }}
                 >
                   {checkoutLoading ? (
-                    <span>Processing Sacred Order...</span>
+                    <span>{buttonsConfig?.place_order?.loading_text || 'Processing Sacred Order...'}</span>
                   ) : paymentModeLoading ? (
                     <span>Loading Checkout Mode...</span>
                   ) : paymentModeError || !paymentMode || !['online', 'offline'].includes(paymentMode) ? (
                     <span>⚠️ Checkout Mode Unavailable</span>
                   ) : paymentMode === 'offline' ? (
-                    <span>💬 Order via WhatsApp / व्हॉट्सॲपवर ऑर्डर करा → ₹{serverCart.total_amount ? Number(serverCart.total_amount).toLocaleString('en-IN') : '0'}</span>
+                    <span>💬 Order via WhatsApp / व्हॉट्सॲपवर ऑर्डर करा → ₹{formattedTotal}</span>
                   ) : paymentMethodChoice === 'cod' ? (
-                    <span>📦 Confirm COD Order / कॅश ऑन डिलिव्हरी → ₹{serverCart.total_amount ? Number(serverCart.total_amount).toLocaleString('en-IN') : '0'}</span>
+                    <span>📦 Confirm COD Order / कॅश ऑन डिलिव्हरी → ₹{formattedTotal}</span>
                   ) : (
-                    <span>💳 Pay with Razorpay / ऑनलाइन पे करा → ₹{serverCart.total_amount ? Number(serverCart.total_amount).toLocaleString('en-IN') : '0'}</span>
+                    <span>💳 {customSubmitLabel}</span>
                   )}
                 </button>
-                <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--muted)', marginTop: '8px' }}>
-                  🔒 100% Secure Checkout · SSL 256-bit Encrypted
-                </p>
+
+                {pageConfig.ssl_message_visible !== false && (
+                  <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--muted)', marginTop: '8px' }}>
+                    🔒 {pageConfig.ssl_message || '100% Secure Checkout · SSL 256-bit Encrypted'}
+                  </p>
+                )}
               </form>
             </div>
 
@@ -742,14 +884,16 @@ export default function CheckoutModal() {
             <div className="checkout-summary-col">
               <div>
                 <div className="checkout-summary-head">
-                  <h4>Order Summary ({cart.reduce((s, it) => s + it.qty, 0)})</h4>
+                  <h4>
+                    {summaryConfig.title || 'Order Summary'} {summaryConfig.show_quantity !== false ? `(${cart.reduce((s, it) => s + it.qty, 0)})` : ''}
+                  </h4>
                 </div>
 
                 {/* Items List */}
                 <div className="checkout-items-list">
                   {cart.map((item, idx) => (
                     <div key={item.id ? `${item.id}-${idx}` : idx} className="checkout-item-row">
-                      {renderCheckoutThumb(item)}
+                      {summaryConfig.show_thumbnails !== false && renderCheckoutThumb(item)}
                       <div className="checkout-item-info">
                         <h5 className="checkout-item-title" title={item.title}>
                           {item.title}
@@ -765,33 +909,34 @@ export default function CheckoutModal() {
                   ))}
                 </div>
 
-                {/* Coupon Box */}
-                <div style={{ borderTop: '1px solid rgba(224,176,74,0.1)', paddingTop: '16px', marginBottom: '18px' }}>
-                  <form onSubmit={handleApplyCoupon} style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      type="text"
-                      placeholder="Coupon (e.g. DIWALI108)"
-                      value={couponInput}
-                      onChange={(e) => setCouponInput(e.target.value)}
-                      style={{
-                        flex: 1,
-                        background: 'rgba(255,255,255,0.04)',
-                        border: '1px solid rgba(224,176,74,0.2)',
-                        borderRadius: '6px',
-                        padding: '8px 12px',
-                        color: 'var(--cream)',
-                        fontSize: '12px',
-                        textTransform: 'uppercase',
-                      }}
-                    />
-                    <button
-                      type="submit"
-                      className="btn btn-ghost"
-                      style={{ padding: '8px 14px', fontSize: '12px' }}
-                    >
-                      Apply
-                    </button>
-                  </form>
+                {/* Coupon Box (Controlled by Builder) */}
+                {summaryConfig.show_coupon_row !== false && (
+                  <div style={{ borderTop: '1px solid rgba(224,176,74,0.1)', paddingTop: '16px', marginBottom: '18px' }}>
+                    <form onSubmit={handleApplyCoupon} style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type="text"
+                        placeholder="Coupon (e.g. DIWALI108)"
+                        value={couponInput}
+                        onChange={(e) => setCouponInput(e.target.value)}
+                        style={{
+                          flex: 1,
+                          background: 'rgba(255,255,255,0.04)',
+                          border: '1px solid rgba(224,176,74,0.2)',
+                          borderRadius: '6px',
+                          padding: '8px 12px',
+                          color: 'var(--cream)',
+                          fontSize: '12px',
+                          textTransform: 'uppercase',
+                        }}
+                      />
+                      <button
+                        type="submit"
+                        className="btn btn-ghost"
+                        style={{ padding: '8px 14px', fontSize: '12px' }}
+                      >
+                        {buttonsConfig?.apply_coupon?.label || 'Apply'}
+                      </button>
+                    </form>
                     {serverCart.coupon_applied && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', fontSize: '12px', color: 'var(--gold-lt)' }}>
                         <span>✓ Coupon &apos;{serverCart.coupon_applied.code}&apos; applied</span>
@@ -816,7 +961,8 @@ export default function CheckoutModal() {
                         </button>
                       </div>
                     )}
-                </div>
+                  </div>
+                )}
 
                 {/* Calculation Breakdown */}
                 <div style={{ borderTop: '1px solid rgba(224,176,74,0.1)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -832,17 +978,21 @@ export default function CheckoutModal() {
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--muted)' }}>
-                    <span>Vedic Goods GST (3%)</span>
-                    <span style={{ color: 'var(--cream)' }}>₹{Number(serverCart.tax_amount || 0).toLocaleString('en-IN')}</span>
-                  </div>
+                  {summaryConfig.show_tax_row !== false && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--muted)' }}>
+                      <span>Vedic Goods GST ({summaryConfig.gst_percentage || 3}%)</span>
+                      <span style={{ color: 'var(--cream)' }}>₹{Number(serverCart.tax_amount || 0).toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--muted)' }}>
-                    <span>Shipping</span>
-                    <span style={{ color: serverCart.shipping_amount === 0 ? 'var(--gold-lt)' : 'var(--cream)' }}>
-                      {serverCart.shipping_amount === 0 ? 'FREE (Orders > ₹999)' : `₹${serverCart.shipping_amount}`}
-                    </span>
-                  </div>
+                  {summaryConfig.show_shipping_row !== false && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--muted)' }}>
+                      <span>Shipping</span>
+                      <span style={{ color: serverCart.shipping_amount === 0 ? 'var(--gold-lt)' : 'var(--cream)' }}>
+                        {serverCart.shipping_amount === 0 ? 'FREE (Orders > ₹999)' : `₹${serverCart.shipping_amount}`}
+                      </span>
+                    </div>
+                  )}
 
                   <div
                     style={{
@@ -864,11 +1014,14 @@ export default function CheckoutModal() {
                 </div>
               </div>
 
-              <div style={{ marginTop: '20px', padding: '12px', borderRadius: '8px', background: 'rgba(224,176,74,0.06)', border: '1px solid rgba(224,176,74,0.1)' }}>
-                <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted)', lineHeight: '1.5' }}>
-                  🌿 सर्व वस्तू शास्त्रोक्त पद्धतीने अभिमंत्रित करून वाराणसी/हरिद्वार आश्रमातून पाठवल्या जातात. 100% Consecrated & Lab Certified Sacred Products.
-                </p>
-              </div>
+              {/* Bottom Consecration Note */}
+              {summaryConfig.show_trust_note !== false && pageConfig.footer_trust_visible !== false && (
+                <div style={{ marginTop: '20px', padding: '12px', borderRadius: '8px', background: 'rgba(224,176,74,0.06)', border: '1px solid rgba(224,176,74,0.1)' }}>
+                  <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted)', lineHeight: '1.5' }}>
+                    🌿 {pageConfig.footer_trust_note || 'सर्व वस्तू शास्त्रोक्त पद्धतीने अभिमंत्रित करून वाराणसी/हरिद्वार आश्रमातून पाठवल्या जातात. 100% Consecrated & Lab Certified Sacred Products.'}
+                  </p>
+                </div>
+              )}
             </div>
           </>
         )}

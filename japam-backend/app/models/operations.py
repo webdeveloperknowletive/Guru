@@ -27,6 +27,7 @@ class PaymentTransaction(db.Model):
     source_form = db.Column(db.String(100), default="Store Checkout", nullable=False, index=True)  # Store Checkout, Puja Booking, Consultation Booking
     form_submission_id = db.Column(db.String(100), nullable=True, index=True)
     payment_method = db.Column(db.String(50), default="Razorpay", nullable=True)
+    bank_rrn = db.Column(db.String(100), nullable=True, index=True)
     refund_status = db.Column(db.String(50), default="none", nullable=True)
     refund_amount = db.Column(db.Numeric(12, 2), default=Decimal("0.00"), nullable=True)
     error_message = db.Column(db.Text, nullable=True)
@@ -132,3 +133,34 @@ class SystemSetting(db.Model):
 
     def __repr__(self):
         return f"<SystemSetting {self.key}>"
+
+
+class CheckoutFormConfig(db.Model):
+    __tablename__ = "checkout_form_configs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    version = db.Column(db.Integer, nullable=False, default=1, index=True)
+    status = db.Column(db.String(20), default="draft", nullable=False, index=True)  # draft, published, archived
+    config_data = db.Column(db.Text, nullable=False)
+    publish_notes = db.Column(db.String(255), nullable=True)
+    created_by_id = db.Column(db.Integer, db.ForeignKey("admin_users.id", ondelete="SET NULL"), nullable=True)
+    created_by_email = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    published_at = db.Column(db.DateTime, nullable=True)
+
+    def to_dict(self):
+        import json
+        try:
+            parsed = json.loads(self.config_data)
+        except Exception:
+            parsed = {}
+        return {
+            "id": self.id,
+            "version": self.version,
+            "status": self.status,
+            "config": parsed,
+            "publish_notes": self.publish_notes,
+            "created_by_email": self.created_by_email,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "published_at": self.published_at.isoformat() if self.published_at else None,
+        }

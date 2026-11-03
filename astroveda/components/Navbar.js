@@ -68,7 +68,7 @@ export default function Navbar({ logo }) {
     }
   };
 
-  const openCart = () => { setCartOpen(true); setWishOpen(false); setDropdownOpen(false); setDrawerOpen(false); };
+  const openCart = () => { console.log('OPEN_CART_TRIGGERED'); setCartOpen(true); setWishOpen(false); setDropdownOpen(false); setDrawerOpen(false); };
   const openWish = () => { setWishOpen(true); setCartOpen(false); setDropdownOpen(false); setDrawerOpen(false); };
 
   // Track scroll position to smoothly adapt sticky navbar appearance

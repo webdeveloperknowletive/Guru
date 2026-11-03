@@ -625,6 +625,87 @@ export default async function Home() {
 
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify([
+            {
+              '@context': 'https://schema.org',
+              '@type': 'Service',
+              name: 'Janma Kundali Preparation (जन्मकुंडली निर्मिती व पत्रिका लेखन)',
+              provider: {
+                '@type': 'Organization',
+                name: 'Swami Guruji',
+                url: process.env.NEXT_PUBLIC_SITE_URL || 'https://swamiguruji.com',
+              },
+              description: 'Personalized Vedic birth-chart report with planetary placements, dashas, and traditional analysis.',
+              offers: {
+                '@type': 'Offer',
+                price: '101.00',
+                priceCurrency: 'INR',
+                availability: 'https://schema.org/InStock',
+              },
+              serviceType: 'Vedic Astrology Consultation',
+            },
+            {
+              '@context': 'https://schema.org',
+              '@type': 'Service',
+              name: 'Kundali Analysis & Guidance (पत्रिका फलादेश व ग्रहदोष मार्गदर्शन)',
+              provider: {
+                '@type': 'Organization',
+                name: 'Swami Guruji',
+                url: process.env.NEXT_PUBLIC_SITE_URL || 'https://swamiguruji.com',
+              },
+              description: 'In-depth horoscope reading, dosha assessment, career/marriage guidance, and practical Vedic remedies.',
+              offers: {
+                '@type': 'Offer',
+                price: '101.00',
+                priceCurrency: 'INR',
+                availability: 'https://schema.org/InStock',
+              },
+              serviceType: 'Vedic Astrology Consultation',
+            },
+            {
+              '@context': 'https://schema.org',
+              '@type': 'FAQPage',
+              mainEntity: [
+                {
+                  '@type': 'Question',
+                  name: 'Why choose Swami Guruji for Vedic traditions and rituals?',
+                  acceptedAnswer: {
+                    '@type': 'Answer',
+                    text: 'A Vedic and spiritual tradition spanning three generations. A commitment to carry forward the legacy of traditional rituals, sacrificial rites (yajnas), and religious ceremonies.',
+                  },
+                },
+                {
+                  '@type': 'Question',
+                  name: 'What qualifications and guidance does Guruji provide for Kundali analysis?',
+                  acceptedAnswer: {
+                    '@type': 'Answer',
+                    text: 'Qualified in Jyotish Bhaskar, Guruji provides detailed Kundali analysis, study-based astrological guidance, and traditional remedies tailored to individual needs.',
+                  },
+                },
+                {
+                  '@type': 'Question',
+                  name: 'Are spiritual products, Rudraksha, and Yantras authentic and energised?',
+                  acceptedAnswer: {
+                    '@type': 'Answer',
+                    text: 'Explore authentic Rudraksha, gemstones, Yantras, and spiritual products. Selected Yantras and Rudraksha can be ritually energised by Guruji, with personalised guidance on their proper use and care according to Vedic traditions.',
+                  },
+                },
+                {
+                  '@type': 'Question',
+                  name: 'Can devotees outside Maharashtra or abroad book services?',
+                  acceptedAnswer: {
+                    '@type': 'Answer',
+                    text: 'Serving yajmans across Maharashtra, India, and abroad through traditional Vedic pujas, spiritual guidance, and convenient online services.',
+                  },
+                },
+              ],
+            },
+          ]),
+        }}
+      />
       <TopBar
         banners={topbarBanners}
         contactLink={topbarContactLink}

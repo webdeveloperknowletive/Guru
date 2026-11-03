@@ -5,9 +5,9 @@ export default function Footer({ logo, footerText }) {
   const { openContact, openTracking } = useStore();
   const logoSrc = logo || '/swami-guruji-logo-cropped.jpg';
 
-  const brandDesc = footerText?.brand_desc || 'परंपरेतून मार्गदर्शन, श्रद्धेतून समाधान. 25 वर्षांहून अधिक अनुभव — पूजा, ज्योतिष, रत्न, रुद्राक्ष, यंत्र आणि ब्रेसलेट.';
+  const brandDesc = footerText?.brand_desc || 'Guidance through tradition, contentment through faith. Over 25 years of experience — Pujas, astrology, gemstones, Rudraksha, Yantras, and bracelets.';
   const shloka = footerText?.shloka || '॥ सर्वे भवन्तु सुखिनः ॥';
-  const waUrl = footerText?.whatsapp_url || 'https://wa.me/919000000000';
+  const waUrl = footerText?.whatsapp_url || 'https://wa.me/919623117545';
 
   return (
     <footer id="contact">
@@ -55,25 +55,27 @@ export default function Footer({ logo, footerText }) {
           </div>
           <p className="dev">{shloka}</p>
         </div>
+
         <div className="foot-col">
           <h5>Quick Links</h5>
           <ul>
-            <li><a href="#top">Home</a></li>
-            <li><a href="#shop">Shop</a></li>
-            <li><a href="#puja">Puja Services</a></li>
-            <li><a href="#jyotish">Jyotish Consultation</a></li>
-            <li><a href="#about">About</a></li>
+            <li><a href="#top" className="foot-link">Home</a></li>
+            <li><a href="#shop" className="foot-link">Shop</a></li>
+            <li><a href="#puja" className="foot-link">Puja Services</a></li>
+            <li><a href="#jyotish" className="foot-link">Jyotish Consultation</a></li>
+            <li><a href="#about" className="foot-link">About</a></li>
             <li>
               <button
                 type="button"
                 onClick={openContact}
-                style={{ background: 'none', border: 'none', color: 'inherit', font: 'inherit', cursor: 'pointer', padding: 0 }}
+                className="foot-link"
               >
                 Contact Us
               </button>
             </li>
           </ul>
         </div>
+
         <div className="foot-col">
           <h5>Customer Support</h5>
           <ul>
@@ -81,9 +83,10 @@ export default function Footer({ logo, footerText }) {
               <button
                 type="button"
                 onClick={() => openTracking()}
-                style={{ background: 'none', border: 'none', color: 'var(--gold-lt)', font: 'inherit', cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                className="foot-link highlight"
               >
-                📦 Track Your Order
+                <span className="foot-icon">📦</span>
+                <span className="foot-label">Track Your Order</span>
               </button>
             </li>
             <li>
@@ -97,9 +100,10 @@ export default function Footer({ logo, footerText }) {
                     openTracking();
                   }
                 }}
-                style={{ background: 'none', border: 'none', color: 'inherit', font: 'inherit', cursor: 'pointer', padding: 0 }}
+                className="foot-link"
               >
-                🔄 Sacred Return &amp; Refund Policy
+                <span className="foot-icon">🔄</span>
+                <span className="foot-label">Sacred Return &amp; Refund Policy</span>
               </button>
             </li>
             <li>
@@ -111,9 +115,10 @@ export default function Footer({ logo, footerText }) {
                     window.openDpdpPolicy('privacy');
                   }
                 }}
-                style={{ background: 'none', border: 'none', color: 'inherit', font: 'inherit', cursor: 'pointer', padding: 0 }}
+                className="foot-link"
               >
-                🛡️ Privacy Policy (DPDP Act)
+                <span className="foot-icon">🛡️</span>
+                <span className="foot-label">Privacy Policy (DPDP Act)</span>
               </button>
             </li>
             <li>
@@ -125,23 +130,46 @@ export default function Footer({ logo, footerText }) {
                     window.openDpdpPolicy('cookies');
                   }
                 }}
-                style={{ background: 'none', border: 'none', color: 'inherit', font: 'inherit', cursor: 'pointer', padding: 0 }}
+                className="foot-link"
               >
-                ⚙️ Cookie Preferences
+                <span className="foot-icon">⚙️</span>
+                <span className="foot-label">Cookie Preferences</span>
               </button>
             </li>
-            <li><a href="#about">About Spiritual Consecration</a></li>
+            <li>
+              <a href="#about" className="foot-link">
+                <span className="foot-icon">🪔</span>
+                <span className="foot-label">About Spiritual Consecration</span>
+              </a>
+            </li>
           </ul>
         </div>
+
         <div className="foot-col">
           <h5>Connect</h5>
           <ul>
-            <li><a href="#">📷 Instagram</a></li>
-            <li><a href="#">📘 Facebook</a></li>
-            <li><a href="https://wa.me/919623117545" target="_blank" rel="noopener noreferrer">📲 WhatsApp</a></li>
+            <li>
+              <a href="#" className="foot-link">
+                <span className="foot-icon">📷</span>
+                <span className="foot-label">Instagram</span>
+              </a>
+            </li>
+            <li>
+              <a href="#" className="foot-link">
+                <span className="foot-icon">📘</span>
+                <span className="foot-label">Facebook</span>
+              </a>
+            </li>
+            <li>
+              <a href="https://wa.me/919623117545" target="_blank" rel="noopener noreferrer" className="foot-link">
+                <span className="foot-icon">📲</span>
+                <span className="foot-label">WhatsApp</span>
+              </a>
+            </li>
           </ul>
         </div>
       </div>
+
       <div className="foot-back-to-top">
         <button
           type="button"
@@ -155,34 +183,32 @@ export default function Footer({ logo, footerText }) {
           <span>Back to Top ↑</span>
         </button>
       </div>
-      <div className="foot-bottom" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-        <span>© 2026 Swami Guruji · परंपरेतून मार्गदर्शन · श्रद्धेतून समाधान (DPDP Act, 2023 India Compliant)</span>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+
+      <div className="foot-bottom">
+        <span className="foot-copy">© 2026 Swami Guruji · परंपरेतून मार्गदर्शन · श्रद्धेतून समाधान (DPDP Act, 2023 India Compliant)</span>
+        <div className="foot-bottom-links">
           <button
             type="button"
             onClick={() => typeof window !== 'undefined' && window.openDpdpPolicy && window.openDpdpPolicy('privacy')}
-            style={{ background: 'none', border: 'none', color: 'rgba(255, 255, 255, 0.65)', cursor: 'pointer', padding: 0, fontSize: '12px' }}
           >
             Privacy Policy
           </button>
-          <span>·</span>
+          <span className="sep">·</span>
           <button
             type="button"
             onClick={() => typeof window !== 'undefined' && window.openDpdpPolicy && window.openDpdpPolicy('return')}
-            style={{ background: 'none', border: 'none', color: 'rgba(255, 255, 255, 0.65)', cursor: 'pointer', padding: 0, fontSize: '12px' }}
           >
             Return Policy
           </button>
-          <span>·</span>
+          <span className="sep">·</span>
           <button
             type="button"
             onClick={() => typeof window !== 'undefined' && window.openDpdpPolicy && window.openDpdpPolicy('cookies')}
-            style={{ background: 'none', border: 'none', color: 'rgba(255, 255, 255, 0.65)', cursor: 'pointer', padding: 0, fontSize: '12px' }}
           >
             Cookie Settings
           </button>
         </div>
-        <span>॥ कालः क्रीडति गच्छति ॥</span>
+        <span className="foot-shloka">॥ कालः क्रीडति गच्छति ॥</span>
       </div>
     </footer>
   );

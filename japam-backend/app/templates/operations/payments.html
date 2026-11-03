@@ -129,6 +129,11 @@
                 🆔 {{ txn.gateway_payment_id }}
               </div>
             {% endif %}
+            {% if txn.bank_rrn %}
+              <div style="font-family:monospace; font-size:0.70rem; color:#0369a1; margin-top:2px;" title="Bank RRN / UTR">
+                🏦 RRN: {{ txn.bank_rrn }}
+              </div>
+            {% endif %}
           </td>
           <td>
             <div>
@@ -192,6 +197,10 @@
             {% elif txn.status == 'refunded' %}
               <span class="badge badge-cancelled" style="font-size:0.72rem;">
                 Refunded
+              </span>
+            {% elif txn.status in ('cancelled', 'payment_cancelled') %}
+              <span class="badge badge-cancelled" style="font-size:0.72rem; background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;">
+                Cancelled
               </span>
             {% elif txn.status == 'failed' or txn.status == 'cod_failed_returned' %}
               <span class="badge badge-cancelled" style="font-size:0.72rem;">

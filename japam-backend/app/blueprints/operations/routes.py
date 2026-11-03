@@ -49,6 +49,7 @@ def payments_list():
                 PaymentTransaction.form_submission_id.ilike(search_pattern),
                 PaymentTransaction.gateway_payment_id.ilike(search_pattern),
                 PaymentTransaction.gateway_order_id.ilike(search_pattern),
+                PaymentTransaction.bank_rrn.ilike(search_pattern),
                 PaymentTransaction.item_summary.ilike(search_pattern),
             )
         )

@@ -1,7 +1,7 @@
 'use client';
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { findProduct, getAllProducts } from '@/lib/products';
-import { calculateCart, checkoutOrder, createRazorpayOrder, verifyPayment, recordPaymentFailure, getPaymentMode } from '@/lib/api';
+import { calculateCart, checkoutOrder, createRazorpayOrder, verifyPayment, recordPaymentFailure, getPaymentMode, getCheckoutConfig } from '@/lib/api';
 import { getTranslation } from '@/lib/translations';
 import { recordEvent } from '@/lib/analytics';
 
@@ -29,6 +29,7 @@ export function loadRazorpayScript() {
 const StoreContext = createContext(null);
 
 export function StoreProvider({ children }) {
+
 
 
   const [cart, setCart] = useState(() => {
@@ -142,21 +143,70 @@ export function StoreProvider({ children }) {
     }
   }, []);
 
-  // Fetch store payment mode on mount and periodically sync
+  // Authoritative Dynamic Checkout Form Configuration
+  const [checkoutConfig, setCheckoutConfig] = useState(null);
+  const [checkoutConfigLoading, setCheckoutConfigLoading] = useState(true);
+
+  const refreshCheckoutConfig = useCallback(async () => {
+    try {
+      setCheckoutConfigLoading(true);
+      const res = await getCheckoutConfig();
+      if (res && res.success && res.config) {
+        setCheckoutConfig(res.config);
+      }
+    } catch (err) {
+      console.warn('Could not load dynamic checkout config, using defaults:', err);
+    } finally {
+      setCheckoutConfigLoading(false);
+    }
+  }, []);
+
+  // Fetch store payment mode and dynamic checkout configuration on mount
   useEffect(() => {
     let isMounted = true;
     refreshPaymentMode();
+    refreshCheckoutConfig();
     const interval = setInterval(() => {
-      if (isMounted) refreshPaymentMode();
-    }, 20000);
+      if (isMounted) {
+        refreshPaymentMode();
+        refreshCheckoutConfig();
+      }
+    }, 10000);
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [refreshPaymentMode]);
+  }, [refreshPaymentMode, refreshCheckoutConfig]);
 
-  // Sync cart to localStorage
+  const cartLoadedRef = useRef(false);
+
+  // Restore saved cart and wishlist on mount
   useEffect(() => {
+    try {
+      const savedCart = localStorage.getItem('astroveda_cart_v2');
+      if (savedCart) {
+        const parsed = JSON.parse(savedCart);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setCart(parsed);
+        }
+      }
+      const savedWish = localStorage.getItem('astroveda_wishlist_v2');
+      if (savedWish) {
+        const parsed = JSON.parse(savedWish);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setWishlist(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Error restoring state from storage:', e);
+    } finally {
+      cartLoadedRef.current = true;
+    }
+  }, []);
+
+  // Sync cart to localStorage only after initial restoration
+  useEffect(() => {
+    if (!cartLoadedRef.current) return;
     try {
       localStorage.setItem('astroveda_cart_v2', JSON.stringify(cart));
     } catch (e) {
@@ -164,8 +214,9 @@ export function StoreProvider({ children }) {
     }
   }, [cart]);
 
-  // Sync wishlist to localStorage
+  // Sync wishlist to localStorage only after initial restoration
   useEffect(() => {
+    if (!cartLoadedRef.current) return;
     try {
       localStorage.setItem('astroveda_wishlist_v2', JSON.stringify(wishlist));
     } catch (e) {
@@ -242,26 +293,43 @@ export function StoreProvider({ children }) {
         quantity: item.qty,
       }));
 
+      const sumCfg = checkoutConfig?.order_summary || {};
+      const isTaxActive = sumCfg.show_tax_row !== false;
+      const isShippingActive = sumCfg.show_shipping_row !== false;
+      const gstPct = typeof sumCfg.gst_percentage !== 'undefined' ? Number(sumCfg.gst_percentage) : 3;
+      const freeThresh = typeof sumCfg.free_shipping_threshold !== 'undefined' ? Number(sumCfg.free_shipping_threshold) : 999;
+      const stdShipping = typeof sumCfg.shipping_charge !== 'undefined' ? Number(sumCfg.shipping_charge) : 99;
+
       try {
         const res = await calculateCart(payloadItems, couponCode);
         if (!isCancelled) {
+          const sub = Number(res.subtotal) || 0;
+          const disc = Number(res.discount_amount) || 0;
+          const taxable = Math.max(0, sub - disc);
+          const tax = isTaxActive ? (typeof res.tax_amount !== 'undefined' ? Number(res.tax_amount) : Math.round(taxable * (gstPct / 100) * 100) / 100) : 0;
+          let ship = 0;
+          if (isShippingActive) {
+            ship = typeof res.shipping_amount !== 'undefined' ? Number(res.shipping_amount) : (taxable >= freeThresh ? 0 : stdShipping);
+          }
+          const tot = taxable + tax + ship;
+
           setServerCart({
-            subtotal: res.subtotal,
-            discount_amount: res.discount_amount || 0,
+            subtotal: sub,
+            discount_amount: disc,
             coupon_applied: res.coupon_applied || null,
-            tax_amount: res.tax_amount || 0,
-            shipping_amount: res.shipping_amount || 0,
-            total_amount: res.total_amount,
+            tax_amount: tax,
+            shipping_amount: ship,
+            total_amount: tot,
             loading: false,
             error: null,
           });
         }
       } catch (err) {
         if (!isCancelled) {
-          // Graceful client fallback if API is temporarily unavailable
+          // Graceful client fallback dynamically matching Checkout Form Builder settings
           const clientSubtotal = cart.reduce((s, it) => s + (Number(it.price) || 0) * it.qty, 0);
-          const clientTax = Math.round(clientSubtotal * 0.03 * 100) / 100;
-          const clientShipping = clientSubtotal >= 999 ? 0 : 99;
+          const clientTax = isTaxActive ? Math.round(clientSubtotal * (gstPct / 100) * 100) / 100 : 0;
+          const clientShipping = isShippingActive ? (clientSubtotal >= freeThresh ? 0 : stdShipping) : 0;
           setServerCart({
             subtotal: clientSubtotal,
             discount_amount: 0,
@@ -281,7 +349,7 @@ export function StoreProvider({ children }) {
     return () => {
       isCancelled = true;
     };
-  }, [cart, couponCode]);
+  }, [cart, couponCode, checkoutConfig]);
 
   const showToast = useCallback((msg) => {
     setToast({ show: true, msg });
@@ -292,6 +360,7 @@ export function StoreProvider({ children }) {
    * Add product by canonical backend ID or title
    */
   const addToCart = useCallback((productOrTitle, rawPrice) => {
+    console.log('ADDTOCART_CALLED', productOrTitle);
     let canonical = null;
     if (typeof productOrTitle === 'object' && productOrTitle !== null) {
       canonical = productOrTitle;
@@ -429,6 +498,16 @@ export function StoreProvider({ children }) {
       }
     }
     setProductModal({ show: true, product: prod, title: titleStr, activeImageIdx: selectedIdx });
+
+    // Synchronize browser URL with canonical product slug without full page reload
+    if (typeof window !== 'undefined' && prod?.slug) {
+      const currentPath = window.location.pathname;
+      if (currentPath === '/' || currentPath === '') {
+        try {
+          window.history.pushState({ isProductModal: true, slug: prod.slug }, '', `/product/${encodeURIComponent(prod.slug)}`);
+        } catch {}
+      }
+    }
     recordEvent({
       type: 'modal_open',
       path: typeof window !== 'undefined' ? window.location.pathname : '/',
@@ -440,7 +519,31 @@ export function StoreProvider({ children }) {
 
   const closeProductModal = useCallback(() => {
     setProductModal({ show: false, product: null, title: null });
+
+    // Revert browser URL to root if closed from modal state
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/product/')) {
+      try {
+        if (window.history.state?.isProductModal) {
+          window.history.back();
+        } else {
+          window.history.pushState(null, '', '/');
+        }
+      } catch {
+        window.history.pushState(null, '', '/');
+      }
+    }
   }, []);
+
+  // Handle browser back and forward navigation for product modal
+  useEffect(() => {
+    const handlePopState = () => {
+      if (productModal.show) {
+        setProductModal({ show: false, product: null, title: null });
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [productModal.show]);
 
   const openTracking = useCallback((orderNumber = '', token = '', email = '') => {
     setTrackingModal({ show: true, orderNumber, token, email });
@@ -485,7 +588,8 @@ export function StoreProvider({ children }) {
     setCheckoutStep('form');
     setCheckoutOpen(true);
     refreshPaymentMode();
-  }, [refreshPaymentMode]);
+    refreshCheckoutConfig();
+  }, [refreshPaymentMode, refreshCheckoutConfig]);
 
   const closeCheckout = useCallback(() => {
     setCheckoutOpen(false);
@@ -516,10 +620,13 @@ export function StoreProvider({ children }) {
       : (customerData.payment_method === 'COD' ? 'COD' : 'Razorpay');
 
     const payload = {
-      customer_name: customerData.name.trim(),
-      customer_email: customerData.email.trim(),
-      customer_phone: customerData.phone.trim(),
-      shipping_address: customerData.address.trim(),
+      customer_name: (customerData.name || '').trim(),
+      customer_email: (customerData.email || '').trim(),
+      customer_phone: (customerData.phone || '').trim(),
+      shipping_address: (customerData.address || '').trim(),
+      city: (customerData.city || '').trim(),
+      pincode: (customerData.pincode || '').trim(),
+      custom_fields: customerData.custom_fields || {},
       payment_method: effectivePaymentMethod,
       payment_mode: isOffline ? 'offline' : 'online',
       policy_accepted: customerData.policy_accepted !== false,
@@ -597,8 +704,14 @@ export function StoreProvider({ children }) {
         if (serverCart.discount_amount > 0) {
           waMsgLines.push(`Coupon Discount: -₹${Number(serverCart.discount_amount).toLocaleString('en-IN')}`);
         }
-        waMsgLines.push(`GST (3%): ₹${Number(serverCart.tax_amount || 0).toLocaleString('en-IN')}`);
-        waMsgLines.push(`Shipping: ${serverCart.shipping_amount === 0 ? 'FREE' : `₹${serverCart.shipping_amount}`}`);
+        if (serverCart.tax_amount > 0) {
+          const sumCfg = checkoutConfig?.order_summary || {};
+          const gstPct = typeof sumCfg.gst_percentage !== 'undefined' ? sumCfg.gst_percentage : 3;
+          waMsgLines.push(`GST (${gstPct}%): ₹${Number(serverCart.tax_amount).toLocaleString('en-IN')}`);
+        }
+        if (checkoutConfig?.order_summary?.show_shipping_row !== false) {
+          waMsgLines.push(`Shipping: ${serverCart.shipping_amount === 0 ? 'FREE' : `₹${serverCart.shipping_amount}`}`);
+        }
         waMsgLines.push(`*Total Amount: ₹${Number(serverCart.total_amount || result.total_amount || 0).toLocaleString('en-IN')}*`);
         waMsgLines.push('━━━━━━━━━━━━━━━━━━━━━');
         waMsgLines.push('💳 *Payment Status:* Offline Payment Pending');
@@ -767,6 +880,22 @@ export function StoreProvider({ children }) {
   const cartSubtotal = cart.reduce((s, it) => s + (Number(it.price) || 0) * it.qty, 0);
   const isInWishlist = (titleOrId) => wishlist.some(it => it.id === titleOrId || it.title === titleOrId);
 
+  // Expose store handle on window cleanly after mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.__astroveda = {
+        addToCart,
+        openCheckout,
+        closeCheckout,
+        setCart,
+        refreshCheckoutConfig,
+        getCart: () => cart,
+        getConfig: () => checkoutConfig
+      };
+      window.openCheckout = openCheckout;
+    }
+  }, [addToCart, openCheckout, closeCheckout, setCart, refreshCheckoutConfig, cart, checkoutConfig]);
+
   return (
     <StoreContext.Provider value={{
       cart, wishlist, cartOpen, wishOpen, searchOpen, drawerOpen, toast,
@@ -779,6 +908,7 @@ export function StoreProvider({ children }) {
       serverCart, couponCode, setCouponCode,
       checkoutOpen, checkoutStep, checkoutLoading, checkoutError, lastOrder,
       openCheckout, closeCheckout, submitCheckout,
+      checkoutConfig, checkoutConfigLoading, refreshCheckoutConfig,
       // Payment Mode
       paymentMode, setPaymentMode, paymentModeLoading, paymentModeError, refreshPaymentMode, businessWhatsappNumber, offlineInstructions, offlineQrCode,
       // Connected Modals & Workflows
