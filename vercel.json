@@ -1,0 +1,43 @@
+
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "web": {
+      "root": "astroveda/"
+    },
+    "api": {
+      "root": "japam-backend/",
+      "entrypoint": "wsgi:app"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": {
+        "service": "api"
+      }
+    },
+    {
+      "source": "/static/(.*)",
+      "destination": {
+        "service": "api"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "web"
+      }
+    }
+  ],
+  "daemons": {
+    "worker": {
+      "root": "japam-backend/",
+      "entrypoint": "Dockerfile",
+      "command": ["python", "worker.py"],
+      "instances": {
+        "bom1": 1
+      }
+    }
+  }
+}
