@@ -1,12 +1,15 @@
 
+
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "services": {
     "web": {
-      "root": "astroveda/"
+      "root": "astroveda/",
+      "framework": "nextjs"
     },
     "api": {
       "root": "japam-backend/",
+      "framework": "flask",
       "entrypoint": "wsgi:app"
     }
   },
@@ -29,7 +32,9 @@
         "service": "web"
       }
     }
-  ],
+  ]
+}
+
   "daemons": {
     "worker": {
       "root": "japam-backend/",
